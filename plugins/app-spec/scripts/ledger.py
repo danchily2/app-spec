@@ -199,7 +199,7 @@ class _Ledger:
                 continue
             for part in _platform_values(value):
                 item = f"{section}:{part}" if part else section
-                rows.append((item, [], norm(item) in kept or bool(part and norm(part) in kept), None))
+                rows.append((item, [section], norm(item) in kept or bool(part and norm(part) in kept), None))
         return self.count("platform", rows)
 
     def thresholds(self):

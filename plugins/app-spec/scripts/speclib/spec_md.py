@@ -400,6 +400,24 @@ def _platform_value(value):
     return str(value)
 
 
+def _kept_platform(c, plat):
+    """The platform section without dropped items: a permission by its key (kind `permission`), any other list member
+    as `<section>:<value>` and a whole section by its name (kind `platform`)."""
+    kept = {}
+    for section, value in plat.items():
+        if section != "permissions" and c.is_dropped("platform", section):
+            continue
+        if isinstance(value, list):
+            def name(v):
+                return str(v.get("key") or v.get("name") or v.get("id")) if isinstance(v, dict) else str(v)
+            if section == "permissions":
+                value = [v for v in value if not c.is_dropped("permission", name(v))]
+            else:
+                value = [v for v in value if not c.is_dropped("platform", f"{section}:{name(v)}")]
+        kept[section] = value
+    return kept
+
+
 def strings_and_platform(c):
     inv = c.inventory
     strings = inv.get("strings") if isinstance(inv.get("strings"), dict) else {}
@@ -413,11 +431,12 @@ def strings_and_platform(c):
     lines += ["", "### Analytics events", ""]
     lines += (_table(["Event", "Source"], [[_name(e, "name"), e.get("file") if isinstance(e, dict) else ""] for e in events])
               if events else ["None found."])
-    storage = _items(inv.get("storage"))
+    storage = [s for s in _items(inv.get("storage"))
+               if not (isinstance(s, dict) and c.is_dropped("storage", s.get("key") or s.get("name")))]
     lines += ["", "### Storage keys", ""]
     lines += (_table(["Kind", "Key", "Source"], [[s.get("kind"), s.get("key") or s.get("name"), s.get("file")]
                                                  for s in storage if isinstance(s, dict)]) if storage else ["None found."])
-    plat = inv.get("platform") if isinstance(inv.get("platform"), dict) else {}
+    plat = _kept_platform(c, inv.get("platform") if isinstance(inv.get("platform"), dict) else {})
     lines += ["", "### Platform", ""]
     lines += [f"- **{k}:** {_platform_value(plat[k])}" for k in sorted(plat) if plat[k]] or ["None found."]
     return lines

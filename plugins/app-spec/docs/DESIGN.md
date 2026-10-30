@@ -99,7 +99,7 @@ A re-run of `spec` regenerates every file except three. `overrides.json` is neve
 
 ```json
 {"version":1,
- "drop":[{"kind":"field|screen|useCase|endpoint|string|event","id":"...","reason":"..."}],
+ "drop":[{"kind":"field|screen|useCase|endpoint|string|event|storage|permission|platform","id":"...","reason":"..."}],
  "rename":[{"id":"...","name":"..."}],
  "ids":{"SCR-001.title":"pay.list.title"},
  "merge":[{"into":"UC-003","from":["UC-007"]}]}
@@ -109,7 +109,7 @@ A re-run of `spec` regenerates every file except three. `overrides.json` is neve
 | --- | --- |
 | `drop` | Items the spec leaves out. A dropped field is absent from Appendix A and listed in Appendix F with its reason |
 | `drop[].kind` | The class of the dropped item |
-| `drop[].id` | The id of the item: a catalog id, a string key or an event name |
+| `drop[].id` | The id of the item: a catalog id, a string key, an event name, a storage key, a permission key, or for `platform` the item as `<section>:<value>` (a whole section by its name) |
 | `drop[].reason` | Why the item is dropped. Required |
 | `rename` | New display names, by id. The id stays |
 | `ids` | Proposed accessibility ids for the new app, keyed by `<SCR id>.<element name>` |
@@ -343,18 +343,22 @@ a new one, so a renamed use case keeps its id.
 ### ledger.json and LEDGER.md
 
 ```json
-{"version":1,"classes":{"screens":{"total":4,"covered":4,"uncovered":[{"item":"DebugScreen","reason":"not user-facing"}]}},
- "thresholds":{"screens":100,"endpoints":100,"events":100,"permissions":100,"storage":100,"strings":95,"fields":95},
+{"version":1,"classes":{"screens":{"total":4,"covered":4,"withReason":1,"percent":100,"pass":true,
+                        "uncovered":[{"item":"DebugScreen","reason":"not user-facing"}]}},
+ "thresholds":{"screens":100,"endpoints":100,"events":100,"permissions":100,"storage":100,"strings":95,"fields":95,"platform":0},
  "pass":true}
 ```
 
 | Field | Meaning |
 | --- | --- |
 | `classes.<class>.total` | Inventory items in the class |
-| `classes.<class>.covered` | Items that a catalog entry references |
+| `classes.<class>.covered` | Items that a catalog entry references, plus items left out with a counting reason |
+| `classes.<class>.withReason` | How many of the covered items are left out with a reason |
+| `classes.<class>.percent` | `covered / total * 100`, 100 when the class has no items |
+| `classes.<class>.pass` | `true` when `percent` meets the class threshold. A class with no items passes |
 | `classes.<class>.uncovered[]` | Items with no reference. `reason` is `null` when no reason exists. A reason recorded by a person in `overrides.json` is free text and always counts. A reason the scripts assign themselves, which is what "in the catalog" means, must be one of `not user-facing`, `dead code`, `out of module` |
 | `thresholds` | The percentages in force |
-| `pass` | `true` when every class meets its threshold and every uncovered item has a counting reason |
+| `pass` | `true` when every class passes: (covered + covered-with-reason) / total is at least its threshold, and a class with no items passes. An uncovered item without a reason counts against its class |
 
 ### grade.json
 
@@ -467,6 +471,8 @@ is observable on screen, so a Maestro flow or a unit test can assert it. Tools s
 | --- | --- | --- |
 | Coverage of screens, endpoints, events, permissions, storage keys | 100 percent | Overridable in `app-spec.json` |
 | Coverage of string keys and fields | 95 percent | Overridable in `app-spec.json` |
+| Coverage of platform entries | 0 percent | Reported, never fails, until `app-spec.json` sets a threshold: the section is app-wide |
+| Pass rule | | A class passes when (covered + covered-with-reason) / total is at least its threshold, and a class with no items passes. The ledger passes when every class passes |
 | Reasons that let an uncovered item pass | `not user-facing`, `dead code`, `out of module` | A reason recorded by a person in `overrides.json` is free text and always counts. A reason the scripts assign themselves, which is what "in the catalog" means, must be one of these three |
 | Review passes | 2 | Range 1 to 5. Only Blocker and High findings are sent back |
 | Shard size | 9,000 non-blank lines | Without the Workflow tool: groups of up to about 25,000 lines, at most six analysts in parallel |

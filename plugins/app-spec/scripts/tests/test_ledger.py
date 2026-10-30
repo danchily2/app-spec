@@ -176,6 +176,32 @@ class TestRules(LedgerCase):
         self.assertEqual((led["storage"]["total"], led["storage"]["covered"]), (1, 1))
         self.assertEqual([u["item"] for u in led["permissions"]["uncovered"]], ["NSCameraUsageDescription"])
 
+    def test_dropped_storage_and_permission_leave_the_spec_and_count_with_their_reason(self):
+        dest = self.full()
+        edit(dest, "inventory.json", lambda d: d.update(storage=[{"kind": "userdefaults", "key": "lastPayslipId", "file": "A.swift:3"}]))
+        edit(dest, "inventory.json", lambda d: d["platform"].update(
+            permissions=[{"key": "NSCameraUsageDescription", "file": "Info.plist"}], urlSchemes=["vismapay"]))
+        before = render.spec(dest)
+        self.assertIn("lastPayslipId", before)
+        self.assertIn("NSCameraUsageDescription", before)
+        write_overrides(dest, {"drop": [
+            {"kind": "storage", "id": "lastPayslipId", "reason": "dead code"},
+            {"kind": "permission", "id": "NSCameraUsageDescription", "reason": "out of module"},
+            {"kind": "platform", "id": "urlSchemes:vismapay", "reason": "not user-facing"}]})
+        led = ledger.compute(dest)
+        self.assertTrue(led["pass"])
+        self.assertEqual(led["classes"]["storage"]["uncovered"], [{"item": "lastPayslipId", "reason": "dead code"}])
+        self.assertEqual(led["classes"]["permissions"]["uncovered"],
+                         [{"item": "NSCameraUsageDescription", "reason": "out of module"}])
+        self.assertEqual(led["classes"]["platform"]["uncovered"], [{"item": "urlSchemes:vismapay", "reason": "not user-facing"}])
+        text = render.spec(dest)
+        appendix_d = text.split("## Appendix D.")[1].split("## Appendix E.")[0]
+        appendix_f = text.split("## Appendix F.")[1]
+        for item in ("lastPayslipId", "NSCameraUsageDescription", "vismapay"):
+            self.assertNotIn(item, appendix_d)
+            self.assertIn(item, appendix_f)
+        self.assertIn("| storage | lastPayslipId | dead code |", appendix_f)
+
     def test_thresholds_come_from_the_configuration(self):
         dest = self.base()
         self.assertEqual(ledger.compute(dest)["thresholds"]["strings"], 95)
