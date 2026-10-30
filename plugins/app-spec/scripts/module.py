@@ -3,9 +3,11 @@
 
     python3 module.py <app> --module <name|path> [--module ...] --out DIR [--app-name NAME] [--contracts REPO ...]
                       [--max-lines N] [--confirmed] [--locale CODE]
+                      [--capabilities FILE --scope CAP-001,CAP-002]
 
 A --module value is a folder name (matched against package roots: Swift packages, Gradle modules, React Native screen
-and feature folders), or a folder or glob inside the app. Writes app-spec.json (a re-run updates the fields this script owns in place),
+and feature folders), or a folder or glob inside the app. With --scope, the files of the named capabilities in
+--capabilities are the core, and --module is not needed. Writes app-spec.json (a re-run updates the fields this script owns in place),
 module.json and shards/<id>.json (one file per shard, hints empty until inventory.py fills them). Exit code 2 when a
 name matches no folder or several unrelated folders. Standard library only.
 """
@@ -19,7 +21,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from speclib import detect, out, strings, touchpoints  # noqa: E402
-from speclib.common import die, git_info, now_iso, read_text, strip_comments, walk  # noqa: E402
+from speclib.common import die, git_info, load_json, now_iso, read_text, strip_comments, walk  # noqa: E402
 
 DEFAULT_MAX_LINES = 9000
 MERGE_BELOW = 300  # groups under this many lines share a shard with their neighbours
@@ -167,6 +169,45 @@ def resolve_module(app_root, stack, query):
     return _topmost(core)
 
 
+# ---------------------------------------------------------------- capabilities
+
+def scope_from_index(index_path, scope_ids, app_name):
+    """The files of the named capabilities for `app_name`, relative to the app root. Duplicates are dropped.
+
+    Order: the scope ids as given, then each capability's files. Exit 2 on an unknown id, on an app with no
+    implementation of an id, or on an index without implementations (App Fusion's compact index)."""
+    data = load_json(index_path)
+    caps = data.get("capabilities") if isinstance(data, dict) else None
+    if not isinstance(caps, list):
+        die(f"{index_path} has no capabilities list")
+    if not any(isinstance(c, dict) and "implementations" in c for c in caps):
+        die(f"no implementations in {index_path}: pass capabilities.json")
+    by_id = {c.get("id"): c for c in caps if isinstance(c, dict)}
+    files = []
+    for cap_id in scope_ids:
+        cap = by_id.get(cap_id)
+        if cap is None:
+            die(f"unknown capability {cap_id}")
+        impl = (cap.get("implementations") or {}).get(app_name)
+        if impl is None:
+            die(f"app {app_name} has no implementation of {cap_id}")
+        for rel in impl.get("files") or []:
+            if rel not in files:
+                files.append(rel)
+    return files
+
+
+def _scope_ids(text):
+    return [s.strip() for s in text.split(",") if s.strip()]
+
+
+def _scope_fields(args):
+    """The capability index path and the scope ids of this run, or (None, None) when no scope is given."""
+    if not args.scope:
+        return None, None
+    return os.path.realpath(args.capabilities), _scope_ids(args.scope)
+
+
 # ---------------------------------------------------------------- strings
 
 def load_catalog(app_root, stack):
@@ -295,14 +336,15 @@ def make_shards(app_root, files, kind, max_lines=DEFAULT_MAX_LINES):
 
 def _config(args, root, stack, contracts):
     git = git_info(root)
+    index, scope = _scope_fields(args)
     return {
         "version": 1,
         "app": {"path": root, "name": args.app_name or os.path.basename(root), "stack": stack, "commit": git["commit"],
                 "branch": git["branch"], "clean": git["clean"]},
-        "module": {"query": list(args.module), "confirmed": bool(args.confirmed)},
+        "module": {"query": list(args.module or []), "confirmed": bool(args.confirmed)},
         "contracts": contracts,
-        "capabilityIndex": None,
-        "scope": None,
+        "capabilityIndex": index,
+        "scope": scope,
         "options": {"passes": DEFAULTS["passes"], "locale": args.locale or "en", "thresholds": dict(DEFAULTS["thresholds"]),
                     "bannedNouns": list(DEFAULTS["bannedNouns"])},
         "created": now_iso().replace("+00:00", "Z"),
@@ -315,13 +357,12 @@ def _update_config(cfg, args, root, contracts):
     app = cfg.setdefault("app", {})
     app.update({"commit": git["commit"], "branch": git["branch"], "clean": git["clean"]})
     module = cfg.setdefault("module", {})
-    module["query"] = list(args.module)
+    module["query"] = list(args.module or [])
     if args.confirmed:
         module["confirmed"] = True
     module.setdefault("confirmed", False)
     cfg["contracts"] = contracts
-    cfg["capabilityIndex"] = None
-    cfg["scope"] = None
+    cfg["capabilityIndex"], cfg["scope"] = _scope_fields(args)
     if args.locale:
         cfg.setdefault("options", {})["locale"] = args.locale
     return cfg
@@ -354,7 +395,9 @@ def _write_shards(dest, shards):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("app")
-    ap.add_argument("--module", action="append", required=True, help="a folder name, folder or glob; repeat for several")
+    ap.add_argument("--module", action="append", help="a folder name, folder or glob; repeat for several (not needed with --scope)")
+    ap.add_argument("--capabilities", metavar="FILE", help="capabilities.json of an App Fusion program, read with --scope")
+    ap.add_argument("--scope", metavar="CAP-001,CAP-002", help="capability ids whose files are the core")
     ap.add_argument("--out", required=True)
     ap.add_argument("--app-name", help="short name of the app, used in header lines (default: the app folder's name)")
     ap.add_argument("--contracts", nargs="*", default=[], metavar="REPO", help="backend repositories read as contracts")
@@ -364,6 +407,10 @@ def main(argv=None):
     args = ap.parse_args(argv)
     if args.max_lines < 1:
         die("--max-lines must be at least 1")
+    if args.scope and not args.capabilities:
+        ap.error("--scope needs --capabilities")
+    if not args.module and not args.scope:
+        ap.error("--module is required unless --scope is given")
     root = os.path.realpath(args.app)
     if not os.path.isdir(root):
         die(f"{args.app} is not a folder")
@@ -372,8 +419,13 @@ def main(argv=None):
         die(f"--out {args.out} is inside the app; write the output folder outside it")
     stack = detect.detect(root)["stack"]
 
-    core_folders = resolve_module(root, stack, args.module)
-    core_files = files_under(root, stack, core_folders)
+    index, scope = _scope_fields(args)
+    if scope:
+        core_files = scope_from_index(index, scope, args.app_name or os.path.basename(root))
+        core_folders = _topmost(os.path.dirname(rel) for rel in core_files)
+    else:
+        core_folders = resolve_module(root, stack, args.module)
+        core_files = files_under(root, stack, core_folders)
     if not core_files:
         die(f"no source files under {', '.join(core_folders)}")
     keys = string_keys_for(core_files, load_catalog(root, stack), root)
@@ -390,7 +442,7 @@ def main(argv=None):
     out.save(dest, "module.json", {"version": 1, "core": core_files, "touchPoints": touch, "stringKeys": keys,
                                    "shards": entries, "loc": total})
 
-    print(f"Module {', '.join(args.module)} in {os.path.basename(root)} ({stack})")
+    print(f"Module {', '.join(args.module or scope)} in {os.path.basename(root)} ({stack})")
     print("Core folders:")
     for folder in core_folders:
         info = _folder_summary(root, stack, folder)

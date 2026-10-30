@@ -1,3 +1,5 @@
+import contextlib
+import io
 import json
 import os
 import shutil
@@ -11,6 +13,7 @@ from speclib import out, touchpoints
 import module
 
 IOS = str(FIX / "ios-app")
+INDEX = str(FIX / "capability_index.json")
 
 
 def catalog(app):
@@ -78,6 +81,37 @@ class TestModule(unittest.TestCase):
         self.assertEqual(rc, 2)
         self.assertIn("several folders match Feature: Modules/CalendarFeature, Modules/PayslipsFeature", err)
         self.assertFalse((Path(self.tmp) / "app-spec.json").exists())
+
+    def test_scope_from_index_unions_files(self):
+        files = module.scope_from_index(INDEX, ["CAP-001", "CAP-002"], "ios-app")
+        self.assertEqual(files, ["Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipListView.swift",
+                                 "EmployeeServices/Payslips/Sources/Payslips/GetPayslips.swift"])
+
+    def test_scope_unknown_capability_exits(self):
+        with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+            module.scope_from_index(INDEX, ["CAP-999"], "ios-app")
+
+    def test_cli_scope_records_index(self):
+        rc, _, _ = run_cli(["module.py", IOS, "--capabilities", INDEX, "--scope", "CAP-001", "--out", self.tmp])
+        self.assertEqual(rc, 0)
+        cfg = out.load_config(self.tmp)
+        self.assertEqual(cfg["scope"], ["CAP-001"])
+        self.assertEqual(cfg["capabilityIndex"], os.path.realpath(INDEX))
+        mod = out.load(self.tmp, "module.json")
+        self.assertEqual(mod["core"], ["Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipListView.swift"])
+
+    def test_scope_exit_messages(self):
+        rc, _, err = run_cli(["module.py", IOS, "--capabilities", INDEX, "--scope", "CAP-999", "--out", self.tmp])
+        self.assertEqual(rc, 2)
+        self.assertIn("unknown capability CAP-999", err)
+        rc, _, err = run_cli(["module.py", IOS, "--capabilities", INDEX, "--scope", "CAP-003", "--out", self.tmp])
+        self.assertEqual(rc, 2)
+        self.assertIn("app ios-app has no implementation of CAP-003", err)
+        write(self.tmp, "capability_index.json", json.dumps({"capabilities": [{"id": "CAP-001", "name": "x"}]}))
+        compact = os.path.realpath(os.path.join(self.tmp, "capability_index.json"))
+        rc, _, err = run_cli(["module.py", IOS, "--capabilities", compact, "--scope", "CAP-001", "--out", self.tmp])
+        self.assertEqual(rc, 2)
+        self.assertIn(f"no implementations in {compact}: pass capabilities.json", err)
 
     # ---- beyond the brief's seven
 

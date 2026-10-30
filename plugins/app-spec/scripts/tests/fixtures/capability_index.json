@@ -1,0 +1,31 @@
+{
+  "capabilities": [
+    {
+      "id": "CAP-001",
+      "name": "Payslip list",
+      "implementations": {
+        "ios-app": {
+          "files": ["Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipListView.swift"]
+        }
+      }
+    },
+    {
+      "id": "CAP-002",
+      "name": "Fetch payslips",
+      "implementations": {
+        "ios-app": {
+          "files": ["EmployeeServices/Payslips/Sources/Payslips/GetPayslips.swift"]
+        }
+      }
+    },
+    {
+      "id": "CAP-003",
+      "name": "Payslip list on Android",
+      "implementations": {
+        "android-app": {
+          "files": ["app/src/main/java/com/example/payslips/PayslipListScreen.kt"]
+        }
+      }
+    }
+  ]
+}
