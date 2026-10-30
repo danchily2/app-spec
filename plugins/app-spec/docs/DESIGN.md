@@ -70,7 +70,7 @@ A re-run of `spec` regenerates every file except three. `overrides.json` is neve
  "contracts":[{"path":"/abs/path","name":"me-api","commit":"<sha>"}],
  "capabilityIndex":null,
  "scope":null,
- "options":{"passes":2,"locale":"en",
+ "options":{"passes":2,"locale":"en","specName":"SPEC.md",
             "thresholds":{"screens":100,"endpoints":100,"events":100,"permissions":100,"storage":100,"strings":95,"fields":95},
             "bannedNouns":["Realm","Swinject","NotificationCenter","ViewModel","Redux","Hilt","Room"]},
  "created":"2026-10-30T09:00:00Z"}
@@ -90,6 +90,7 @@ A re-run of `spec` regenerates every file except three. `overrides.json` is neve
 | `capabilityIndex` | Path to a `capability_index.json`, or `null` |
 | `scope` | List of `CAP-NNN` ids that define the module through the capability index, or `null` |
 | `options.passes` | Most review rounds. Default 2, range 1 to 5 |
+| `options.specName` | File name of the spec inside `<out>`, as the spec skill wrote it with `--name`. Optional, default `SPEC.md`. `status.py` reads it |
 | `options.locale` | Source-language code of the strings the spec quotes. Default `en` |
 | `options.thresholds` | Coverage percent per class. See Thresholds and defaults |
 | `options.bannedNouns` | Legacy nouns the grader forbids in requirement sentences outside Appendix C |
