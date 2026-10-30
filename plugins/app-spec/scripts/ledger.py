@@ -66,6 +66,7 @@ class _Ledger:
         self.cases = [c for c in self.all_cases if (("useCase", str(c["id"])) not in self.dropped)]
         self.screens = [s for s in self.all_screens if ("screen", str(s["id"])) not in self.dropped]
         self.case_ids = {c["id"] for c in self.cases}
+        self.items = {}  # kind to every item key counted: the ids `overrides.json` can drop an item by
 
     def _catalog(self, name, key):
         data = out.load(self.dest, name)
@@ -96,6 +97,7 @@ class _Ledger:
                 dropped, reason = inherited
             if dropped or not referenced:
                 uncovered.append({"item": item, "reason": reason})
+        self.items.setdefault(kind, set()).update(seen)
         total = len(seen)
         with_reason = sum(1 for u in uncovered if u["reason"])
         covered = total - len(uncovered) + with_reason

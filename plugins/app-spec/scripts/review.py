@@ -15,8 +15,9 @@ verdicts of the current ledger.json and grade.json and the critic's findings fro
 out). It then writes REVIEW.md from review.json: the scorecard of every pass, the findings that remain after the last
 pass, and the failing ledger classes and grade checks.
 
-`questions` writes OPEN_QUESTIONS.md: every open question of prose.json, every rule question of rules.json and every
-UNKNOWN endpoint of endpoints.json, each with its id, what was searched and who can answer.
+`questions` writes OPEN_QUESTIONS.md with the entries, ids and order of the spec's section 8: the open questions of
+prose.json, then one `OQ-NNN` per endpoint the catalog leaves incomplete and one per rule below High confidence, each
+with what was searched and who can answer.
 
 `uncovered` prints, as JSON, every item ledger.json lists as uncovered without a reason, with the override `kind` and
 `id` that `accept` records for it. `accept` adds `{"kind", "id", "reason"}` to the `drop` list of overrides.json, or
@@ -32,7 +33,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from speclib import out  # noqa: E402
+from speclib import out, spec_md  # noqa: E402
 from speclib.common import die, load_json  # noqa: E402
 
 SEVERITIES = ("Blocker", "High", "Medium", "Nit")
@@ -122,26 +123,9 @@ def render_review(dest, doc):
 
 
 def questions(dest):
+    """Write OPEN_QUESTIONS.md from the same entries, ids and order as section 8 of the spec."""
     cfg = out.load_config(dest)
-    prose = _dict(out.load(dest, "prose.json", {}))
-    rows = []
-    for q in _list(prose.get("openQuestions")):
-        if isinstance(q, dict) and q.get("question"):
-            rows.append([q.get("id") or f"Q-{len(rows) + 1}", q["question"], q.get("searched") or "not recorded",
-                         q.get("owner") or "not recorded"])
-    for r in _list(_dict(out.load(dest, "rules.json", {})).get("rules")):
-        if isinstance(r, dict) and r.get("question"):
-            rows.append([r.get("id"), f"{r['question']} ({r.get('name')})", f"`{r.get('source')}`",
-                         "the product owner of " + (r.get("useCase") or "the module")])
-    for e in _list(_dict(out.load(dest, "endpoints.json", {})).get("endpoints")):
-        if isinstance(e, dict) and e.get("label") == "UNKNOWN":
-            clients = e.get("clients") or ([e["client"]] if e.get("client") else [])
-            searched = ", ".join(f"`{c.get('file')}`" for c in clients if isinstance(c, dict)) or "the module's clients"
-            if e.get("backend"):
-                searched += f", backend `{e['backend'].get('file')}`"
-            what = e.get("reason") or "no request or response type was found"
-            rows.append([e.get("id"), f"What is the contract of {e.get('method')} {e.get('path')}? {what}.", searched,
-                         "the backend team"])
+    rows = [[q["id"], q["question"], q["searched"], q["owner"]] for q in spec_md.open_question_entries(spec_md.Context(dest))]
     module = " ".join(_list(_dict(cfg.get("module")).get("query"))) or "unknown"
     lines = ["# Open questions", "", f"Module {module} of {_dict(cfg.get('app')).get('name')}. Every UNKNOWN of the spec, "
              "with what was searched and who can answer.", ""]

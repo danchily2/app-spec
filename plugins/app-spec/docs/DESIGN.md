@@ -383,9 +383,18 @@ One entry per shape check of the grader, in this order: `sections`, `rules-per-u
 `banned-nouns`, `overrides-reflected`. `detail` names every failing item, at most 20, then `and N more`. `pass` is `true`
 when every check passes.
 
-`unknowns-have-owner` fails for a line of sections 1 to 8 that holds `UNKNOWN` without the words `searched` and `owner`.
-The renderer's own placeholder `UNKNOWN — <what is missing>` is left to `prose-complete`, which fails while one remains
-before Appendix F. Citations are checked when backticked as `path:line` or `path:line-line`, where the path has a `/` or a
+`unknowns-have-owner` fails for a line of sections 1 to 8 that holds `UNKNOWN` without the words `searched` and `owner`,
+unless every `OQ-NNN` the line names as `open question OQ-NNN` is listed in section 8. The renderer writes the gaps the
+catalogs leave as `UNKNOWN (open question OQ-NNN)`: one open question per endpoint whose label is `UNKNOWN` or that has
+no auth, response fields, errors, client or backend, and one per rule below High confidence. Each such question says
+what was searched (the client files or the rule's source) and its owner, `owner of <app name>`. The ids run from
+`OQ-001` in that order after the writer's own questions, and `review.py questions` writes `OPEN_QUESTIONS.md` from the
+same list. The prose placeholder `UNKNOWN — <what is missing>` is left to `prose-complete`, which fails while one
+remains before Appendix F.
+
+`overrides-reflected` knows, besides the catalog ids, every item key the ledger counts (a screen as `<file> <name>`, a
+field as `<SCR id or file>.<slug>`, an endpoint as `METHOD /path`), so a reason recorded with `review --accept` for any
+uncovered item is a known drop. Citations are checked when backticked as `path:line` or `path:line-line`, where the path has a `/` or a
 source-file extension (a host with a port is not one). The renderer backticks every citation in prose evidence.
 
 ### review.json and REVIEW.md

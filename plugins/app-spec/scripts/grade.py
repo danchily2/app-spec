@@ -22,7 +22,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ledger import _platform_values  # noqa: E402
+from ledger import _Ledger, _platform_values  # noqa: E402
 from speclib import out  # noqa: E402
 from speclib.common import die  # noqa: E402
 from speclib.ids import norm  # noqa: E402
@@ -46,6 +46,8 @@ _NO_RULES_LINE = "UNKNOWN — no rules extracted"  # the renderer's two own line
 _NO_RULE_LINE = re.compile(r"^UNKNOWN — no rule extracted for ((?:UC|CAP)-\d{3,}(?:, (?:UC|CAP)-\d{3,})*); add a rule or write "
                            r'"' + re.escape(NO_RULE) + r'" with a citation$')
 _ROW_SPLIT = re.compile(r"(?<!\\)\|")
+_OQ_REF = re.compile(r"\bopen question (OQ-\d{3,})\b")
+_OQ_ITEM = re.compile(r"^- \*\*(OQ-\d{3,}):\*\* .*\bSearched: .*\bOwner: ")
 
 
 # ---------------------------------------------------------------- the spec as lines with a section
@@ -265,11 +267,18 @@ class _Grader:
                 found.add(number)
         return found
 
+    def _listed_questions(self):
+        """The `OQ-NNN` ids that section 8 lists as `- **OQ-NNN:** ...`."""
+        return {m.group(1) for _, t in self.spec.lines([HEADINGS[7]]) for m in [_OQ_ITEM.match(t)] if m}
+
     def unknowns_have_owner(self):
-        items, exempt = [], self._rule_placeholders()
+        items, exempt, listed = [], self._rule_placeholders(), self._listed_questions()
         for number, text in self.spec.lines(BODY):
             if "UNKNOWN" not in text or _PLACEHOLDER in text or number in exempt:
                 continue
+            refs = _OQ_REF.findall(text)
+            if refs and set(refs) <= listed:
+                continue  # a structural UNKNOWN that points at an open question with its search note and owner
             low = text.lower()
             if not (re.search(r"\bsearched\b", low) and re.search(r"\bowner\b", low)):
                 items.append(f"line {number}: {text.strip()[:70]}")
@@ -330,7 +339,10 @@ class _Grader:
                 continue
             platform.add(section)
             platform |= {f"{section}:{p}" for p in _platform_values(value)}
-        return {
+        counted = _Ledger(self.dest)
+        counted.run()
+        led = counted.items  # the ledger's own item keys, which `review --accept` records for an uncovered item
+        known = {
             "useCase": {x["id"] for x in cases} | {x["alias"] for x in cases if x.get("alias")},
             "screen": {x["id"] for x in screens.get("screens") or [] if isinstance(x, dict) and x.get("id")},
             "endpoint": {e["id"] for e in out.load(self.dest, "endpoints.json", {}).get("endpoints") or []
@@ -344,6 +356,10 @@ class _Grader:
             "permission": {named(p, "key", "name") for p in plat.get("permissions") or []} | gather("permissions"),
             "platform": platform,
         }
+        for kind, keys in led.items():
+            if kind in known:
+                known[kind] |= {str(k) for k in keys}
+        return known
 
     def _old_names(self, ident):
         """The names the use case, screen, flow or rule `ident` had before a rename, from the workflow results."""

@@ -71,7 +71,8 @@ class TestReview(unittest.TestCase):
         out.save(self.out, "prose.json", {"openQuestions": [{"id": "Q-1", "question": "Is gross shown?",
                                                              "searched": "`A.swift:3`", "owner": "payroll team"}]})
         rules = out.load(self.out, "rules.json")
-        rules["rules"][0]["question"] = "Is the limit 3 or 4?"
+        rules["rules"][0].update(question="Is the limit 3 or 4?", confidence="Medium")
+        rules["rules"][1].update(question="Asked of a High rule", confidence="High")  # High rules ask nothing
         out.save(self.out, "rules.json", rules)
         eps = out.load(self.out, "endpoints.json")
         eps["endpoints"][0]["label"] = "UNKNOWN"
@@ -81,9 +82,11 @@ class TestReview(unittest.TestCase):
         self.assertEqual(code, 0, err)
         md = read_text(self.out, "OPEN_QUESTIONS.md")
         self.assertIn("| Q-1 | Is gross shown? | `A.swift:3` | payroll team |", md)
-        self.assertIn(f"| {rules['rules'][0]['id']} | Is the limit 3 or 4?", md)
-        self.assertIn(f"| {eps['endpoints'][0]['id']} | What is the contract of", md)
-        self.assertIn("the response type is generated", md)
+        self.assertRegex(md, rf"\| OQ-\d{{3}} \| Is the limit 3 or 4\? \({rules['rules'][0]['id']}\) \| "
+                             rf"`{rules['rules'][0]['source']}` \| owner of ios-app \|")
+        self.assertNotIn("Asked of a High rule", md)
+        self.assertRegex(md, rf"\| OQ-\d{{3}} \| What are the contract \(the response type is generated\).*"
+                             rf"\({eps['endpoints'][0]['id']}\)\?")
 
     def test_uncovered_and_accept(self):
         eps = out.load(self.out, "endpoints.json")["endpoints"]

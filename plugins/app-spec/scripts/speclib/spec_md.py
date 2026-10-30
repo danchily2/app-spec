@@ -208,13 +208,75 @@ def _field_rows(fields):
             for f in fields if isinstance(f, dict)]
 
 
+def _clients(e):
+    return [x for x in (e.get("clients") or ([e["client"]] if e.get("client") else [])) if isinstance(x, dict)]
+
+
+def _endpoint_gaps(e):
+    """What the catalog does not know about endpoint `e`, as the parts of one open question."""
+    gaps = []
+    if (e.get("label") or "UNKNOWN") == "UNKNOWN":
+        gaps.append(f"the contract ({_text(e.get('reason')) or 'label UNKNOWN'})")
+    if not _text(e.get("auth")):
+        gaps.append("the auth it sends")
+    if not _field_rows(((e.get("response") or {}).get("fields")) or []):
+        gaps.append("the response fields")
+    if not [x for x in e.get("errors") or [] if isinstance(x, dict)]:
+        gaps.append("the errors it handles and what the user sees")
+    if not _clients(e):
+        gaps.append("the client that builds it")
+    if not isinstance(e.get("backend"), dict):
+        gaps.append("the backend route")
+    return gaps
+
+
+def open_question_entries(c):
+    """Every open question of section 8 and OPEN_QUESTIONS.md, in order: the writer's, then one `OQ-NNN` per endpoint
+    the catalog leaves incomplete, then one per rule below High confidence. Each is a dict with `id`, `question`,
+    `searched`, `owner` and, for the structural ones, `ref` (the endpoint or rule id the question belongs to)."""
+    if getattr(c, "_open", None) is not None:
+        return c._open
+    entries = []
+    for q in _items(c.prose.get("openQuestions")):
+        if isinstance(q, dict):
+            entries.append({"id": _text(q.get("id")) or "Q", "question": _cited(q.get("question")),
+                            "searched": _cited(q.get("searched")) or _unknown("not recorded"),
+                            "owner": _cited(q.get("owner")) or _unknown("not recorded"), "ref": None})
+    owner = f"owner of {c.app}"
+    structural = []
+    for e in c.endpoints:
+        gaps = _endpoint_gaps(e)
+        if gaps:
+            files = ", ".join(f"`{x.get('file')}`" for x in _clients(e) if x.get("file"))
+            structural.append({"question": f"What are {', '.join(gaps)} of {e['method']} {e['path']} ({e['id']})?",
+                               "searched": files or "the module's network clients", "owner": owner, "ref": e["id"]})
+    for r in c.rules:
+        if r.get("confidence") != "High" and not (r.get("useCase") and c.is_dropped("useCase", r["useCase"])):
+            question = _text(r.get("question")) or (f'Is the rule "{_text(r.get("name"))}" right as stated? Its '
+                                                     f"confidence is {r.get('confidence') or 'not recorded'}.")
+            structural.append({"question": f"{question} ({r['id']})",
+                               "searched": f"`{r.get('source')}`" if r.get("source") else "the module's code",
+                               "owner": owner, "ref": r["id"]})
+    for n, entry in enumerate(structural, 1):
+        entry["id"] = f"OQ-{n:03d}"
+    c._open = entries + structural
+    return c._open
+
+
+def _oq(c, ref):
+    """`UNKNOWN (open question OQ-NNN)` for the open question of endpoint or rule `ref`."""
+    found = next((q["id"] for q in open_question_entries(c) if q.get("ref") == ref), None)
+    return f"UNKNOWN (open question {found})" if found else _unknown("no open question recorded")
+
+
 def endpoints(c):
     lines = []
     for e in c.endpoints:
         backend = e.get("backend")
-        lines += [f"### {e['id']} — {e['method']} {e['path']} ({e.get('label') or 'UNKNOWN'})", "",
+        label = e.get("label") or "UNKNOWN"
+        lines += [f"### {e['id']} — {e['method']} {e['path']} ({_oq(c, e['id']) if label == 'UNKNOWN' else label})", "",
                   f"- **Capabilities:** {c.show(e.get('useCases') or [])}",
-                  f"- **Auth:** {_text(e.get('auth')) or _unknown('no auth recorded')}"]
+                  f"- **Auth:** {_text(e.get('auth')) or _oq(c, e['id'])}"]
         if isinstance(backend, dict) and backend.get("auth"):
             lines[-1] += f"; backend: {_text(backend['auth'])}"
         for label, key in (("Request fields", "request"), ("Response fields", "response")):
@@ -222,21 +284,21 @@ def endpoints(c):
             if rows:
                 lines += [f"- **{label}:**", ""] + _table(["Name", "Type", "Required", "Nullable"], rows) + [""]
             else:
-                lines.append(f"- **{label}:** " + ("none recorded" if key == "request" else _unknown("no response fields recorded")))
+                lines.append(f"- **{label}:** " + ("none recorded" if key == "request" else _oq(c, e["id"])))
         errors = [x for x in e.get("errors") or [] if isinstance(x, dict)]
         if errors:
             lines.append("- **Errors and UI reaction:**")
             lines += [f"  - {x.get('status')}: {_text(x.get('reaction')) or _unknown('no reaction recorded')}" for x in errors]
         else:
-            lines.append("- **Errors and UI reaction:** " + _unknown("no error handling found"))
-        clients = e.get("clients") or ([e["client"]] if e.get("client") else [])
+            lines.append("- **Errors and UI reaction:** " + _oq(c, e["id"]))
+        clients = _clients(e)
         lines.append("- **Client:** " + ("; ".join(f"`{x.get('file')}` ({x.get('type') or 'type unknown'})" for x in clients)
-                                         or _unknown("no client cited")))
+                                         or _oq(c, e["id"])))
         if isinstance(backend, dict):
             lines.append(f"- **Backend:** {backend.get('repo') or 'repository unknown'} "
                          f"`{_cite(backend.get('file'), backend.get('line'))}`")
         else:
-            lines.append("- **Backend:** " + _unknown("no backend file given or found"))
+            lines.append("- **Backend:** " + _oq(c, e["id"]))
         for d in e.get("disagreements") or []:
             if isinstance(d, dict):
                 lines.append(f"- **Disagreement on `{d.get('field')}`:** client `{d.get('client')}`, backend `{d.get('backend')}`. "
@@ -270,7 +332,11 @@ def _rule(c, r):
         lines.append(f"- **Suspected defect in the old app (do not copy):** {_text(r['suspectedDefect'])}")
     lines.append(f"- **Source:** `{r.get('source')}`" if r.get("source") else "- **Source:** " + _unknown("no source cited"))
     if r.get("confidence") != "High":
-        lines.append(f"- **Question:** {_text(r.get('question')) or _unknown('no question recorded')}")
+        oq = next((q["id"] for q in open_question_entries(c) if q.get("ref") == r["id"]), None)
+        if r.get("question") and oq:
+            lines.append(f"- **Question:** {_text(r['question'])} (open question {oq})")
+        else:
+            lines.append(f"- **Question:** {_oq(c, r['id'])}")
     return lines + [""]
 
 
@@ -330,17 +396,8 @@ def dependencies(c):
 
 
 def open_questions(c):
-    lines = []
-    for q in _items(c.prose.get("openQuestions")):
-        if isinstance(q, dict):
-            lines.append(f"- **{_text(q.get('id')) or 'Q'}:** {_cited(q.get('question'))} "
-                         f"Searched: {_cited(q.get('searched')) or _unknown('not recorded')}. "
-                         f"Owner: {_cited(q.get('owner')) or _unknown('not recorded')}.")
-    for r in c.rules:
-        if r.get("confidence") != "High" and r.get("question") and not (
-                r.get("useCase") and c.is_dropped("useCase", r["useCase"])):
-            lines.append(f"- **{r['id']}:** {_text(r['question'])} Source: `{r.get('source')}`. Owner: "
-                         + _unknown("not recorded"))
+    lines = [f"- **{q['id']}:** {q['question']} Searched: {q['searched']}. Owner: {q['owner']}."
+             for q in open_question_entries(c)]
     if lines:
         return lines
     return ["None recorded."] if c.has_prose else [_unknown("open questions not written yet")]
