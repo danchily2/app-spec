@@ -50,16 +50,16 @@ catalogs and ids.
   inventory.json, INVENTORY.md      deterministic inventory scoped to the module
   fields.json           field inventory per screen
   understand_result.json, rules_result.json   the workflows' results, as returned
-  ids.json              the id registry
+  ids.json              the id registry                              (updated in place by render.py; never regenerated)
   use-cases.json, screens.json, flows.json, rules.json, endpoints.json   the catalogs, rendered
   ledger.json, LEDGER.md            coverage per class
   grade.json            shape checks
-  review.json, REVIEW.md            the scorecard of every review pass
+  review.json, REVIEW.md            the scorecard of every review pass          (reset by `spec`; `review` appends a pass)
   SPEC.md (or --name)   the deliverable
   OPEN_QUESTIONS.md
 ```
 
-A re-run of `spec` regenerates every file except `app-spec.json` and `overrides.json`.
+A re-run of `spec` regenerates every file except three. `app-spec.json` and `overrides.json` are never touched. `ids.json` is updated in place by `render.py`: existing keys keep their ids, retired keys stay, new keys take `max + 1`, so no id is ever reused. A `spec` re-run resets `review.json` and `REVIEW.md`, and the `review` command appends one pass to them.
 
 ### app-spec.json
 
@@ -337,9 +337,9 @@ The registry that keeps ids stable. See Ids.
 | --- | --- |
 | `classes.<class>.total` | Inventory items in the class |
 | `classes.<class>.covered` | Items that a catalog entry references |
-| `classes.<class>.uncovered[]` | Items with no reference. `reason` is `null` when no reason exists |
+| `classes.<class>.uncovered[]` | Items with no reference. `reason` is `null` when no reason exists. A reason recorded by a person in `overrides.json` is free text and always counts. A reason the scripts assign themselves must be one of `not user-facing`, `dead code`, `out of module` |
 | `thresholds` | The percentages in force |
-| `pass` | `true` when every class meets its threshold and every uncovered item has a reason |
+| `pass` | `true` when every class meets its threshold and every uncovered item has a counting reason |
 
 ### grade.json
 
@@ -447,7 +447,7 @@ is observable on screen, so a Maestro flow or a unit test can assert it. Tools s
 | --- | --- | --- |
 | Coverage of screens, endpoints, events, permissions, storage keys | 100 percent | Overridable in `app-spec.json` |
 | Coverage of string keys and fields | 95 percent | Overridable in `app-spec.json` |
-| Reasons that let an uncovered item pass | `not user-facing`, `dead code`, `out of module` | Or a reason in `overrides.json` |
+| Reasons that let an uncovered item pass | `not user-facing`, `dead code`, `out of module` | A reason recorded by a person in `overrides.json` is free text and always counts. A reason the scripts assign themselves must be one of these three |
 | Review passes | 2 | Range 1 to 5. Only Blocker and High findings are sent back |
 | Shard size | 9,000 non-blank lines | Without the Workflow tool: groups of up to about 25,000 lines, at most six analysts in parallel |
 | Locale | `en` | Source-language strings quoted in the spec |
