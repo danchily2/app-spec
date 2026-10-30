@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="payslip_title">Payslips</string>
+    <string name="payslip_latest">Latest payslip</string>
+    <string name="calendar_title">Calendar</string>
+</resources>
