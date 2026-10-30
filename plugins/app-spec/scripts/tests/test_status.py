@@ -197,13 +197,38 @@ class TestStatus(unittest.TestCase):
         out.save(dest, "app-spec.json", cfg)
         os.remove(os.path.join(dest, "SPEC.md"))
         self.assertEqual(status.report(dest)["stages"]["spec"]["status"], "-")
-        self.assertIn('render.py" spec', cmd(dest))
+        self.assertTrue(cmd(dest).endswith('render.py" spec ' + dest + " --name docs/specs/payslips.md"))
         render.spec(dest, "docs/specs/payslips.md")
         settle(dest)
         stamp(dest, "docs/specs/payslips.md", 115)
         r = status.report(dest)
         self.assertEqual(r["stages"]["spec"]["status"], "done")
         self.assertIn("/app-spec:review", r["next"]["command"])
+
+    def test_spec_name_in_grade_and_stale_render_commands(self):
+        dest = self.good()
+        cfg = out.load_config(dest)
+        cfg["options"] = {"specName": "my spec.md"}
+        out.save(dest, "app-spec.json", cfg)
+        shutil.copy(os.path.join(dest, "SPEC.md"), os.path.join(dest, "my spec.md"))
+        settle(dest)
+        stamp(dest, "ledger.json", 135)
+        stamp(dest, "my spec.md", 125)
+        stamp(dest, "grade.json", 120)
+        c = cmd(dest)
+        self.assertTrue(c.endswith('grade.py" ' + dest + " --name 'my spec.md'"), c)
+        stamp(dest, "screens.json", 200)
+        c = cmd(dest)
+        self.assertTrue(c.endswith('render.py" spec ' + dest + " --name 'my spec.md'"), c)
+
+    def test_malformed_config_does_not_crash(self):
+        dest = os.path.join(self.tmp, "bad")
+        out.save(dest, "app-spec.json", {"app": "x", "module": 3, "options": []})
+        r = status.report(dest)
+        self.assertEqual(r["spec"], "SPEC.md")
+        self.assertIn("module.py", r["next"]["command"])
+        out.save(dest, "app-spec.json", {"app": {"path": 5}, "options": {"specName": 7}})
+        self.assertIn("module.py", status.report(dest)["next"]["command"])
 
     def test_spec_name_in_person_line(self):
         dest = self.good()

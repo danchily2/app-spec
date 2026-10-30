@@ -72,7 +72,8 @@ def _config(dest):
 
 
 def _spec_name(cfg):
-    name = (cfg.get("options") or {}).get("specName")
+    options = cfg.get("options")
+    name = options.get("specName") if isinstance(options, dict) else None
     return name if isinstance(name, str) and name else DEFAULT_SPEC
 
 
@@ -153,9 +154,13 @@ def _coverage(dest):
 def _next(dest, cfg, stages, stale, spec_name):
     q = shlex.quote(dest)
     skill = f"/app-spec:spec {q}"
+    name_arg = "" if spec_name == DEFAULT_SPEC else f" --name {shlex.quote(spec_name)}"  # else render and grade use SPEC.md
     if not stages["module"]["status"] == "done":
-        app = (cfg.get("app") or {}).get("path") or "<app>"
-        query = (cfg.get("module") or {}).get("query")
+        app_cfg, module_cfg = cfg.get("app"), cfg.get("module")
+        app = (app_cfg.get("path") if isinstance(app_cfg, dict) else None) or "<app>"
+        query = module_cfg.get("query") if isinstance(module_cfg, dict) else None
+        if not isinstance(app, str):
+            app = "<app>"
         modules = " ".join(f"--module {shlex.quote(str(m))}" for m in query) if isinstance(query, list) and query \
             else "--module <name>"
         return f"{script('module.py')} {shlex.quote(app) if app != '<app>' else app} {modules} --out {q}", \
@@ -171,7 +176,7 @@ def _next(dest, cfg, stages, stale, spec_name):
     if stages["contracts"]["status"] != "done":
         return f"{script('contracts.py')} {q}", "contract repositories are configured and not read yet"
     if stages["spec"]["status"] != "done":
-        return f"{script('render.py')} spec {q}", f"{spec_name} is not written yet"
+        return f"{script('render.py')} spec {q}{name_arg}", f"{spec_name} is not written yet"
     if stages["review"]["status"] != "done":
         return f"/app-spec:review {q}", "the spec has no review yet"
     # Everything exists: the first stale step in pipeline order, the review last.
@@ -183,7 +188,7 @@ def _next(dest, cfg, stages, stale, spec_name):
             return f"{script('render.py')} catalogs {q}", line
     for line in stale:
         if line.startswith("the spec predates"):
-            return f"{script('render.py')} spec {q}", line
+            return f"{script('render.py')} spec {q}{name_arg}", line
     # The review loop runs the ledger and the grader itself, so a stale review comes before their own lines.
     for line in stale:
         if line.startswith("the review"):
@@ -193,7 +198,7 @@ def _next(dest, cfg, stages, stale, spec_name):
             return f"{script('ledger.py')} {q}", line
     for line in stale:
         if line.startswith("the grade"):
-            return f"{script('grade.py')} {q}", line
+            return f"{script('grade.py')} {q}{name_arg}", line
     return f"(a person) read {spec_name}", "the spec is ready for a person"
 
 
