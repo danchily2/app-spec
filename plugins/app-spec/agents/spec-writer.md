@@ -57,8 +57,8 @@ Return **one JSON object** in exactly this shape, and nothing outside it:
   `CAP-NNN` alias the catalog shows).
 - **dependencies**: modules, sign-in, shared clients and start-page entries the module needs, out-of-scope
   neighbours, and each decision a person must make, as a question with the options the code suggests.
-- **openQuestions**: every `UNKNOWN` you write anywhere else gets one here, with an id `Q-NNN`. Rule questions and
-  `UNKNOWN` endpoints are added by the skill; do not repeat them.
+- **openQuestions**: every `UNKNOWN` you write anywhere else gets one here, with an id `Q-NNN`. The renderer adds
+  the questions of rules below High confidence and of incomplete endpoints itself, as `OQ-NNN`; do not repeat them.
 - **data**: entities the module reads and writes, local storage with its lifetime, caching and refresh.
 - **keepDrop**: one entry per use case. `keep` lists the behaviour the new app must keep, by rule (`RULE-NNN`) and
   flow (`FLOW-NNN`) id. `drop` lists implementation facts that are not requirements, each with the file it came from:

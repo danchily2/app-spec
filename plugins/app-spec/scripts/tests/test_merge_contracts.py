@@ -79,11 +79,25 @@ class TestMerge(unittest.TestCase):
 
     def test_unknown_with_reason_lowers_verified_and_keeps_the_reason(self):
         env = self.envelope("a.json", {"endpoints": [{"id": self.verified, "label": "UNKNOWN",
-                                                      "reason": "the response type is generated and not in the repo"}]})
+                                                      "reason": "the response fields are generated, not in the repo"}]})
         run_cli(["merge_contracts.py", self.out, env])
         e = endpoints(self.out)[self.verified]
         self.assertEqual(e["label"], "UNKNOWN")
-        self.assertEqual(e["reason"], "the response type is generated and not in the repo")
+        self.assertEqual(e["reason"], "the response fields are generated, not in the repo")
+
+    def test_a_reason_that_names_no_field_keeps_verified(self):
+        env = self.envelope("a.json", {"endpoints": [{"id": self.verified, "label": "UNKNOWN",
+                                                      "reason": "could not tell", "response": FIELDS}]})
+        run_cli(["merge_contracts.py", self.out, env])
+        e = endpoints(self.out)[self.verified]
+        self.assertEqual(e["label"], "VERIFIED")
+        self.assertNotIn("reason", e)
+
+    def test_a_reason_that_names_a_field_of_the_entry_lowers_verified(self):
+        env = self.envelope("a.json", {"endpoints": [{"id": self.verified, "label": "UNKNOWN", "response": FIELDS,
+                                                      "reason": "gross is decoded but never declared"}]})
+        run_cli(["merge_contracts.py", self.out, env])
+        self.assertEqual(endpoints(self.out)[self.verified]["label"], "UNKNOWN")
 
     def test_reapply_after_render_restores_the_merge_and_is_idempotent(self):
         env = self.envelope("a.json", {

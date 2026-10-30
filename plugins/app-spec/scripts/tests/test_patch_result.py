@@ -63,6 +63,30 @@ class TestPatch(unittest.TestCase):
         self.assertEqual(result["rules"][0]["priority"], "P0")
         self.assertEqual(result["rerunShards"], ["core-02"])
 
+    def test_rerun_patch_unions_evidence_and_replaces_scalars(self):
+        first = self.understand["useCases"][0]
+        partial = {"name": first["name"], "description": "from the re-run shard", "evidence": "INFERRED",
+                   "files": ["Other/Shard.swift:4"], "endpoints": ["GET /extra"], "screens": [],
+                   "strings": list(first.get("strings") or [])[:1]}
+        patch = self.write("u.json", {"useCases": [partial], "rerunShards": []})
+        code, _, err = run_cli(["patch_result.py", self.out, "understand", patch, "--rerun"])
+        self.assertEqual(code, 0, err)
+        merged = out.load(self.out, "understand_result.json")["useCases"][0]
+        self.assertEqual(merged["description"], "from the re-run shard")
+        self.assertEqual(merged["evidence"], "INFERRED")
+        for key in ("screens", "files", "endpoints", "events", "strings", "storage", "platform", "permissions"):
+            for value in first.get(key) or []:
+                self.assertIn(value, merged[key], key)  # nothing the first run found is lost
+        self.assertIn("Other/Shard.swift:4", merged["files"])
+        self.assertIn("GET /extra", merged["endpoints"])
+        self.assertEqual(len(merged["strings"]), len(set(merged["strings"])))
+
+    def test_review_patch_still_replaces(self):
+        first = self.understand["useCases"][0]
+        part = {"useCases": [{"name": first["name"], "description": "fixed", "evidence": "VERIFIED", "files": []}]}
+        run_cli(["patch_result.py", self.out, "understand", self.write("v.json", part)])
+        self.assertEqual(out.load(self.out, "understand_result.json")["useCases"][0]["files"], [])
+
     def test_bad_input_exits_2(self):
         self.assertEqual(run_cli(["patch_result.py", self.out, "other", self.write("x.json", {})])[0], 2)
         self.assertEqual(run_cli(["patch_result.py", self.out, "rules", self.write("y.json", [1])])[0], 2)

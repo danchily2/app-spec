@@ -16,7 +16,7 @@ Write the spec of one module of one app. The arguments are `$ARGUMENTS`:
 | `--contracts REPO ...` | Backend repositories read as contract sources. Read-only |
 | `--capabilities FILE --scope CAP,...` | An App Fusion `capability_index.json` for `CAP-NNN` aliases; with `--scope`, those capabilities' files are the module |
 | `--bar FILE` | A local hand-written spec the critic reads as the bar, next to the rubric. Never copied into the spec |
-| `--passes N` | Most review passes, 1 to 5. Default: the `passes` plugin option, else 2 |
+| `--passes N` | Most review passes, 1 to 5; any other value stops the run. Default: the `passes` plugin option, else 2 |
 | `--headless` | Ask nothing: take every proposal and say so in the report |
 
 Below, `OUT` is the absolute output folder, `NAME` the spec's file name, and `P` is `${CLAUDE_PLUGIN_ROOT}`.
@@ -51,16 +51,22 @@ confirmed the scope.
 Then record the options this run was given, reset the review of an earlier run, and protect the sources:
 
 ```bash
-# only when --name or --passes was given; module.py keeps these fields on a re-run
+# always: specName is NAME (SPEC.md without --name), so a name from an earlier run never lingers;
+# passes only when --passes was given, and only from 1 to 5
 python3 -c 'import json,sys; p=sys.argv[1]+"/app-spec.json"; d=json.load(open(p)); o=d.setdefault("options",{})
-if sys.argv[2]: o["specName"]=sys.argv[2]
-if sys.argv[3]: o["passes"]=int(sys.argv[3])
+o["specName"]=sys.argv[2] or "SPEC.md"
+if sys.argv[3]:
+    n=int(sys.argv[3])
+    if not 1<=n<=5: sys.exit("--passes must be from 1 to 5")
+    o["passes"]=n
 json.dump(d,open(p,"w"),indent=2,ensure_ascii=False)' OUT "<NAME or empty>" "<N or empty>"
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/review.py" reset OUT
 ```
 
+Check `--passes` before step 1: a value outside 1 to 5 stops the run with that message, before anything is written.
 The number of review passes is `--passes` when given, else the `passes` plugin option when the shell has it
-(`echo "${CLAUDE_PLUGIN_OPTION_PASSES:-}"`), else `options.passes` in `app-spec.json`, else 2.
+(`echo "${CLAUDE_PLUGIN_OPTION_PASSES:-}"`, used only when it is 1 to 5), else `options.passes` in `app-spec.json`,
+else 2.
 
 Print the deny rules a person can add as a second layer to the source write guard, with the app's path and each
 contract repository's path written out in full:
@@ -86,13 +92,15 @@ rule behind each. Show the counts.
 
 ## 3: Use cases, screens and flows
 
-Build the workflow arguments from `app-spec.json` and `module.json`:
+Build the workflow arguments from `app-spec.json` and `module.json` (with `rules` as the second argument, for step 4,
+it adds the use-case index):
 
 ```bash
 python3 -c 'import json,os,sys; o=os.path.realpath(sys.argv[1]); c=json.load(open(o+"/app-spec.json")); m=json.load(open(o+"/module.json"))
 a={"out":o,"app":{k:c["app"][k] for k in ("name","path","stack")},"shards":[dict({k:s[k] for k in ("id","kind","name","loc")},file=o+"/"+s["file"]) for s in m["shards"]]}
-if c.get("capabilityIndex"): a["capabilityIndex"]=c["capabilityIndex"]
-print(json.dumps(a))' OUT
+if c.get("capabilityIndex") and sys.argv[2:]!=["rules"]: a["capabilityIndex"]=c["capabilityIndex"]
+if sys.argv[2:]==["rules"]: a["useCaseIndex"]=o+"/use-cases.json"
+print(json.dumps(a))' OUT [rules]
 ```
 
 Say the estimate: one analyst per shard, one mapper, one referee per use case.
@@ -110,8 +118,10 @@ offer one follow-up run with `args.shards` cut to those shards (headless: run it
 `OUT/patches/understand-rerun.json` and fold it in:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/patch_result.py" OUT understand OUT/patches/understand-rerun.json
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/patch_result.py" OUT understand OUT/patches/understand-rerun.json --rerun
 ```
+
+`--rerun` merges a use case both runs found: its evidence lists become the union, so it never shrinks.
 
 **Without the Workflow tool**, run the same three stages yourself, with the prompts and schemas of
 `workflows/understand-module.js` (`FRAGMENT_SCHEMA`, `USECASES_SCHEMA`, `VERDICT_SCHEMA`):
@@ -136,9 +146,11 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/render.py" catalogs OUT
 
 ## 4: Business rules
 
-Use the same arguments plus `"useCaseIndex": "OUT/use-cases.json"`. **With the Workflow tool**, call
+Build the arguments with the step-3 command and `rules` as its second argument; it adds `useCaseIndex`, the
+real path of `OUT/use-cases.json`. **With the Workflow tool**, call
 `app-spec:extract-rules` (fallback `scriptPath: "${CLAUDE_PLUGIN_ROOT}/workflows/extract-rules.js"`), with the same
-Run ID, resume and `rerunShards` rules as step 3; fold a follow-up run in with `patch_result.py OUT rules <file>`.
+Run ID, resume and `rerunShards` rules as step 3; fold a follow-up run in with
+`patch_result.py OUT rules <file> --rerun`.
 Save the result as `OUT/rules_result.json`.
 
 **Without the Workflow tool**, give each group of shards (up to about 25,000 lines, at most six in parallel) to one

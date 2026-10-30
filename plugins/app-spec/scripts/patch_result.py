@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """Fold a partial workflow result into understand_result.json or rules_result.json.
 
-    python3 patch_result.py <out> understand|rules PATCH
+    python3 patch_result.py <out> understand|rules PATCH [--rerun]
 
 PATCH is a JSON file in the shape of the result it patches: a follow-up run over the shards a run returned in
-`rerunShards`, or the entries an agent corrected for one review finding. It may also hold `"remove": [names]`.
+`rerunShards` (pass `--rerun`), or the entries an agent corrected for one review finding. It may also hold
+`"remove": [names]`.
 
 - understand: `useCases` and `flows` are matched by normalized name, `screens` by normalized name and declaration
   file. rules: `rules` are matched by normalized name and source file. These are the keys ids.json uses, so a patched
   entry keeps its id.
-- A patch entry replaces the entry with the same key, and a new key is added at the end.
+- A patch entry replaces the entry with the same key, and a new key is added at the end. With `--rerun` the follow-up
+  run saw other shards, so a same-key entry is merged instead: each list field (screens, files, endpoints, events,
+  strings, storage, platform, permissions, states, fields ...) becomes the union of both, once each, and only the
+  scalar fields are replaced. A use case never loses evidence the first run found.
 - `remove` takes out every entry whose normalized name is listed.
 - `rejected`, `unverified` and `injectionFlags` are added once each. `rerunShards` is replaced when the patch has it
   (a follow-up run says which shards failed again) and kept when it does not.
@@ -19,6 +23,7 @@ Run `render.py catalogs <out>` afterwards. Exit code 2 when `<out>` is not an ou
 missing, or PATCH is not a JSON object. Standard library only.
 """
 
+import json
 import os
 import re
 import sys
@@ -52,8 +57,26 @@ def _add_once(items, new):
     return items
 
 
-def patch(result, part, kind):
-    """`result` with the patch `part` folded in. Return (result, replaced, added, removed)."""
+def _union(old, new):
+    """`new` over `old`: a list field holds the items of both, once each, old first; any other field is `new`'s."""
+    merged = dict(old)
+    for k, v in new.items():
+        if isinstance(v, list) and isinstance(old.get(k), list):
+            items, seen = [], set()
+            for x in old[k] + v:
+                key = json.dumps(x, sort_keys=True)
+                if key not in seen:
+                    seen.add(key)
+                    items.append(x)
+            merged[k] = items
+        else:
+            merged[k] = v
+    return merged
+
+
+def patch(result, part, kind, rerun=False):
+    """`result` with the patch `part` folded in. Return (result, replaced, added, removed). With `rerun` (a follow-up
+    run over other shards) a same-key entry keeps the evidence it had: its list fields become the union."""
     gone = {norm(n) for n in part.get("remove") or [] if isinstance(n, str)}
     replaced = added = removed = 0
     for name, key in KEYS[kind].items():
@@ -67,7 +90,7 @@ def patch(result, part, kind):
                 continue
             k = key(e)
             if k in index:
-                entries[index[k]] = e
+                entries[index[k]] = _union(entries[index[k]], e) if rerun else e
                 replaced += 1
             else:
                 index[k] = len(entries)
@@ -86,6 +109,8 @@ def patch(result, part, kind):
 
 def main(argv=None):
     args = list(sys.argv[1:] if argv is None else argv)
+    rerun = "--rerun" in args
+    args = [a for a in args if a != "--rerun"]
     if len(args) != 3 or args[1] not in KEYS:
         print(__doc__.split("\n\n")[1].strip(), file=sys.stderr)
         return 2
@@ -97,7 +122,7 @@ def main(argv=None):
     part = load_json(path, None)
     if not isinstance(part, dict):
         die(f"{path} is not a JSON object in the shape of {FILES[kind]}")
-    result, replaced, added, removed = patch(result, part, kind)
+    result, replaced, added, removed = patch(result, part, kind, rerun)
     out.save(dest, FILES[kind], result)
     print(f"{FILES[kind]}: {replaced} replaced, {added} added, {removed} removed; rerunShards "
           f"{result.get('rerunShards') or []}")

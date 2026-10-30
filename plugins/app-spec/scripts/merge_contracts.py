@@ -18,7 +18,8 @@ The merge rule, applied to each endpoint the reader returned, matched by id:
 - `request`, `response`, `errors` and `auth` are written from the reader when the reader gives them.
 - The reader's disagreements for the endpoint are added to its `disagreements` list, once each.
 - The label: a `VERIFIED` label (set by contracts.py) stays `VERIFIED`, unless the reader returns `UNKNOWN` with a
-  `reason` that states which field it could not read; then it becomes `UNKNOWN` and the reason is kept as `reason`. Any
+  `reason` that states which field it could not read (the reason says "field", or names a request or response field
+  of the entry after the merge); then it becomes `UNKNOWN` and the reason is kept as `reason`. Any
   other label can go down to the reader's label, and goes up only from `UNKNOWN` to `INFERRED` (the reader found the
   client). The reader never makes an endpoint `VERIFIED`: that needs the backend route contracts.py found.
 - An id that endpoints.json does not hold is reported on stderr and skipped.
@@ -29,6 +30,7 @@ endpoints.json is missing, or an envelope is not valid JSON in this shape. Stand
 
 import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -84,6 +86,17 @@ def label(old, new, reason):
     return new if LABELS.index(new) < LABELS.index(old) else old
 
 
+def names_a_field(reason, entry):
+    """True when `reason` is field-level: it says "field", or names a request or response field of `entry`."""
+    if not isinstance(reason, str) or not reason.strip():
+        return False
+    if re.search(r"\bfields?\b", reason, re.I):
+        return True
+    names = {f.get("name") for key in ("request", "response") for f in ((entry.get(key) or {}).get("fields") or [])
+             if isinstance(f, dict) and isinstance(f.get("name"), str) and f.get("name")}
+    return any(re.search(r"(?<![\w])" + re.escape(n) + r"(?![\w])", reason) for n in names)
+
+
 def apply(dest, result):
     """Apply `result` (the contracts_result.json shape) to endpoints.json in `dest`. Return (changed ids, unknown ids)."""
     data = out.load(dest, "endpoints.json")
@@ -100,7 +113,7 @@ def apply(dest, result):
         for key in FIELDS:
             if read.get(key) is not None:
                 entry[key] = read[key]
-        reason = read.get("reason") if isinstance(read.get("reason"), str) and read["reason"].strip() else None
+        reason = read.get("reason") if names_a_field(read.get("reason"), entry) else None
         entry["label"] = label(entry.get("label"), read.get("label"), reason)
         if entry["label"] == "UNKNOWN" and reason:
             entry["reason"] = reason.strip()
