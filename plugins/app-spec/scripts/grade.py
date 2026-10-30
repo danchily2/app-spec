@@ -1,0 +1,481 @@
+#!/usr/bin/env python3
+"""Check the shape of the spec: headings, criteria, citations, unknowns, banned nouns and the overrides.
+
+    python3 grade.py <out> [--name FILE]
+
+Reads the spec (`SPEC.md`, or `FILE` inside the output folder `<out>`), the catalogs, `overrides.json`,
+`inventory.json` and `app-spec.json`, and writes `grade.json`:
+
+    {"version": 1, "checks": [{"name", "pass", "detail"}], "pass": bool}
+
+The checks, in this order: sections, rules-per-use-case, criteria-per-use-case, criteria-numbering, citations-resolve,
+unknowns-have-owner, prose-complete, no-duplicate-use-cases, banned-nouns, overrides-reflected. `detail` names every
+failing item, at most 20, then `and N more`. Nothing here judges whether a sentence is true: that is the critic's job.
+
+Exit code 0 when every check passes, 1 when one fails, 2 when `<out>` is not an output folder or a catalog is missing.
+Standard library only; analysed code is read, never executed or written.
+"""
+
+import os
+import re
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from ledger import _platform_values  # noqa: E402
+from speclib import out  # noqa: E402
+from speclib.common import die  # noqa: E402
+from speclib.ids import norm  # noqa: E402
+from speclib.spec_md import Context, _element_rows, target  # noqa: E402
+from speclib.template import APPENDICES, AC_RE, HEADINGS  # noqa: E402
+
+CHECKS = ("sections", "rules-per-use-case", "criteria-per-use-case", "criteria-numbering", "citations-resolve",
+          "unknowns-have-owner", "prose-complete", "no-duplicate-use-cases", "banned-nouns", "overrides-reflected")
+NO_RULE = "No client-side rule; the server decides."
+MAX_DETAIL = 20
+
+BODY = HEADINGS                                            # sections 1 to 8
+NOT_COVERAGE = HEADINGS + APPENDICES[:5]                   # everything the spec says except the coverage appendix
+APPENDIX_F = APPENDICES[5]
+
+_SPAN = re.compile(r"`([^`\n]+)`")
+_CITE = re.compile(r"^(\S+?):(\d+)(?:-(\d+))?$")
+_BARE_CITE = re.compile(r"[\w@+\-./]*[\w]\.[A-Za-z0-9]{1,6}:\d+(?:-\d+)?")
+_FILE_WORD = re.compile(r"\S*/\S*|[\w@+\-.]+\.(?:swift|kt|kts|java|ts|tsx|js|jsx|m|mm|h|dart|xml|json|plist|gradle|cs|py)\b")
+_PLACEHOLDER = "UNKNOWN — "
+_RULE_PLACEHOLDERS = ("UNKNOWN — no rule extracted for ", "UNKNOWN — no rules extracted")  # rules-per-use-case judges these
+_ROW_SPLIT = re.compile(r"(?<!\\)\|")
+
+
+# ---------------------------------------------------------------- the spec as lines with a section
+
+class _Spec:
+    def __init__(self, text):
+        self.rows = []  # (line number, text, in a code block, heading of its section or None before the first heading)
+        section, fenced = None, False
+        for number, line in enumerate(text.splitlines(), 1):
+            stripped = line.strip()
+            if stripped.startswith("```") or stripped.startswith("~~~"):
+                self.rows.append((number, line, True, section))
+                fenced = not fenced
+                continue
+            if not fenced and line.startswith("## "):
+                section = line.rstrip()
+                self.rows.append((number, line, False, section))
+                continue
+            self.rows.append((number, line, fenced, section))
+        self.headings = [t for _, t, code, sec in self.rows if not code and t.startswith("## ") and t.rstrip() == sec]
+
+    def lines(self, headings, code=False):
+        """`(number, text)` of the lines under the given headings, code blocks left out unless `code`."""
+        want = set(headings)
+        return [(n, t) for n, t, c, s in self.rows if s in want and not t.startswith("## ") and (code or not c)]
+
+    def text(self, headings, code=True):
+        return "\n".join(t for _, t in self.lines(headings, code))
+
+
+def _detail(items):
+    items = list(dict.fromkeys(items))
+    shown = "; ".join(items[:MAX_DETAIL])
+    return shown + (f"; and {len(items) - MAX_DETAIL} more" if len(items) > MAX_DETAIL else "")
+
+
+def _token(ident):
+    """A regex for `ident` as a whole token: not inside a longer id, key or name."""
+    return re.compile(r"(?<![\w-])(?<!\w\.)" + re.escape(str(ident)) + r"(?![\w-]|\.\w)")
+
+
+def _unmarked(line):
+    """`line` without the parts that name code: backticked spans, paths and citations."""
+    line = _SPAN.sub(" ", line)
+    line = _BARE_CITE.sub(" ", line)
+    return _FILE_WORD.sub(" ", line)
+
+
+def _has_citation(line):
+    return bool(_BARE_CITE.search(line)) or any(_cites(line))
+
+
+def _filelike(path):
+    return "/" in path or bool(re.search(r"\.[A-Za-z0-9]+$", path))
+
+
+def _cites(line):
+    """Each `(text, path, first line, last line)` of a backticked `path:line` or `path:line-line` on `line`."""
+    for span in _SPAN.finditer(line):
+        for part in re.split(r"\s*[,;]\s*", span.group(1).strip()):
+            m = _CITE.match(part)
+            if m and _filelike(m.group(1)):
+                yield part, m.group(1), int(m.group(2)), int(m.group(3) or m.group(2))
+
+
+# ---------------------------------------------------------------- the grader
+
+class _Grader:
+    def __init__(self, dest, name):
+        self.dest = dest
+        self.ctx = Context(dest)  # exits 2 when the output folder or a catalog is missing
+        path = os.path.join(dest, target(dest, name))
+        if not os.path.isfile(path):
+            die(f"{path} not found (run render.py spec first)")
+        with open(path, encoding="utf-8") as fh:
+            self.spec = _Spec(fh.read())
+        self.cfg = self.ctx.cfg
+        self.roots = [str(self.cfg["app"]["path"])] + [str(c["path"]) for c in self.cfg.get("contracts") or []
+                                                       if isinstance(c, dict) and c.get("path")]
+        self._lengths = {}
+
+    # ------------------------------------------------------------ sections
+
+    def sections(self):
+        expected, found = HEADINGS + APPENDICES, self.spec.headings
+        items = [f"missing {h}" for h in expected if h not in found]
+        items += [f"unexpected {h}" for h in found if h not in expected]
+        items += [f"repeated {h}" for h in dict.fromkeys(found) if found.count(h) > 1]
+        known = [h for h in dict.fromkeys(found) if h in expected]
+        if not items and known != [h for h in expected if h in known]:
+            items.append("headings out of order: " + ", ".join(h[3:] for h in known))
+        return items
+
+    # ------------------------------------------------------------ use cases
+
+    def _shown_ids(self, case):
+        return {case["id"], self.ctx.shown[case["id"]]}
+
+    def _label(self, case):
+        return f"{self.ctx.shown[case['id']]} {case['name']}"
+
+    def _ac_lines(self):
+        """`(number, text, ids)` of every acceptance-criterion line of section 6."""
+        found = []
+        for number, text in self.spec.lines([HEADINGS[5]]):
+            m = re.match(r"^- \*\*AC\d+ \(([^)]*)\):\*\*", text)
+            if m:
+                found.append((number, text, {i.strip() for i in m.group(1).split(",")}))
+        return found
+
+    def rules_per_use_case(self):
+        ruled = {r.get("useCase") for r in self.ctx.rules}
+        screens = self.spec.lines([HEADINGS[2]])
+        acs = self._ac_lines()
+        items = []
+        for case in self.ctx.cases:
+            if case["id"] in ruled:
+                continue
+            sentence = [t for _, t in self._screen_section_lines(screens, case)]
+            sentence += [t for _, t, ids in acs if ids & self._shown_ids(case)]
+            if not any(NO_RULE in t and _has_citation(t) for t in sentence):
+                items.append(f"{self._label(case)} has no rule and no cited sentence '{NO_RULE}'")
+        return items
+
+    def _screen_section_lines(self, screens, case):
+        """The lines of the `###` blocks of the screens of `case` in the Screens section."""
+        ids = {s for s in case.get("screens") or []}
+        ids |= {s["id"] for s in self.ctx.screens if case["id"] in (s.get("useCases") or [])}
+        picked, inside = [], False
+        for number, text in screens:
+            if text.startswith("### "):
+                inside = any(f"({s})" in text for s in ids)
+            if inside:
+                picked.append((number, text))
+        return picked
+
+    def criteria_per_use_case(self):
+        acs = [(ids, t) for _, t, ids in self._ac_lines() if _PLACEHOLDER not in t]
+        covered = set().union(*[ids for ids, _ in acs]) if acs else set()
+        return [f"{self._label(c)} has no acceptance criterion" for c in self.ctx.cases
+                if not (self._shown_ids(c) & covered)]
+
+    def criteria_numbering(self):
+        items, numbers = [], []
+        pattern = re.compile(AC_RE)
+        for number, text in self.spec.lines([HEADINGS[5]]):
+            if not text.startswith("- **AC"):
+                continue
+            m = pattern.match(text)
+            if not m:
+                items.append(f"line {number} is not an AC line: {text[:60]}")
+            else:
+                numbers.append((number, int(m.group(1))))
+        for position, (number, n) in enumerate(numbers, 1):
+            if n != position:
+                items.append(f"line {number} is AC{n}, expected AC{position}")
+                break
+        return items
+
+    def no_duplicate_use_cases(self):
+        names = []
+        rows = [t for _, t in self.spec.lines([HEADINGS[1]]) if t.startswith("|")]
+        for row in rows[2:]:  # the head and the separator
+            cells = [c.strip() for c in _ROW_SPLIT.split(row.strip().strip("|"))]
+            if len(cells) > 1:
+                names.append(cells[1])
+        names = names or [c["name"] for c in self.ctx.cases]
+        seen, items = {}, []
+        for name in names:
+            key = norm(name)
+            if key in seen:
+                items.append(f"'{name}' repeats '{seen[key]}'")
+            seen.setdefault(key, name)
+        return items
+
+    # ------------------------------------------------------------ citations
+
+    def _length(self, rel):
+        """The number of lines of `rel` under the app root or a contract root, or `None` when no root holds it."""
+        for root in self.roots:
+            base = os.path.realpath(root)
+            path = os.path.realpath(os.path.join(base, rel))
+            try:
+                inside = os.path.commonpath([base, path]) == base
+            except ValueError:
+                inside = False
+            if inside and os.path.isfile(path):
+                if path not in self._lengths:
+                    try:
+                        with open(path, "rb") as fh:
+                            data = fh.read()
+                    except OSError:
+                        continue
+                    self._lengths[path] = data.count(b"\n") + (0 if not data or data.endswith(b"\n") else 1)
+                return self._lengths[path]
+        return None
+
+    def citations_resolve(self):
+        items = []
+        for number, line, code, section in self.spec.rows:
+            if code or section == APPENDIX_F:
+                continue
+            for text, path, first, last in _cites(line):
+                length = self._length(path)
+                if length is None:
+                    items.append(f"{text} (line {number}): file not found")
+                elif first < 1 or last < first:
+                    items.append(f"{text} (line {number}): not a line range")
+                elif last > length:
+                    items.append(f"{text} (line {number}): the file has {length} lines")
+        return items
+
+    # ------------------------------------------------------------ unknowns
+
+    def _is_rule_placeholder(self, text):
+        return any(p in text for p in _RULE_PLACEHOLDERS)
+
+    def unknowns_have_owner(self):
+        items = []
+        for number, text in self.spec.lines(BODY):
+            if "UNKNOWN" not in text or _PLACEHOLDER in text or self._is_rule_placeholder(text):
+                continue
+            low = text.lower()
+            if not (re.search(r"\bsearched\b", low) and re.search(r"\bowner\b", low)):
+                items.append(f"line {number}: {text.strip()[:70]}")
+        return items
+
+    def prose_complete(self):
+        return [f"line {n}: {t.strip()[:70]}" for n, t in self.spec.lines(NOT_COVERAGE)
+                if _PLACEHOLDER in t and not self._is_rule_placeholder(t)]
+
+    # ------------------------------------------------------------ banned nouns
+
+    def banned_nouns(self):
+        nouns = [n for n in ((self.cfg.get("options") or {}).get("bannedNouns") or []) if isinstance(n, str) and n]
+        items = []
+        for number, text in self.spec.lines(BODY):
+            plain = _unmarked(text)
+            for noun in nouns:
+                if re.search(r"(?<!\w)" + re.escape(noun) + r"(?!\w)", plain):
+                    items.append(f"{noun} (line {number})")
+        return items
+
+    # ------------------------------------------------------------ overrides
+
+    def _known(self):
+        """The ids each kind of override can name, from the catalogs, the inventory and the module."""
+        c = self.ctx
+        inv = out.load(self.dest, "inventory.json", {}) or {}
+        module = out.load(self.dest, "module.json", {}) or {}
+        flows = out.load(self.dest, "flows.json", {}) or {}
+        screens = out.load(self.dest, "screens.json", {}) or {}
+        cases = c.all_cases
+
+        def gather(key):
+            return {str(v) for case in cases for v in case.get(key) or [] if isinstance(v, str)}
+
+        strings = inv.get("strings") if isinstance(inv.get("strings"), dict) else {}
+        plat = inv.get("platform") if isinstance(inv.get("platform"), dict) else {}
+        fields, text_keys = set(), set()
+        for s in screens.get("screens") or []:
+            if isinstance(s, dict) and s.get("id"):
+                for keys, _, e in _element_rows(s["id"], [e for e in s.get("elements") or [] if isinstance(e, dict)]):
+                    fields |= keys
+                    if e.get("textKey"):
+                        text_keys.add(str(e["textKey"]))
+
+        def named(entry, *keys):
+            if isinstance(entry, dict):
+                for k in keys:
+                    if entry.get(k):
+                        return str(entry[k])
+                return None
+            return str(entry) if entry else None
+
+        platform = set()
+        for section, value in plat.items():
+            if section == "permissions":
+                continue
+            platform.add(section)
+            platform |= {f"{section}:{p}" for p in _platform_values(value)}
+        return {
+            "useCase": {x["id"] for x in cases} | {x["alias"] for x in cases if x.get("alias")},
+            "screen": {x["id"] for x in screens.get("screens") or [] if isinstance(x, dict) and x.get("id")},
+            "endpoint": {e["id"] for e in out.load(self.dest, "endpoints.json", {}).get("endpoints") or []
+                         if isinstance(e, dict) and e.get("id")},
+            "flow": {x["id"] for x in flows.get("flows") or [] if isinstance(x, dict) and x.get("id")},
+            "rule": {r["id"] for r in c.rules},
+            "field": fields,
+            "string": set(module.get("stringKeys") or []) | set(strings.get("keys") or {}) | gather("strings") | text_keys,
+            "event": {named(e, "name") for e in inv.get("events") or []} | gather("events"),
+            "storage": {named(s, "key", "name") for s in inv.get("storage") or []} | gather("storage"),
+            "permission": {named(p, "key", "name") for p in plat.get("permissions") or []} | gather("permissions"),
+            "platform": platform,
+        }
+
+    def _old_names(self, ident):
+        """The names the use case, screen, flow or rule `ident` had before a rename, from the workflow results."""
+        prefix = str(ident).split("-")[0]
+        registry = (out.load(self.dest, "ids.json", {}) or {}).get(prefix) or {}
+        keys = {str(k).split("|")[0] for k, v in registry.items() if v == ident}
+        raw = {}
+        for name, lists in (("understand_result.json", ("useCases", "screens", "flows")), ("rules_result.json", ("rules",))):
+            data = out.load(self.dest, name, {}) or {}
+            for lst in lists:
+                for entry in data.get(lst) or []:
+                    if isinstance(entry, dict) and entry.get("name"):
+                        raw.setdefault(norm(entry["name"]), set()).add(str(entry["name"]))
+        return {n for k in keys for n in raw.get(k, ())}
+
+    def overrides_reflected(self):
+        ov = out.load(self.dest, "overrides.json", {}) or {}
+        ov = ov if isinstance(ov, dict) else {}
+        known, items = self._known(), []
+        body = self.spec.text(NOT_COVERAGE)
+        in_f = self.spec.text([APPENDIX_F])
+
+        def is_known(kind, ident):
+            pool = known.get(kind)
+            if pool is None:
+                return False
+            if kind in ("permission", "platform"):
+                return norm(ident) in {norm(p) for p in pool if p}
+            return ident in pool
+
+        for d in ov.get("drop") or []:
+            if not isinstance(d, dict) or not d.get("id"):
+                continue
+            kind, ident = d.get("kind"), str(d["id"])
+            if kind not in known:
+                items.append(f"drop {ident}: unknown kind {kind}")
+            elif not is_known(kind, ident):
+                items.append(f"drop {kind} {ident}: unknown id, no catalog or inventory item has it")
+            else:
+                items += self._drop_items(kind, ident, body, in_f)
+        for r in ov.get("rename") or []:
+            if not isinstance(r, dict) or not r.get("id"):
+                continue
+            ident = str(r["id"])
+            kind = {"UC": "useCase", "CAP": "useCase", "SCR": "screen", "FLOW": "flow", "RULE": "rule",
+                    "EP": "endpoint"}.get(ident.split("-")[0])
+            if not kind or not is_known(kind, ident):
+                items.append(f"rename {ident}: unknown id")
+            elif r.get("name") and not self.ctx.is_dropped(kind, ident):
+                items += self._rename_items(ident, str(r["name"]), body)
+        for key in ov.get("ids") or {}:
+            if str(key) not in known["field"]:
+                items.append(f"ids {key}: unknown field key")
+        for m in ov.get("merge") or []:
+            if isinstance(m, dict):
+                registry = (out.load(self.dest, "ids.json", {}) or {}).get("UC") or {}
+                retired = set(registry.values())
+                if m.get("into") and str(m["into"]) not in known["useCase"]:
+                    items.append(f"merge into {m['into']}: unknown id")
+                items += [f"merge from {f}: unknown id" for f in m.get("from") or []
+                          if str(f) not in known["useCase"] and str(f) not in retired]
+        return items
+
+    def _drop_items(self, kind, ident, body, in_f):
+        if kind == "platform":
+            return self._drop_platform(ident, in_f)
+        regions = [h for h in NOT_COVERAGE if not (kind == "string" and h == APPENDICES[0])]
+        text = self.spec.text(regions)
+        idents = [ident]
+        if kind == "useCase":
+            alias = next((c.get("alias") for c in self.ctx.all_cases if c["id"] == ident), None)
+            idents += [alias] if alias else []
+        items = [f"drop {kind} {ident}: still in the spec" for i in idents if _token(i).search(text)]
+        if not _token(ident).search(in_f):
+            items.append(f"drop {kind} {ident}: missing from {APPENDIX_F[3:]}")
+        return items
+
+    def _drop_platform(self, ident, in_f):
+        """A platform drop is `<section>:<value>` or a whole section; Appendix D shows `- **<section>:** a, b`."""
+        section, _, value = ident.partition(":")
+        items = []
+        for line in self.spec.lines([APPENDICES[3]]):
+            m = re.match(r"^- \*\*([^*]+):\*\* (.*)$", line[1])
+            if m and m.group(1) == section and (not value or value in [v.strip() for v in m.group(2).split(",")]):
+                items.append(f"drop platform {ident}: still in the spec")
+                break
+        if not _token(ident).search(in_f):
+            items.append(f"drop platform {ident}: missing from {APPENDIX_F[3:]}")
+        return items
+
+    def _rename_items(self, ident, name, body):
+        items = []
+        if name not in body:
+            items.append(f"rename {ident}: '{name}' is not in the spec")
+        stale = [o for o in self._old_names(ident) if o != name and o in body.replace(name, "")]
+        items += [f"rename {ident}: old name '{o}' is still in the spec" for o in sorted(stale)]
+        return items
+
+    # ------------------------------------------------------------ run
+
+    def run(self):
+        checks = []
+        for name in CHECKS:
+            items = getattr(self, name.replace("-", "_"))()
+            checks.append({"name": name, "pass": not items, "detail": _detail(items)})
+        return {"version": 1, "checks": checks, "pass": all(c["pass"] for c in checks)}
+
+
+def run(dest, name="SPEC.md"):
+    """Grade the spec `name` in the output folder `dest`, write grade.json and return it."""
+    result = _Grader(dest, name).run()
+    out.save(dest, "grade.json", result)
+    return result
+
+
+def main(argv=None):
+    args = list(sys.argv[1:] if argv is None else argv)
+    name = "SPEC.md"
+    if "--name" in args:
+        i = args.index("--name")
+        if i + 1 >= len(args):
+            print("usage: grade.py <out> [--name FILE]", file=sys.stderr)
+            return 2
+        name = args[i + 1]
+        del args[i:i + 2]
+    if len(args) != 1 or args[0].startswith("-"):
+        print("usage: grade.py <out> [--name FILE]", file=sys.stderr)
+        return 2
+    result = run(args[0], name)
+    print(f"Grade: {'pass' if result['pass'] else 'fail'}")
+    for c in result["checks"]:
+        if not c["pass"]:
+            print(f"  FAIL {c['name']}: {c['detail']}")
+    print(f"Wrote {args[0]}: grade.json")
+    return 0 if result["pass"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -363,10 +363,17 @@ a new one, so a renamed use case keeps its id.
 ### grade.json
 
 ```json
-{"version":1,"checks":[{"name":"template-headings","pass":true,"detail":""}],"pass":true}
+{"version":1,"checks":[{"name":"sections","pass":true,"detail":""}],"pass":true}
 ```
 
-One entry per shape check of the grader. `pass` is `true` when every check passes.
+One entry per shape check of the grader, in this order: `sections`, `rules-per-use-case`, `criteria-per-use-case`,
+`criteria-numbering`, `citations-resolve`, `unknowns-have-owner`, `prose-complete`, `no-duplicate-use-cases`,
+`banned-nouns`, `overrides-reflected`. `detail` names every failing item, at most 20, then `and N more`. `pass` is `true`
+when every check passes.
+
+`unknowns-have-owner` fails for a line of sections 1 to 8 that holds `UNKNOWN` without the words `searched` and `owner`.
+The renderer's own placeholder `UNKNOWN — <what is missing>` is left to `prose-complete`, which fails while one remains
+before Appendix F. Citations are checked when backticked as `path:line` or `path:line-line`.
 
 ### review.json and REVIEW.md
 
