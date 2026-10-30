@@ -4,6 +4,8 @@
     "payslip.title" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Payslips" } } } },
     "payslip.latest" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Latest payslip" } } } },
     "payslip.download" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Download payslip" } } } },
+    "payslip.list.title" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Your payslips" } } } },
+    "payslip.pdf" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Payslip PDF" } } } },
     "calendar.title" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Calendar" } } } },
     "common.cancel" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Cancel" } } } },
     "common.ok" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "OK" } } } }
