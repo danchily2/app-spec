@@ -388,11 +388,16 @@ One entry per shape check of the grader. `pass` is `true` when every check passe
 - `ids.json` holds one map per class from a **normalized key** to the id, and `max` holds the highest number issued per class.
 - An id is never reused. A retired key stays in its map, and a new key always takes `max + 1`.
 - A re-run looks up the normalized key first, so the same item keeps its id. Only `render.py` issues ids.
-- The normalized key of use cases, screens, flows and rules is the name in lower case, with every run of characters
-  other than letters and digits replaced by one space, and trimmed.
+- `norm(text)` lower-cases the text, replaces every run of characters other than letters and digits with one space,
+  trims, and drops the words `a`, `an` and `the`.
+- The normalized key of a use case or a flow is `norm(name)`. The key of a screen is `norm(name)`, a `|`, and the file
+  path of its declaration without the line. The key of a rule is `norm(name)`, a `|`, and the source file without the
+  lines.
 - The normalized key of an endpoint is the upper-case method, one space, and the path with every parameter (`{id}`,
-  `:id`, `$id`) replaced by `{}`.
-- With a capability index, a use case whose outcome matches a capability takes that `CAP-NNN` as `alias`. The spec
+  `:id`, `$id`) replaced by `{}`, as `inventory.json` holds it.
+- With a capability index, a use case whose outcome matches a capability takes that `CAP-NNN` as `alias`. A match is an
+  equal `norm(name)`, or at least one file that the capability's `implementations[app.name].files` share with the use
+  case's `files`. A name match wins over a file match, and a capability aliases at most one use case. The spec
   shows the alias next to the `UC` id, and either id is valid in an AC line.
 - A merge in `overrides.json` retires the `from` ids and keeps the `into` id.
 

@@ -1,0 +1,12 @@
+{"capabilities": [
+  {"id": "CAP-225", "name": "View a payslip's details",
+   "implementations": {"ios-app": {"files": ["Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipDetailView.swift"]}}},
+  {"id": "CAP-226", "name": "Payslip overview",
+   "implementations": {"ios-app": {"files": ["Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipListView.swift", "EmployeeServices/Payslips/Sources/Payslips/GetPayslips.swift"]}}},
+  {"id": "CAP-227", "name": "Payslip refresh",
+   "implementations": {"ios-app": {"files": ["Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipListView.swift"]}}},
+  {"id": "CAP-300", "name": "Refresh the payslip list",
+   "implementations": {"ios-app": {"files": ["Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipDetailView.swift"]}}},
+  {"id": "CAP-310", "name": "View payslip list on Android",
+   "implementations": {"android-app": {"files": ["app/src/main/java/com/sample/hr/payslips/PayslipListScreen.kt"]}}}
+]}

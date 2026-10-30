@@ -1,0 +1,13 @@
+{
+  "rules": [
+    {"name": "Payslips are newest first", "category": "ordering", "priority": "P1", "source": "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift:10-20",
+     "plainEnglish": "The list shows the newest payslip first.", "given": "three payslips", "when": "the list opens",
+     "then": "the newest is on top", "parameters": [], "edgeCases": ["same date"], "suspectedDefect": null,
+     "confidence": "High", "question": null, "useCase": "View payslip list"},
+    {"name": "Net pay is always shown", "category": "display", "priority": "P2", "source": "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipDetailView.swift:9",
+     "plainEnglish": "The net pay line never hides.", "given": "any payslip", "when": "the detail opens",
+     "then": "net pay is visible", "parameters": [], "edgeCases": [], "suspectedDefect": null,
+     "confidence": "Medium", "question": "Does a part-timer see it too?", "useCase": ""}
+  ],
+  "rejected": [], "unverified": [], "injectionFlags": [], "rerunShards": [], "stats": {}
+}

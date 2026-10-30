@@ -1,0 +1,28 @@
+{
+  "useCases": [
+    {"name": "View payslip list", "description": "The employee sees the payslips of the year.", "personas": ["employee"],
+     "permissions": [], "screens": ["PayslipListView"], "files": ["Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipListView.swift:8", "EmployeeServices/Payslips/Sources/Payslips/GetPayslips.swift"],
+     "endpoints": ["GET /employees/{id}/payslips"], "events": [], "strings": ["payslip.list.title"], "storage": [],
+     "platform": [], "rulesHint": "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift", "evidence": "VERIFIED"},
+    {"name": "View a payslip's details", "description": "The employee reads one payslip line by line.",
+     "personas": ["employee"], "permissions": [], "screens": ["PayslipDetailView"], "files": ["Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipDetailView.swift"],
+     "endpoints": [], "events": [], "strings": [], "storage": [], "platform": [], "rulesHint": "", "evidence": "INFERRED"},
+    {"name": "Refresh the payslip list", "description": "The employee pulls the newest payslips.",
+     "personas": ["employee"], "permissions": [], "screens": ["PayslipListView"], "files": ["Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipListView.swift"],
+     "endpoints": [], "events": [], "strings": [], "storage": [], "platform": [], "rulesHint": "", "evidence": "INFERRED"}
+  ],
+  "screens": [
+    {"name": "PayslipListView", "file": "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipListView.swift:3", "useCases": ["View payslip list", "Refresh the payslip list"],
+     "actions": ["open a payslip", "refresh"],
+     "states": [{"name": "empty", "shows": "No payslips yet", "evidence": "VERIFIED"}],
+     "fields": [{"kind": "button", "textKey": null, "text": "Open", "identifier": null, "file": "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipListView.swift", "line": 14}]},
+    {"name": "PayslipDetailView", "file": "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipDetailView.swift:3", "useCases": ["View a payslip's details"],
+     "actions": ["search the lines"], "states": [], "fields": []}
+  ],
+  "flows": [
+    {"name": "Read the latest payslip", "persona": "employee",
+     "steps": [{"screen": "PayslipListView", "useCases": ["View payslip list"], "action": "tap the first row"},
+               {"screen": "PayslipDetailView", "useCases": ["View a payslip's details"], "action": "read the net pay"}]}
+  ],
+  "rejected": [], "unverified": [], "injectionFlags": [], "rerunShards": [], "stats": {}
+}
