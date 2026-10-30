@@ -47,8 +47,46 @@ test('understand: a throwing referee leaves the use case unverified', async () =
   const respond = label => { if (label.startsWith('verify:')) throw new Error('dead') }
   const { result: r } = await run(wf('understand-module.js'), args, respond)
   assert.equal(r.unverified.length, 1)
-  assert.equal(r.useCases.length, 1, 'the use case stays, no longer VERIFIED')
-  assert.notEqual(r.useCases[0].evidence, 'VERIFIED')
+  assert.equal(r.unverified[0].name, r.useCases[0].name)
+  assert.ok(r.unverified[0].why)
+  assert.equal(r.useCases.length, 1, 'the use case stays')
+  assert.equal(r.useCases[0].evidence, 'INFERRED', 'VERIFIED is lowered')
+  assert.equal(r.rejected.length, 0)
+})
+
+test('understand: a referee that returns nothing leaves the use case unverified and INFERRED', async () => {
+  const respond = label => label.startsWith('verify:') ? null : undefined
+  const { result: r } = await run(wf('understand-module.js'), args, respond)
+  assert.equal(r.unverified.length, 1)
+  assert.equal(r.useCases[0].evidence, 'INFERRED')
+})
+
+test('understand: a clean referee pass keeps VERIFIED and lists nothing', async () => {
+  const respond = label => label.startsWith('verify:') ? { real: true, badEvidence: [], reason: 'ok' } : undefined
+  const { result: r } = await run(wf('understand-module.js'), args, respond)
+  assert.equal(r.useCases.length, 1)
+  assert.equal(r.useCases[0].evidence, 'VERIFIED')
+  assert.deepEqual(r.rejected, [])
+  assert.deepEqual(r.unverified, [])
+})
+
+test('understand: a real verdict with bad evidence lowers the label to INFERRED and lists it unverified', async () => {
+  const respond = label => label.startsWith('verify:') ? { real: true, badEvidence: ['GET /nope'], reason: 'mostly' } : undefined
+  const { result: r } = await run(wf('understand-module.js'), args, respond)
+  assert.equal(r.useCases.length, 1)
+  assert.equal(r.useCases[0].evidence, 'INFERRED')
+  assert.equal(r.unverified.length, 1)
+  assert.ok(r.unverified[0].why.includes('GET /nope'))
+  assert.deepEqual(r.rejected, [])
+})
+
+test('understand: every referee is the stack analyst', async () => {
+  for (const [stack, type] of [['ios-native', 'app-spec:ios-analyst'], ['android-native', 'app-spec:android-analyst'], ['react-native', 'app-spec:rn-analyst']]) {
+    const { calls } = await run(wf('understand-module.js'), { ...args, app: { ...app, stack } })
+    const verify = calls.filter(c => c.opts.label.startsWith('verify:'))
+    assert.ok(verify.length >= 1)
+    assert.ok(verify.every(c => c.opts.agentType === type), stack)
+  }
 })
 
 test('understand: injection suspects are propagated', async () => {
