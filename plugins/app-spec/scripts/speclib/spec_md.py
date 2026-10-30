@@ -73,10 +73,10 @@ class Context:
         self.all_cases = all_cases
         self.cases = [c for c in all_cases if not self.is_dropped("useCase", c["id"])]
         self.screens = [s for s in self._catalog("screens.json", "screens") if not self.is_dropped("screen", s["id"])]
-        self.flows = self._catalog("flows.json", "flows")
+        self.flows = self._kept_flows(self._catalog("flows.json", "flows"))
         self.rules = self._catalog("rules.json", "rules")
         self.endpoints = [e for e in self._catalog("endpoints.json", "endpoints") if not self.is_dropped("endpoint", e["id"])]
-        self.shown = {c["id"]: c.get("alias") or c["id"] for c in all_cases}  # the id the spec shows for a use case
+        self.shown = {c["id"]: c.get("alias") or c["id"] for c in self.cases}  # the id the spec shows for a kept use case
         self.by_alias = {c["alias"]: c["id"] for c in all_cases if c.get("alias")}
         self.screen_names = {s["id"]: s["name"] for s in self.screens}
 
@@ -89,8 +89,23 @@ class Context:
     def is_dropped(self, kind, ident):
         return (kind, str(ident)) in self.dropped
 
+    def _kept_flows(self, flows):
+        """The flows without dropped use cases: a step whose use cases are all dropped goes, and so does a flow left
+        with no step; the dropped ids leave the steps that stay."""
+        kept = []
+        for flow in flows:
+            steps = []
+            for step in flow.get("steps") or []:
+                ids = [u for u in step.get("useCases") or [] if not self.is_dropped("useCase", u)]
+                if step.get("useCases") and not ids:
+                    continue
+                steps.append({**step, "useCases": ids})
+            if steps or not flow.get("steps"):
+                kept.append({**flow, "steps": steps})
+        return kept
+
     def show(self, uc_ids):
-        return ", ".join(self.shown.get(u, u) for u in uc_ids) or "none"
+        return ", ".join(self.shown.get(u, u) for u in uc_ids if not self.is_dropped("useCase", u)) or "none"
 
     def uc_of(self, ident):
         """The `UC-NNN` id of a use-case id or alias as written in the prose."""
@@ -462,6 +477,9 @@ def render(dest):
     return "\n".join(lines) + "\n"
 
 
+_OWNED = {"ledger.md", "review.md", "inventory.md", "open_questions.md"}  # lower case; every `.json` is owned too
+
+
 def target(dest, name):
     """`name` checked to be a file inside `dest`. Exit 2 when it is absolute or leaves `dest`."""
     root = os.path.realpath(dest)
@@ -472,6 +490,9 @@ def target(dest, name):
         inside = False
     if not inside:
         die(f"--name {name!r} must be a file inside {dest}")
+    rel = os.path.relpath(os.path.realpath(os.path.join(root, name)), root).replace(os.sep, "/").lower()
+    if rel.endswith(".json") or rel in _OWNED or rel.split("/")[0] == "shards":
+        die(f"--name {name!r} is a file the tools own in {dest}; choose another name")
     return name
 
 

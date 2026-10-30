@@ -252,17 +252,59 @@ class TestSpec(unittest.TestCase):
         self.assertIn("DebugScreen", f)
         self.assertIn("| screens | 3 | 4 | 100 |", f)
 
-    def test_dropped_screen_and_endpoint_and_use_case_leave_their_sections(self):
-        write_overrides(self.out, {"drop": [{"kind": "screen", "id": "SCR-002", "reason": "dead code"},
-                                            {"kind": "useCase", "id": "UC-003", "reason": "out of module"}]})
+    def test_dropped_items_leave_their_sections_and_enter_f(self):
+        inv = out.load(self.out, "inventory.json")
+        inv["events"] = [{"name": "payslip_opened", "family": "call", "file": "A.swift:3"},
+                         {"name": "payslip_shared", "family": "call", "file": "A.swift:4"}]
+        out.save(self.out, "inventory.json", inv)
+        write_overrides(self.out, {"drop": [
+            {"kind": "screen", "id": "SCR-002", "reason": "dead code"},
+            {"kind": "useCase", "id": "UC-003", "reason": "out of module"},
+            {"kind": "endpoint", "id": "EP-002", "reason": "reason endpoint"},
+            {"kind": "string", "id": "payslip.pdf", "reason": "reason string"},
+            {"kind": "event", "id": "payslip_opened", "reason": "reason event"}]})
         text = render.spec(self.out)
         self.assertNotIn("PayslipDetailView (SCR-002)", section(text, "## Screens"))
         self.assertNotIn("| UC-003 |", section(text, "## Capabilities"))
         self.assertNotIn("(UC-003)", section(text, "## Acceptance criteria"))
+        self.assertNotIn("EP-002", section(text, "## Endpoints"))
+        d = section(text, "## Appendix D. Strings, analytics and platform")
+        self.assertNotIn("payslip.pdf", d)
+        self.assertNotIn("payslip_opened", d)
+        self.assertIn("payslip_shared", d)
         f = section(text, "## Appendix F. Coverage")
-        self.assertIn("SCR-002", f)
-        self.assertIn("dead code", f)
-        self.assertIn("UC-003", f)
+        for needle in ("SCR-002", "dead code", "UC-003", "EP-002", "reason endpoint", "payslip.pdf", "reason string",
+                       "payslip_opened", "reason event"):
+            self.assertIn(needle, f)
+        rest = text.replace(f, "")
+        for gone in ("UC-003", "EP-002", "SCR-002"):
+            self.assertNotIn(gone, rest)
+
+    def test_a_flow_of_a_dropped_use_case_goes_and_a_mixed_flow_loses_only_the_dropped_ids(self):
+        flows = out.load(self.out, "flows.json")
+        base = flows["flows"][0]
+        flows["flows"] = [
+            {**base, "id": "FLOW-001", "name": "Only dropped", "steps": [{"screen": "SCR-001", "useCases": ["UC-003"], "action": "refresh"}]},
+            {**base, "id": "FLOW-002", "name": "Mixed", "steps": [
+                {"screen": "SCR-001", "useCases": ["UC-003"], "action": "refresh"},
+                {"screen": "SCR-001", "useCases": ["UC-001", "UC-003"], "action": "open"}]},
+        ]
+        out.save(self.out, "flows.json", flows)
+        write_overrides(self.out, {"drop": [{"kind": "useCase", "id": "UC-003", "reason": "out of module"}]})
+        e = section(render.spec(self.out), "## Appendix E. Flows")
+        self.assertNotIn("FLOW-001", e)
+        self.assertNotIn("refresh", e)
+        self.assertIn("FLOW-002", e)
+        self.assertIn("(UC-001): open", e)
+        self.assertNotIn("UC-003", e)
+
+    def test_name_refuses_files_the_tools_own(self):
+        for bad in ("app-spec.json", "overrides.json", "ids.json", "use-cases.json", "docs/x.json", "LEDGER.md", "REVIEW.md",
+                    "shards/core.md", "Ids.JSON"):
+            code, _, err = run_cli(["render.py", "spec", self.out, "--name", bad], module=render)
+            self.assertEqual(code, 2, bad)
+            self.assertIn("tools own", err)
+        self.assertIn("view payslip list", read_text(self.out, "ids.json"))
 
     def test_flows_render_with_steps_in_appendix_e(self):
         e = section(render.spec(self.out), "## Appendix E. Flows")
