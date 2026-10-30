@@ -322,11 +322,12 @@ Fields are as in `understand_result.json` with names replaced by ids.
 | `useCases` | `UC-NNN` ids that call it |
 | `client` | Where the app builds the call: its `file` and the request `type` |
 | `clients` | Every client that builds the call, as `{file,type}` entries. One endpoint key can have several clients. `client` is the first |
-| `request.fields`, `response.fields` | Field `name`, `type` and `required` (for a response, whether the value can be absent) |
+| `request.fields`, `response.fields` | Field `name`, `type` and `required` (for a response, whether the value can be absent). Optional `nullable`: `explicit` when the type allows null, `default` when the decoder supplies a default, `no` otherwise |
+| `disagreements` | Optional. Each place where a client field is absent from or differs in the backend: `field`, `client` and `backend` as `file:line`, and a `note` |
 | `errors` | Each status the code handles and what the user sees |
 | `auth` | The auth policy or token the app sends, or `null` |
-| `backend` | Where a contract repository defines the route, with its authorization, or `null` |
-| `label` | `VERIFIED` when read in the code, `INFERRED` when deduced, `UNKNOWN` when not found. Without a contract repository `backend` is `null` and the backend side is `UNKNOWN` |
+| `backend` | Where a contract repository defines the route, with its authorization, or `null` when no backend file was given or found |
+| `label` | `VERIFIED` when read in the code, `INFERRED` when deduced, `UNKNOWN` when not found. `VERIFIED` needs both the client and the backend cited, `INFERRED` only the client, `UNKNOWN` neither |
 
 ### ids.json
 
@@ -477,9 +478,9 @@ is observable on screen, so a Maestro flow or a unit test can assert it. Tools s
 
 | Agent | Returns |
 | --- | --- |
-| `ios-analyst`, `android-analyst`, `rn-analyst` | Use-case fragments for one shard, in the fragment shape of `understand_result.json`. With a referee prompt: a verdict on each cited claim. Copied from App Fusion unchanged |
+| `ios-analyst`, `android-analyst`, `rn-analyst` | Use-case fragments for one shard, in the fragment shape of `understand_result.json`. With a referee prompt: a verdict on each cited claim. Copied from App Fusion, edited to describe one app |
 | `use-case-mapper` | Merged use cases, screens and flows from all fragments, one use case per user outcome. No fusion classes |
-| `business-rules-extractor` | Rule cards for one shard in the shape of `rules_result.json`. Copied from App Fusion unchanged |
+| `business-rules-extractor` | Rule cards for one shard in the shape of `rules_result.json`. Copied from App Fusion, edited to describe one app |
 | `contract-reader` | Endpoint entries in the shape of `endpoints.json`, from the app and from contract repositories |
 | `spec-writer` | The prose sections of `SPEC.md` from the catalogs, citations only |
 | `spec-critic` | Findings in the shape of `review.json` `critic`, ranked Blocker, High, Medium, Nit |
