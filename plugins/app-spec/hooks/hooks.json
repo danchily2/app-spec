@@ -1,0 +1,28 @@
+{
+  "description": "app-spec source write guard: denies file writes under the analysed app and each contract repository named in app-spec.json, and asks before shell commands that would write there. A no-op where no app-spec.json is found. Turn it off with the plugin option guard=false (APP_SPEC_GUARD=false in Devin). Matches Claude Code's tool names and Devin's. Under Devin only, a session-start note says how to read the skills there.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash|^(edit|write|notebook_edit|apply_patch|exec|write_to_process)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/guard.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/devin-context.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
