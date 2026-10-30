@@ -324,6 +324,45 @@ class TestSpec(unittest.TestCase):
         out.save(self.out, "app-spec.json", cfg)
         self.assertRegex(render.spec(self.out), r"Reference HEADs: ios-app `[0-9a-f]{7,}`, me-api `abcdef1234567`")
 
+    def test_prose_citations_are_backticked(self):
+        data = prose()
+        data["screens"]["SCR-001"]["states"][0]["evidence"] = "Modules/PayslipsFeature/PayslipListView.swift:20"
+        data["criteria"][0]["evidence"] = "PayslipItem.swift:10-20, PayslipListView.swift:14"
+        data["data"][0]["evidence"] = "PayslipItem.swift:3"
+        out.save(self.out, "prose.json", data)
+        text = render.spec(self.out)
+        for cited in ("Source: `Modules/PayslipsFeature/PayslipListView.swift:8`", "`Modules/PayslipsFeature/PayslipListView.swift:20`",
+                      "`PayslipItem.swift:10-20`", "`PayslipListView.swift:14`", "`PayslipItem.swift:3`",
+                      "`GetPayslips.swift:6`"):
+            self.assertIn(cited, text)
+        self.assertNotRegex(text, r"(?<!`)\bPayslipItem\.swift:3\b(?!`)")
+        data["summary"] = "Already `A.swift:1` marked, and B.swift:2 not, but api.visma.net:443 is a host."
+        out.save(self.out, "prose.json", data)
+        summary = section(render.spec(self.out), "## Summary")
+        self.assertIn("`A.swift:1` marked, and `B.swift:2` not, but api.visma.net:443 is a host.", summary)
+
+    def test_a_dropped_permission_leaves_the_permissions_table(self):
+        data = out.load(self.out, "use-cases.json")
+        data["useCases"][0]["permissions"] = ["payroll-admin", "viewer"]
+        out.save(self.out, "use-cases.json", data)
+        self.assertIn("payroll-admin", section(render.spec(self.out), "## Business rules and permissions"))
+        write_overrides(self.out, {"drop": [{"kind": "permission", "id": "payroll-admin", "reason": "dead code"}]})
+        text = render.spec(self.out)
+        rules = section(text, "## Business rules and permissions")
+        self.assertNotIn("payroll-admin", rules)
+        self.assertIn("viewer", rules)
+        self.assertIn("payroll-admin", section(text, "## Appendix F. Coverage"))
+
+    def test_a_dropped_string_leaves_the_text_key_column_of_appendix_a(self):
+        self.assertIn("payslip.list.title", section(render.spec(self.out), "## Appendix A. Fields and ids"))
+        write_overrides(self.out, {"drop": [{"kind": "string", "id": "payslip.list.title", "reason": "dead code"}]})
+        text = render.spec(self.out)
+        self.assertNotIn("payslip.list.title", text.replace(section(text, "## Appendix F. Coverage"), ""))
+
+    def test_the_no_rule_hint_uses_the_exact_sentence(self):
+        rules = section(render.spec(self.out), "## Business rules and permissions")
+        self.assertIn("No client-side rule; the server decides.", rules)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -373,7 +373,8 @@ when every check passes.
 
 `unknowns-have-owner` fails for a line of sections 1 to 8 that holds `UNKNOWN` without the words `searched` and `owner`.
 The renderer's own placeholder `UNKNOWN — <what is missing>` is left to `prose-complete`, which fails while one remains
-before Appendix F. Citations are checked when backticked as `path:line` or `path:line-line`.
+before Appendix F. Citations are checked when backticked as `path:line` or `path:line-line`, where the path has a `/` or a
+source-file extension (a host with a port is not one). The renderer backticks every citation in prose evidence.
 
 ### review.json and REVIEW.md
 

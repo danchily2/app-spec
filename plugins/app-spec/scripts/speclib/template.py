@@ -22,6 +22,13 @@ APPENDICES = [
 
 AC_RE = r"^- \*\*AC(\d+) \(((?:UC|CAP)-\d{3,})(?:, (?:UC|CAP)-\d{3,})*\):\*\* .+"
 
+SOURCE_EXT = ("swift", "kt", "java", "ts", "tsx", "js", "jsx", "m", "h", "cs", "py", "xml", "json", "plist", "strings",
+              "xcstrings", "gradle", "kts", "yml", "yaml", "md")
+
+# a citation: a path with a `/` or a source-file extension, a colon, a line or a line range. A host with a port is not one.
+CITE_RE = (r"(?:[\w@+.\-]+/)*[\w@+.\-]*(?:\.(?:" + "|".join(SOURCE_EXT) + r")(?![\w])|/[\w@+.\-]+)"
+           r":\d+(?:-\d+)?")
+
 EVIDENCE_LABELS = ("VERIFIED", "INFERRED", "UNKNOWN", "PROPOSED")
 
 

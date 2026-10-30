@@ -330,6 +330,48 @@ class TestOverrides(GradeCase):
         self.assertTrue(check(grade.run(dest), "overrides-reflected")["pass"])
 
 
+class TestFixRound1(GradeCase):
+    def test_a_stale_dropped_string_in_appendix_a_fails(self):
+        stale = self.mutated("string_stale", lambda t: "\n".join(l for l in t.splitlines() if not l.startswith("| payslip.list.title |")))
+        write_overrides(stale, {"drop": [{"kind": "string", "id": "payslip.list.title", "reason": "dead code"}]})
+        c = check(grade.run(stale), "overrides-reflected")
+        self.assertFalse(c["pass"])
+        self.assertIn("payslip.list.title", c["detail"])
+        self.assertIn("still in the spec", c["detail"])
+
+    def test_slash_words_are_not_masked_for_banned_nouns(self):
+        dest = self.mutated("slash", lambda t: t.replace("List the payslips of the year.", "Use Realm/Room and ViewModel/Presenter."))
+        c = check(grade.run(dest), "banned-nouns")
+        self.assertFalse(c["pass"])
+        for noun in ("Realm", "Room", "ViewModel"):
+            self.assertIn(noun, c["detail"])
+
+    def test_rule_placeholder_exemption_is_anchored(self):
+        hint = 'UNKNOWN — no rule extracted for UC-003; add a rule or write "No client-side rule; the server decides." with a citation'
+        screens = self.mutated("ph_screens", lambda t: t.replace("List the payslips of the year.", hint))
+        self.assertFalse(check(grade.run(screens), "prose-complete")["pass"])
+        fake = self.mutated("ph_fake", lambda t: t.replace("## Dependencies and decisions\n",
+                                                           "## Dependencies and decisions\n\nUNKNOWN — no rule extracted for UC-999; add\n"))
+        self.assertFalse(check(grade.run(fake), "prose-complete")["pass"])
+        inside = self.mutated("ph_inside", lambda t: t.replace("### Permissions", hint + "\n\n### Permissions"))
+        self.assertTrue(check(grade.run(inside), "prose-complete")["pass"])
+        glued = self.mutated("ph_glued", lambda t: t.replace("### Permissions", "Note: " + hint + " and more\n\n### Permissions"))
+        self.assertFalse(check(grade.run(glued), "prose-complete")["pass"])
+
+    def test_a_bare_citation_does_not_satisfy_the_no_rule_sentence(self):
+        dest = self.mutated("bare", lambda t: t.replace(f"`{LIST}:12`", f"{LIST}:12"))
+        c = check(grade.run(dest), "rules-per-use-case")
+        self.assertFalse(c["pass"])
+        self.assertIn("UC-003", c["detail"])
+
+    def test_host_with_a_port_is_not_a_citation(self):
+        dest = self.mutated("host", lambda t: t.replace("## Open questions\n", "## Open questions\n\nCalls `api.visma.net:443` and `localhost:8080`.\n"))
+        self.assertTrue(check(grade.run(dest), "citations-resolve")["pass"])
+        for text in ("`api/visma.yml:2`", "`Missing.xcstrings:2`", "`a/b:3`"):
+            dest = self.mutated("src", lambda t: t.replace("## Open questions\n", "## Open questions\n\n" + text + "\n"))
+            self.assertFalse(check(grade.run(dest), "citations-resolve")["pass"], text)
+
+
 class TestCli(GradeCase):
     def test_exit_codes_and_output(self):
         code, stdout, err = run_cli(["grade.py", self.good], module=grade)

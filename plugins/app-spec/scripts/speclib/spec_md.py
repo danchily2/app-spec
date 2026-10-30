@@ -11,7 +11,7 @@ import re
 from . import out
 from .common import die
 from .ids import element_slug
-from .template import APPENDICES, EVIDENCE_LABELS, HEADINGS, header
+from .template import APPENDICES, CITE_RE, EVIDENCE_LABELS, HEADINGS, header
 
 _LINE = re.compile(r":\d")
 _VALID_ID = re.compile(r"^(?:UC|CAP)-\d{3,}$")
@@ -24,6 +24,16 @@ _RANK = {"P0": 0, "P1": 1, "P2": 2}
 def _text(value):
     """`value` on one line."""
     return " ".join(str(value if value is not None else "").split())
+
+
+_CITE_TOKEN = re.compile(r"(?<![\w@+.\-/`])(" + CITE_RE + r")(?![\w`])")
+NO_RULE = "No client-side rule; the server decides."
+
+
+def _cited(value):
+    """`value` on one line with every `path:line` or `path:line-line` in backticks, so each citation can be checked."""
+    parts = re.split(r"(`[^`]*`)", _text(value))
+    return "".join(p if p.startswith("`") else _CITE_TOKEN.sub(r"`\1`", p) for p in parts)
 
 
 def _cell(value):
@@ -133,7 +143,7 @@ def head(c):
 
 
 def summary(c):
-    text = _text(c.prose.get("summary"))
+    text = _cited(c.prose.get("summary"))
     return [text or _unknown("summary not written yet")]
 
 
@@ -168,8 +178,8 @@ def _states(c, screen):
     if isinstance(written, list) and written:
         for st in written:
             if isinstance(st, dict) and st.get("name"):
-                ev = _text(st.get("evidence"))
-                lines.append(f"  - **{_text(st['name'])}:** {_text(st.get('shows')) or _unknown('nothing recorded')}. "
+                ev = _cited(st.get("evidence"))
+                lines.append(f"  - **{_text(st['name'])}:** {_cited(st.get('shows')) or _unknown('nothing recorded')}. "
                              f"Source: {ev or _unknown('no citation')}")
     else:
         for st in screen.get("states") or []:
@@ -182,7 +192,7 @@ def _states(c, screen):
 def screens(c):
     lines = []
     for s in c.screens:
-        purpose = _text(((c.prose.get("screens") or {}).get(s["id"]) or {}).get("purpose"))
+        purpose = _cited(((c.prose.get("screens") or {}).get(s["id"]) or {}).get("purpose"))
         actions = [_text(a) for a in _items(s.get("actions"))]
         lines += [f"### {s['name']} ({s['id']}) — {c.show(s.get('useCases') or [])}", "",
                   f"- **Purpose/content:** {purpose or _unknown('purpose not written yet')}",
@@ -272,7 +282,7 @@ def rules(c):
         lines += _rule(c, r)
     if not lines:
         lines = [_unknown("no rules extracted"), ""]
-    perms = [[c.shown[u["id"]], ", ".join(_items(u.get("personas"))) or "none", "; ".join(_items(u.get("permissions"))) or "none"]
+    perms = [[c.shown[u["id"]], ", ".join(_items(u.get("personas"))) or "none", "; ".join(p for p in _items(u.get("permissions")) if not c.is_dropped("permission", p)) or "none"]
              for u in c.cases]
     lines += ["### Permissions", ""] + _table(["CAP", "Personas", "Permissions and gates"], perms) + [""]
     ruled = {r.get("useCase") for r in shown}
@@ -280,7 +290,7 @@ def rules(c):
     if bare:
         lines += ["### Use cases without a rule", "",
                   _unknown("no rule extracted for " + ", ".join(bare)
-                           + '; add a rule or write "no client-side rule, server decides" with a citation'), ""]
+                           + f'; add a rule or write "{NO_RULE}" with a citation'), ""]
     return lines
 
 
@@ -301,7 +311,7 @@ def criteria(c):
             if _VALID_ID.match(shown) and shown not in ids:
                 ids.append(shown)
                 covered.add(uc)
-        text, ev = _text(raw.get("text")), _text(raw.get("evidence"))
+        text, ev = _cited(raw.get("text")), _cited(raw.get("evidence"))
         if not ids:
             if not gone:
                 orphans.append(f"- {_unknown('criterion without a use case id')}: {text}")
@@ -315,7 +325,7 @@ def criteria(c):
 
 
 def dependencies(c):
-    deps = [_text(d) for d in _items(c.prose.get("dependencies"))]
+    deps = [_cited(d) for d in _items(c.prose.get("dependencies"))]
     return [f"- {d}" for d in deps] or [_unknown("dependencies and decisions not written yet")]
 
 
@@ -323,9 +333,9 @@ def open_questions(c):
     lines = []
     for q in _items(c.prose.get("openQuestions")):
         if isinstance(q, dict):
-            lines.append(f"- **{_text(q.get('id')) or 'Q'}:** {_text(q.get('question'))} "
-                         f"Searched: {_text(q.get('searched')) or _unknown('not recorded')}. "
-                         f"Owner: {_text(q.get('owner')) or _unknown('not recorded')}.")
+            lines.append(f"- **{_text(q.get('id')) or 'Q'}:** {_cited(q.get('question'))} "
+                         f"Searched: {_cited(q.get('searched')) or _unknown('not recorded')}. "
+                         f"Owner: {_cited(q.get('owner')) or _unknown('not recorded')}.")
     for r in c.rules:
         if r.get("confidence") != "High" and r.get("question") and not (
                 r.get("useCase") and c.is_dropped("useCase", r["useCase"])):
@@ -353,7 +363,7 @@ def _element_rows(sid, elements):
 def fields_and_ids(c):
     lines = []
     for s in c.screens:
-        rows = [[key.split(".", 1)[1], e.get("kind"), e.get("textKey") or "", e.get("text") or "", e.get("identifier") or "",
+        rows = [[key.split(".", 1)[1], e.get("kind"), "" if c.is_dropped("string", e.get("textKey")) else e.get("textKey") or "", e.get("text") or "", e.get("identifier") or "",
                  e.get("proposedId"), _cite(e.get("file"), e.get("line"))]
                 for keys, key, e in _element_rows(s["id"], s.get("elements") or [])
                 if not any(c.is_dropped("field", k) for k in keys)]
@@ -364,7 +374,7 @@ def fields_and_ids(c):
 
 
 def data(c):
-    rows = [[d.get("entity"), d.get("fields"), d.get("storage"), d.get("lifetime"), d.get("evidence") or _unknown("no citation")]
+    rows = [[d.get("entity"), d.get("fields"), d.get("storage"), d.get("lifetime"), _cited(d.get("evidence")) or _unknown("no citation")]
             for d in _items(c.prose.get("data")) if isinstance(d, dict)]
     return (_table(["Entity", "Fields", "Storage", "Lifetime", "Evidence"], rows) if rows
             else [_unknown("data entities not written yet")])
@@ -375,12 +385,12 @@ def keep_and_drop(c):
     lines = []
     for case in c.cases:
         entry = written.get(case["id"]) or written.get(c.shown[case["id"]]) or {}
-        keep = [_text(k) for k in _items(entry.get("keep"))]
+        keep = [_cited(k) for k in _items(entry.get("keep"))]
         drop = [d for d in _items(entry.get("drop")) if isinstance(d, dict)]
         lines += [f"### {c.shown[case['id']]} {case['name']}", "", "- **Keep:**"]
         lines += [f"  - {k}" for k in keep] or ["  - " + _unknown("behaviour to keep not written yet")]
         lines.append("- **Drop:**")
-        lines += [f"  - {_text(d.get('what'))} (`{d.get('file')}`)" for d in drop] or [
+        lines += [f"  - {_cited(d.get('what'))} (`{d.get('file')}`)" for d in drop] or [
             "  - " + _unknown("implementation to drop not written yet")]
         lines.append("")
     return lines or ["UNKNOWN — no use cases in the catalog"]

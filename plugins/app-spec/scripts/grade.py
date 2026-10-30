@@ -26,12 +26,11 @@ from ledger import _platform_values  # noqa: E402
 from speclib import out  # noqa: E402
 from speclib.common import die  # noqa: E402
 from speclib.ids import norm  # noqa: E402
-from speclib.spec_md import Context, _element_rows, target  # noqa: E402
-from speclib.template import APPENDICES, AC_RE, HEADINGS  # noqa: E402
+from speclib.spec_md import NO_RULE, Context, _element_rows, target  # noqa: E402
+from speclib.template import APPENDICES, AC_RE, CITE_RE, HEADINGS  # noqa: E402
 
 CHECKS = ("sections", "rules-per-use-case", "criteria-per-use-case", "criteria-numbering", "citations-resolve",
           "unknowns-have-owner", "prose-complete", "no-duplicate-use-cases", "banned-nouns", "overrides-reflected")
-NO_RULE = "No client-side rule; the server decides."
 MAX_DETAIL = 20
 
 BODY = HEADINGS                                            # sections 1 to 8
@@ -40,10 +39,12 @@ APPENDIX_F = APPENDICES[5]
 
 _SPAN = re.compile(r"`([^`\n]+)`")
 _CITE = re.compile(r"^(\S+?):(\d+)(?:-(\d+))?$")
-_BARE_CITE = re.compile(r"[\w@+\-./]*[\w]\.[A-Za-z0-9]{1,6}:\d+(?:-\d+)?")
-_FILE_WORD = re.compile(r"\S*/\S*|[\w@+\-.]+\.(?:swift|kt|kts|java|ts|tsx|js|jsx|m|mm|h|dart|xml|json|plist|gradle|cs|py)\b")
+_CITE_SHAPE = re.compile(r"(?<![\w@+.\-/])" + CITE_RE + r"(?![\w])")  # a citation-shaped token, backticked or not
+_CITE_FULL = re.compile("^" + CITE_RE + "$")
 _PLACEHOLDER = "UNKNOWN — "
-_RULE_PLACEHOLDERS = ("UNKNOWN — no rule extracted for ", "UNKNOWN — no rules extracted")  # rules-per-use-case judges these
+_NO_RULES_LINE = "UNKNOWN — no rules extracted"  # the renderer's two own lines; rules-per-use-case judges them
+_NO_RULE_LINE = re.compile(r"^UNKNOWN — no rule extracted for ((?:UC|CAP)-\d{3,}(?:, (?:UC|CAP)-\d{3,})*); add a rule or write "
+                           r'"' + re.escape(NO_RULE) + r'" with a citation$')
 _ROW_SPLIT = re.compile(r"(?<!\\)\|")
 
 
@@ -89,16 +90,11 @@ def _token(ident):
 def _unmarked(line):
     """`line` without the parts that name code: backticked spans, paths and citations."""
     line = _SPAN.sub(" ", line)
-    line = _BARE_CITE.sub(" ", line)
-    return _FILE_WORD.sub(" ", line)
+    return _CITE_SHAPE.sub(" ", line)
 
 
 def _has_citation(line):
-    return bool(_BARE_CITE.search(line)) or any(_cites(line))
-
-
-def _filelike(path):
-    return "/" in path or bool(re.search(r"\.[A-Za-z0-9]+$", path))
+    return any(_cites(line))
 
 
 def _cites(line):
@@ -106,7 +102,7 @@ def _cites(line):
     for span in _SPAN.finditer(line):
         for part in re.split(r"\s*[,;]\s*", span.group(1).strip()):
             m = _CITE.match(part)
-            if m and _filelike(m.group(1)):
+            if m and _CITE_FULL.match(part):
                 yield part, m.group(1), int(m.group(2)), int(m.group(3) or m.group(2))
 
 
@@ -259,13 +255,20 @@ class _Grader:
 
     # ------------------------------------------------------------ unknowns
 
-    def _is_rule_placeholder(self, text):
-        return any(p in text for p in _RULE_PLACEHOLDERS)
+    def _rule_placeholders(self):
+        """The numbers of the lines the renderer's own no-rule hint wrote in section 5, for use cases that exist."""
+        shown = {self.ctx.shown[c["id"]] for c in self.ctx.cases}
+        found = set()
+        for number, text in self.spec.lines([HEADINGS[4]]):
+            m = _NO_RULE_LINE.match(text)
+            if text == _NO_RULES_LINE or (m and set(m.group(1).split(", ")) <= shown):
+                found.add(number)
+        return found
 
     def unknowns_have_owner(self):
-        items = []
+        items, exempt = [], self._rule_placeholders()
         for number, text in self.spec.lines(BODY):
-            if "UNKNOWN" not in text or _PLACEHOLDER in text or self._is_rule_placeholder(text):
+            if "UNKNOWN" not in text or _PLACEHOLDER in text or number in exempt:
                 continue
             low = text.lower()
             if not (re.search(r"\bsearched\b", low) and re.search(r"\bowner\b", low)):
@@ -273,8 +276,9 @@ class _Grader:
         return items
 
     def prose_complete(self):
+        exempt = self._rule_placeholders()
         return [f"line {n}: {t.strip()[:70]}" for n, t in self.spec.lines(NOT_COVERAGE)
-                if _PLACEHOLDER in t and not self._is_rule_placeholder(t)]
+                if _PLACEHOLDER in t and n not in exempt]
 
     # ------------------------------------------------------------ banned nouns
 
@@ -406,8 +410,7 @@ class _Grader:
     def _drop_items(self, kind, ident, body, in_f):
         if kind == "platform":
             return self._drop_platform(ident, in_f)
-        regions = [h for h in NOT_COVERAGE if not (kind == "string" and h == APPENDICES[0])]
-        text = self.spec.text(regions)
+        text = self.spec.text(NOT_COVERAGE)
         idents = [ident]
         if kind == "useCase":
             alias = next((c.get("alias") for c in self.ctx.all_cases if c["id"] == ident), None)
