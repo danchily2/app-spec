@@ -327,7 +327,7 @@ Fields are as in `understand_result.json` with names replaced by ids.
 | `errors` | Each status the code handles and what the user sees |
 | `auth` | The auth policy or token the app sends, or `null` |
 | `backend` | Where a contract repository defines the route, with its authorization, or `null` when no backend file was given or found |
-| `label` | `VERIFIED` when read in the code, `INFERRED` when deduced, `UNKNOWN` when not found. `VERIFIED` needs both the client and the backend cited, `INFERRED` only the client, `UNKNOWN` neither |
+| `label` | `VERIFIED` when read in the code, `INFERRED` when deduced, `UNKNOWN` when not found. `VERIFIED` needs both the client and the backend cited, `INFERRED` only the client, `UNKNOWN` neither. After `contracts.py` runs, `VERIFIED` means `backend` is set and a use case cites the endpoint with a client file, an endpoint with a backend match but no citing use case is `INFERRED`, an endpoint without a backend match that was `VERIFIED` from the client side becomes `INFERRED`, and `UNKNOWN` stays `UNKNOWN` |
 
 ### ids.json
 
