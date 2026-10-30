@@ -141,8 +141,17 @@ A re-run of `spec` regenerates every file except three. `app-spec.json` and `ove
 
 ### shards/&lt;id&gt;.json
 
-What one analyst reads: the shard's id, kind, name and files with the content each analyst needs, in the shape App
-Fusion's shard files have. Its fields are fixed by `module.py`, and workflows pass only the file path to the agent.
+What one analyst reads. `module.py` writes one file per shard, and workflows pass only the file path to the agent.
+
+```json
+{"id":"core-01","kind":"core|touch","name":"Payslips","files":["rel"],"loc":9000,
+ "hints":{"routes":[],"screens":[],"endpoints":[],"events":[]}}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `id`, `kind`, `name`, `files`, `loc` | As the same fields of the shard entry in `module.json` |
+| `hints` | The inventory entries whose file is inside the shard, as lists of routes, screens, endpoints and events. Empty lists when the inventory has not run yet |
 
 ### inventory.json and INVENTORY.md
 
@@ -255,6 +264,8 @@ The result of `extract-rules.js`, as returned.
 | `alias` | The `CAP-NNN` id from the capability index when the outcome matches, else `null` |
 | `screens` | `SCR-NNN` ids |
 | `endpoints` | `EP-NNN` ids |
+| `rulesHint` | Not carried into `use-cases.json` |
+| `screens` | `SCR-NNN` ids here. `understand_result.json` holds screen names |
 | Other fields | As in `understand_result.json` |
 
 ### screens.json
@@ -337,7 +348,7 @@ The registry that keeps ids stable. See Ids.
 | --- | --- |
 | `classes.<class>.total` | Inventory items in the class |
 | `classes.<class>.covered` | Items that a catalog entry references |
-| `classes.<class>.uncovered[]` | Items with no reference. `reason` is `null` when no reason exists. A reason recorded by a person in `overrides.json` is free text and always counts. A reason the scripts assign themselves must be one of `not user-facing`, `dead code`, `out of module` |
+| `classes.<class>.uncovered[]` | Items with no reference. `reason` is `null` when no reason exists. A reason recorded by a person in `overrides.json` is free text and always counts. A reason the scripts assign themselves, which is what "in the catalog" means, must be one of `not user-facing`, `dead code`, `out of module` |
 | `thresholds` | The percentages in force |
 | `pass` | `true` when every class meets its threshold and every uncovered item has a counting reason |
 
@@ -447,7 +458,7 @@ is observable on screen, so a Maestro flow or a unit test can assert it. Tools s
 | --- | --- | --- |
 | Coverage of screens, endpoints, events, permissions, storage keys | 100 percent | Overridable in `app-spec.json` |
 | Coverage of string keys and fields | 95 percent | Overridable in `app-spec.json` |
-| Reasons that let an uncovered item pass | `not user-facing`, `dead code`, `out of module` | A reason recorded by a person in `overrides.json` is free text and always counts. A reason the scripts assign themselves must be one of these three |
+| Reasons that let an uncovered item pass | `not user-facing`, `dead code`, `out of module` | A reason recorded by a person in `overrides.json` is free text and always counts. A reason the scripts assign themselves, which is what "in the catalog" means, must be one of these three |
 | Review passes | 2 | Range 1 to 5. Only Blocker and High findings are sent back |
 | Shard size | 9,000 non-blank lines | Without the Workflow tool: groups of up to about 25,000 lines, at most six analysts in parallel |
 | Locale | `en` | Source-language strings quoted in the spec |
