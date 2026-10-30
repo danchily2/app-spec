@@ -11,15 +11,20 @@ change. You find them, and state them so they survive the rebuild.
 
 ## What counts
 
-- **Validation**: required fields, formats, ranges, cross-field checks ("end date not before start date"), file type
-  and size limits for attachments.
-- **Calculation**: totals, balances, mileage, allowances, currency conversion, durations, rounding (to cents, to the
+Each card takes exactly one of these categories:
+
+- **validation**: required fields, formats, ranges, cross-field checks ("end date not before start date"), file type
+  and size limits for attachments, and which status transitions the UI allows (draft, submitted, approved, rejected).
+- **calculation**: totals, balances, mileage, allowances, currency conversion, durations, rounding (to cents, to the
   quarter hour).
-- **Eligibility**: who sees or may do what (role, permission flags, feature flags, company settings, platform).
-- **Lifecycle**: statuses and transitions (draft, submitted, approved, rejected, paid). What triggers each, and what
-  the UI allows in each.
-- **Policy**: retries, timeouts, cache lifetimes, offline queues, session expiry, reminders, rate limits, retention.
-- **Formatting**: dates, times, numbers, currency and names that a user reads and relies on, including locale rules.
+- **default**: the value a field, filter or choice starts with, and what is kept or reset when another value changes.
+- **ordering**: sorting, grouping and paging that a user relies on ("newest first, grouped by month").
+- **offline**: what works without a connection, what is cached and for how long, retries, timeouts, queues, session
+  expiry and reminders.
+- **flag**: behaviour switched by a feature flag, a remote setting, a company setting or the platform.
+- **permission**: who sees or may do what, by role, permission or system permission, and what a user without it sees.
+- **display**: dates, times, numbers, currency and names that a user reads and relies on, including locale rules, and
+  what is shown or hidden for a status.
 
 ## What does not count
 
@@ -38,7 +43,8 @@ of the technology, skip it.
    requirement, loses or corrupts data, or grants access wrongly. P2 for display conveniences. P1 otherwise.
 6. **Confidence.** High (explicit in code), Medium (inferred), Low (ambiguous). Below High, write the exact question
    for the owner.
-7. **Capability.** When the caller gives a capability catalog, name the `CAP-NNN` the rule belongs to, else null.
+7. **Use case.** When the caller gives a use-case index, name the use case the rule belongs to by its name, exactly as
+   the index writes it, else an empty string.
 8. If the code looks wrong (an off-by-one, a truncation instead of rounding, a check that can be bypassed), say so in
    `suspectedDefect`, and still describe what the code does.
 

@@ -49,11 +49,15 @@ catalogs and ids.
   shards/<id>.json      what each analyst reads
   inventory.json, INVENTORY.md      deterministic inventory scoped to the module
   fields.json           field inventory per screen
-  understand_result.json, rules_result.json   the workflows' results, as returned
+  understand_result.json, rules_result.json   the workflows' results, as returned (patches/ folded in by patch_result.py)
+  contracts/batch-<k>.json, contracts_result.json   the contract reader's envelopes, and their merge (merge_contracts.py)
+  patches/<name>.json   partial results of a follow-up run or a review fix, before they are folded in
   ids.json              the id registry                              (updated in place by render.py; never regenerated)
   use-cases.json, screens.json, flows.json, rules.json, endpoints.json   the catalogs, rendered
+  prose.json            the spec writer's prose, as returned
   ledger.json, LEDGER.md            coverage per class
   grade.json            shape checks
+  critic-<n>.json       the critic's findings of one pass, as returned
   review.json, REVIEW.md            the scorecard of every review pass          (reset by `spec`; `review` appends a pass)
   SPEC.md (or --name)   the deliverable
   OPEN_QUESTIONS.md
@@ -329,6 +333,13 @@ Fields are as in `understand_result.json` with names replaced by ids.
 | `auth` | The auth policy or token the app sends, or `null` |
 | `backend` | Where a contract repository defines the route, with its authorization, or `null` when no backend file was given or found |
 | `label` | `VERIFIED` when read in the code, `INFERRED` when deduced, `UNKNOWN` when not found. `VERIFIED` needs both the client and the backend cited, `INFERRED` only the client, `UNKNOWN` neither. After `contracts.py` runs, `VERIFIED` means `backend` is set and a use case cites the endpoint with a client file, an endpoint with a backend match but no citing use case is `INFERRED`, an endpoint without a backend match that was `VERIFIED` from the client side becomes `INFERRED`, and `UNKNOWN` stays `UNKNOWN` |
+| `reason` | Optional. Why the contract reader left the label `UNKNOWN`, naming the field it could not read |
+
+**Merge of the contract reader.** `contracts.py` runs first and sets `backend` and the route-based label; then the
+contract reader runs per batch of up to 10 endpoints, and `merge_contracts.py` writes its `request`, `response`,
+`errors` and `auth` into the entry with the same id, appends its disagreements, never lowers a `VERIFIED` label unless
+the reader returns `UNKNOWN` with a field-level `reason`, never raises a label to `VERIFIED`, and reports its
+`injectionFlags`. The envelopes are kept in `contracts_result.json` and applied again after every `render.py catalogs`.
 
 ### ids.json
 
@@ -381,7 +392,7 @@ source-file extension (a host with a port is not one). The renderer backticks ev
 
 ```json
 {"passes":[{"n":1,"ledger":{"pass":true},"grade":{"pass":true},
-  "critic":[{"severity":"Blocker|High|Medium|Nit","section":"Screens","finding":"...","fix":"...","owner":"spec-writer"}]}]}
+  "critic":[{"severity":"Blocker|High|Medium|Nit","section":"Screens","finding":"...","fix":"...","owner":"writer"}]}]}
 ```
 
 | Field | Meaning |
@@ -392,7 +403,37 @@ source-file extension (a host with a port is not one). The renderer backticks ev
 | `critic[].section` | The spec section the finding is about |
 | `critic[].finding` | What is wrong, with a citation |
 | `critic[].fix` | What to change |
-| `critic[].owner` | The agent that owns the gap |
+| `critic[].owner` | The part that owns the gap: `analyst`, `mapper`, `rules`, `contracts` or `writer`. The `spec` skill sends a Blocker or High finding back to it, for that gap only |
+
+### prose.json
+
+What the spec writer returns. `render.py spec` puts each entry into its slot; a slot without an entry is rendered as
+`UNKNOWN — <what is missing>`.
+
+```json
+{"summary":"...",
+ "screens":{"SCR-001":{"purpose":"...","states":[{"name":"empty","shows":"...","evidence":"`rel:line`"}]}},
+ "criteria":[{"ids":["UC-001"],"text":"...","evidence":"`rel:line`"}],
+ "dependencies":["..."],
+ "openQuestions":[{"id":"Q-001","question":"...","searched":"...","owner":"..."}],
+ "data":[{"entity":"...","fields":"...","storage":"...","lifetime":"...","evidence":"`rel:line`"}],
+ "keepDrop":{"UC-001":{"keep":["..."],"drop":[{"what":"...","file":"rel"}]}}}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `summary` | Section 1 |
+| `screens.<SCR>.purpose`, `states` | Purpose and content, and the states that replace the catalog's states, of one screen in section 3 |
+| `criteria` | Section 6, numbered in this order. `ids` are `UC-NNN` ids or their `CAP-NNN` aliases |
+| `dependencies` | Section 7, one line each |
+| `openQuestions` | Section 8 |
+| `data` | Appendix B, one row per entity |
+| `keepDrop.<UC>` | Appendix C: behaviour to keep, and implementation facts to drop with the file each came from |
+
+Every entry cites `path:line` in backticks, or says `UNKNOWN; searched: ...; owner: ...` (never `UNKNOWN — `, the
+renderer's mark for an empty slot, which `prose-complete` fails). A use case without a rule
+carries the sentence `No client-side rule; the server decides.` with a backticked citation in one of its criteria or
+in the purpose of one of its screens.
 
 ### SPEC.md and OPEN_QUESTIONS.md
 
@@ -496,9 +537,9 @@ is observable on screen, so a Maestro flow or a unit test can assert it. Tools s
 | `ios-analyst`, `android-analyst`, `rn-analyst` | Use-case fragments for one shard, in the fragment shape of `understand_result.json`. With a referee prompt: a verdict on each cited claim. Copied from App Fusion, edited to describe one app |
 | `use-case-mapper` | Merged use cases, screens and flows from all fragments, one use case per user outcome. No fusion classes |
 | `business-rules-extractor` | Rule cards for one shard in the shape of `rules_result.json`. Copied from App Fusion, edited to describe one app |
-| `contract-reader` | Endpoint entries in the shape of `endpoints.json`, from the app and from contract repositories |
-| `spec-writer` | The prose sections of `SPEC.md` from the catalogs, citations only |
-| `spec-critic` | Findings in the shape of `review.json` `critic`, ranked Blocker, High, Medium, Nit |
+| `contract-reader` | The envelope `{endpoints:[{id, request, response, errors, auth, label, reason, citations}], disagreements, injectionFlags}` for a batch of up to 10 endpoints, from the app and from contract repositories. `merge_contracts.py` merges it into `endpoints.json` |
+| `spec-writer` | `prose.json`: the prose slots of `SPEC.md` from the catalogs and the cited code, citations only |
+| `spec-critic` | Findings `[{severity, section, finding, fix, owner}]` in the shape of `review.json` `critic`, ranked Blocker, High, Medium, Nit. It opens at least one cited range per use case |
 
 | Workflow | Returns |
 | --- | --- |
