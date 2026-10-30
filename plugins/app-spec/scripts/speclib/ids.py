@@ -19,6 +19,21 @@ def norm(text):
     return " ".join(w for w in words if w not in _ARTICLES)
 
 
+def slug(text):
+    """`norm(text)` with hyphens between the words."""
+    return norm(text).replace(" ", "-")
+
+
+def element_slug(element, index):
+    """The short name of a screen element: the last part of its string key, else the first words of its text, else its
+    kind and index. `<SCR id>.<this>` is the key an override of `ids` or `drop` uses."""
+    key = str(element.get("textKey") or "")
+    name = slug(re.split(r"[./]", key)[-1]) if key else ""
+    if not name and element.get("text"):
+        name = "-".join(slug(element["text"]).split("-")[:6])
+    return name or f"{element.get('kind') or 'other'}-{index}"
+
+
 class Registry:
     """`ids.json`: one map per prefix from a key to its id, and `max`, the highest number issued per prefix.
 

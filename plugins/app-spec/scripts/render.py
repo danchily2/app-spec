@@ -2,6 +2,7 @@
 """Turn the workflow results into the catalogs every later step reads.
 
     python3 render.py catalogs <out>
+    python3 render.py spec <out> [--name FILE]
 
 `catalogs` reads understand_result.json and rules_result.json (as the workflows returned them), inventory.json,
 fields.json, app-spec.json and overrides.json from the output folder `<out>`. It assigns stable ids through ids.json
@@ -9,6 +10,11 @@ fields.json, app-spec.json and overrides.json from the output folder `<out>`. It
 flows.json, rules.json and endpoints.json. It never writes ids.json's old keys away, app-spec.json or overrides.json.
 Prints the counts, and any reference it could not resolve, to stderr. Exit code 2 when `<out>` is not an output
 folder or understand_result.json is missing. Standard library only.
+
+`spec` compiles the catalogs, fields.json, inventory.json, module.json, overrides.json, ledger.json (when present) and
+prose.json (when present) into the eight sections and six appendices of the template, and writes them to `<out>/FILE`
+(default SPEC.md). A prose slot with no prose.json entry is written as `UNKNOWN — <what is missing>`. The output is
+deterministic. Exit code 2 when `<out>` is not an output folder, a catalog is missing, or FILE leaves `<out>`.
 """
 
 import argparse
@@ -18,9 +24,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from speclib import out  # noqa: E402
+from speclib import out, spec_md  # noqa: E402
 from speclib.common import die, endpoints_match, load_json, normalize_endpoint  # noqa: E402
-from speclib.ids import Registry, norm  # noqa: E402
+from speclib.ids import Registry, element_slug, norm  # noqa: E402
 
 UC_LISTS = ("personas", "permissions", "screens", "files", "endpoints", "events", "strings", "storage", "platform")
 _LOCATION = re.compile(r":\d[\d,\-– ]*$")
@@ -273,20 +279,13 @@ class _Catalogs:
         overrides = self.overrides.get("ids") or {}
         used = set()
         for i, element in enumerate(elements):
-            slug = self._element_slug(element, i)
-            if slug in used:
-                slug = f"{slug}-{i}"
-            used.add(slug)
-            element["proposedId"] = (overrides.get(f"{sid}.{slug}") or element.get("identifier")
-                                     or f"{module}.{screen_slug}.{slug}")
+            name = element_slug(element, i)
+            if name in used:
+                name = f"{name}-{i}"
+            used.add(name)
+            element["proposedId"] = (overrides.get(f"{sid}.{name}") or element.get("identifier")
+                                     or f"{module}.{screen_slug}.{name}")
         return elements
-
-    def _element_slug(self, element, index):
-        key = str(element.get("textKey") or "")
-        slug = _slug(re.split(r"[./]", key)[-1]) if key else ""
-        if not slug and element.get("text"):
-            slug = "-".join(_slug(element["text"]).split("-")[:6])
-        return slug or f"{element.get('kind') or 'other'}-{index}"
 
     def _screens(self, screen_entries, uc_by_name, retired):
         result = []
@@ -391,12 +390,24 @@ def catalogs(dest):
     return _Catalogs(dest).run()
 
 
+def spec(dest, name="SPEC.md"):
+    """Write the spec for the output folder `dest` to `name` inside it. Return its text."""
+    return spec_md.write(dest, name)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="command", required=True)
     cat = sub.add_parser("catalogs", help="render the catalogs from the workflow results")
     cat.add_argument("out")
+    sp = sub.add_parser("spec", help="render the spec from the catalogs and prose.json")
+    sp.add_argument("out")
+    sp.add_argument("--name", default="SPEC.md", help="file name inside <out> (default SPEC.md)")
     args = ap.parse_args(argv)
+    if args.command == "spec":
+        spec(args.out, args.name)
+        print(os.path.join(args.out, args.name))
+        return
     if args.command == "catalogs":
         result = catalogs(args.out)
         for warning in result.pop("warnings"):
