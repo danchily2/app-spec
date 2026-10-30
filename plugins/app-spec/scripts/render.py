@@ -109,12 +109,17 @@ class _Catalogs:
             method = str(e.get("method") or "").upper()
             path = _endpoint_path(e.get("path"))
             if not method or not path:
+                self.warnings.append(f"inventory endpoint {e.get('type') or e.get('path')} in {_path(e.get('file'))} has "
+                                     f"no {'method' if not method else 'path'} and is left out of endpoints.json")
                 continue
             eid = self.registry.assign("EP", f"{method} {path}")
+            client = {"file": _path(e.get("file")), "type": e.get("type")}
             if eid in entries:
+                if client not in entries[eid]["clients"]:
+                    entries[eid]["clients"].append(client)
                 continue
             entries[eid] = {"id": eid, "method": method, "path": path, "raw": e.get("raw"), "useCases": [],
-                            "client": {"file": _path(e.get("file")), "type": e.get("type")},
+                            "client": client, "clients": [client],
                             "request": {"fields": []}, "response": {"fields": []}, "errors": [], "auth": None,
                             "backend": None, "label": "INFERRED"}
         return entries
@@ -136,10 +141,13 @@ class _Catalogs:
 
     def _use_cases(self, screen_ids, endpoints):
         cases = {}
+        current = {norm(r["name"]) for r in self.understood.get("useCases", []) if isinstance(r, dict) and r.get("name")}
         for raw in self.understood.get("useCases", []):
             if not isinstance(raw, dict) or not raw.get("name"):
                 continue
-            uid = self.registry.assign("UC", norm(raw["name"]))
+            files = sorted({_path(f) for f in _strings(raw.get("files"))})
+            uid = self._use_case_id(raw["name"], files, current, cases)
+            self.registry.data["UCfiles"][uid] = files
             if uid in cases:
                 self.warnings.append(f"use case {raw['name']} appears twice; the first is kept")
                 continue
@@ -151,6 +159,18 @@ class _Catalogs:
             case["evidence"] = raw.get("evidence") or "UNKNOWN"
             cases[uid] = case
         return cases
+
+    def _use_case_id(self, name, files, current, cases):
+        """The id of a use case: its key's id; for a new key, the id of a retired key whose recorded files are the
+        same list; else a new id."""
+        key = norm(name)
+        if key not in self.registry.data["UC"] and files:
+            live = {self.registry.data["UC"].get(k) for k in current}
+            for uid, recorded in sorted(self.registry.data["UCfiles"].items()):
+                if recorded == files and uid not in live and uid not in cases:
+                    self.registry.adopt("UC", key, uid)
+                    return uid
+        return self.registry.assign("UC", key)
 
     def _refs(self, names, by_name, where):
         """Screen ids for screen `names`. A name no screen has is dropped and reported."""
@@ -193,25 +213,28 @@ class _Catalogs:
         app = self.cfg["app"]["name"]
         caps = [c for c in caps if isinstance(c, dict) and c.get("id")]
         taken = set()
-        for case in cases.values():  # a name match wins
-            for cap in caps:
+        ordered = sorted(cases.values(), key=_number)
+        by_id = sorted(caps, key=lambda c: str(c["id"]))
+        for case in ordered:  # a name match wins
+            for cap in by_id:
                 if cap["id"] not in taken and norm(cap.get("name")) == norm(case["name"]):
                     case["alias"] = cap["id"]
                     taken.add(cap["id"])
                     break
-        for case in cases.values():  # then the largest overlap of implementation files
+        pairs = []  # then the largest overlaps of implementation files, assigned globally largest first
+        for case in ordered:
             if case["alias"]:
                 continue
             mine = {_path(f) for f in case["files"]}
-            best, best_count = None, 0
-            for cap in caps:
+            for cap in by_id:
                 impl = (cap.get("implementations") or {}).get(app) or {}
                 count = len(mine & {_path(f) for f in impl.get("files") or []})
-                if cap["id"] not in taken and count > best_count:
-                    best, best_count = cap["id"], count
-            if best:
-                case["alias"] = best
-                taken.add(best)
+                if count and cap["id"] not in taken:
+                    pairs.append((-count, _number(case), str(cap["id"]), case, cap["id"]))
+        for _, _, _, case, cap_id in sorted(pairs, key=lambda p: p[:3]):
+            if not case["alias"] and cap_id not in taken:
+                case["alias"] = cap_id
+                taken.add(cap_id)
 
     # ------------------------------------------------------------ screens, flows, rules
 
@@ -319,12 +342,12 @@ class _Catalogs:
     # ------------------------------------------------------------ labels, rename
 
     def _label_endpoints(self, endpoints, cases):
-        for case in cases.values():
+        for case in sorted(cases.values(), key=_number):
             files = {_path(f) for f in case["files"]}
             for eid in case["endpoints"]:
                 e = endpoints[eid]
                 e["useCases"].append(case["id"])
-                if e["client"]["file"] in files:
+                if files & {c["file"] for c in e["clients"]}:
                     e["label"] = "VERIFIED"
         for e in endpoints.values():
             if e["label"] != "VERIFIED":

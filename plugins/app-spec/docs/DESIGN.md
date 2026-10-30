@@ -321,6 +321,7 @@ Fields are as in `understand_result.json` with names replaced by ids.
 | `raw` | The path as written in the code, before constants were resolved |
 | `useCases` | `UC-NNN` ids that call it |
 | `client` | Where the app builds the call: its `file` and the request `type` |
+| `clients` | Every client that builds the call, as `{file,type}` entries. One endpoint key can have several clients. `client` is the first |
 | `request.fields`, `response.fields` | Field `name`, `type` and `required` (for a response, whether the value can be absent) |
 | `errors` | Each status the code handles and what the user sees |
 | `auth` | The auth policy or token the app sends, or `null` |
@@ -330,11 +331,13 @@ Fields are as in `understand_result.json` with names replaced by ids.
 ### ids.json
 
 ```json
-{"UC":{"view payslip list":"UC-001"},"SCR":{},"FLOW":{},"RULE":{},"EP":{"GET /payslips/{}":"EP-001"},
+{"UC":{"view payslip list":"UC-001"},"UCfiles":{"UC-001":["Modules/Payslips/PayslipList.swift"]},"SCR":{},"FLOW":{},"RULE":{},"EP":{"GET /payslips/{}":"EP-001"},
  "max":{"UC":7,"SCR":3,"FLOW":2,"RULE":11,"EP":4}}
 ```
 
-The registry that keeps ids stable. See Ids.
+The registry that keeps ids stable. See Ids. `UCfiles` maps each `UC` id to the sorted files of its use case, as `rel`
+without the line. A new use-case key whose sorted files equal those recorded for a retired key takes that id instead of
+a new one, so a renamed use case keeps its id.
 
 ### ledger.json and LEDGER.md
 

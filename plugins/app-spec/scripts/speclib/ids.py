@@ -3,7 +3,9 @@
 import os
 import re
 
-from .common import load_json, write_json
+import json
+
+from .common import die, write_json
 
 PREFIXES = ("UC", "SCR", "FLOW", "RULE", "EP")
 _ARTICLES = {"a", "an", "the"}
@@ -25,13 +27,23 @@ class Registry:
 
     def __init__(self, path):
         self.path = path
-        data = load_json(path, {})
-        self.data = data if isinstance(data, dict) else {}
+        data = {}
+        if os.path.exists(path):  # a missing file starts a new registry; an unreadable one must never restart numbering
+            try:
+                with open(path, encoding="utf-8") as fh:
+                    data = json.load(fh)
+            except (OSError, ValueError) as exc:
+                die(f"{path} cannot be read ({exc.__class__.__name__}); fix or remove it, ids would restart at 001")
+            if not isinstance(data, dict):
+                die(f"{path} is not a JSON object; fix or remove it, ids would restart at 001")
+        self.data = data
         for prefix in PREFIXES:
             if not isinstance(self.data.get(prefix), dict):
                 self.data[prefix] = {}
         if not isinstance(self.data.get("max"), dict):
             self.data["max"] = {}
+        if not isinstance(self.data.get("UCfiles"), dict):
+            self.data["UCfiles"] = {}  # files of each use case id, to recognise a renamed use case
 
     def _highest(self, prefix):
         """The highest number ever issued for `prefix`: the stored `max`, or a higher number found in the map."""
@@ -48,6 +60,10 @@ class Registry:
         mapping[key] = f"{prefix}-{number:03d}"
         self.data["max"][prefix] = number
         return mapping[key]
+
+    def adopt(self, prefix, key, id_):
+        """Record `key` as another name of the existing `id_` without issuing a number."""
+        self.data.setdefault(prefix, {})[key] = id_
 
     def save(self):
         """Write the registry to its path."""

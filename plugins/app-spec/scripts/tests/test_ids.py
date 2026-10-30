@@ -1,3 +1,5 @@
+import contextlib
+import io
 import json
 import os
 import shutil
@@ -50,6 +52,27 @@ class TestRegistry(unittest.TestCase):
         saved = self.read()
         self.assertEqual(saved["UC"]["old"], "UC-005")
         self.assertEqual(saved["max"]["UC"], 8)
+
+    def test_unreadable_registry_stops_and_is_left_untouched(self):
+        for text in ("{not json", "[1, 2]"):
+            with open(self.path, "w", encoding="utf-8") as fh:
+                fh.write(text)
+            with self.assertRaises(SystemExit) as caught, contextlib.redirect_stderr(io.StringIO()) as err:
+                ids.Registry(self.path)
+            self.assertEqual(caught.exception.code, 2)
+            self.assertIn("ids.json", err.getvalue())
+            with open(self.path, encoding="utf-8") as fh:
+                self.assertEqual(fh.read(), text)
+
+    def test_missing_registry_starts_empty(self):
+        self.assertEqual(ids.Registry(self.path).assign("UC", "a"), "UC-001")
+
+    def test_adopt_names_an_existing_id_without_a_new_number(self):
+        r = ids.Registry(self.path)
+        r.assign("UC", "old")
+        r.adopt("UC", "new", "UC-001")
+        self.assertEqual(r.assign("UC", "new"), "UC-001")
+        self.assertEqual(r.assign("UC", "other"), "UC-002")
 
     def test_prefixes_count_apart_and_have_three_digits(self):
         r = ids.Registry(self.path)

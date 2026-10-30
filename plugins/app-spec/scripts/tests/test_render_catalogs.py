@@ -12,6 +12,7 @@ import render
 
 IOS = str(FIX / "ios-app")
 RESULTS = FIX / "results"
+GETTER = "EmployeeServices/Payslips/Sources/Payslips/GetPayslips.swift"
 LIST_VIEW = "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipListView.swift"
 
 
@@ -184,6 +185,132 @@ class TestCatalogs(unittest.TestCase):
         code, _, err = run_cli(["render.py", "catalogs", self.out], module=render)
         self.assertEqual(code, 2)
         self.assertIn("understand_result.json", err)
+
+    # ---------------------------------------------------------------- fix round 1
+
+    def edit(self, name, change):
+        data = out.load(self.out, name)
+        change(data)
+        out.save(self.out, name, data)
+
+    def warnings(self):
+        return render.catalogs(self.out)["warnings"]
+
+    def test_inventory_endpoint_clients_are_collected_and_a_second_client_verifies(self):
+        def add(inv):
+            first = inv["endpoints"][1]
+            inv["endpoints"].append({**first, "type": "GetPayslipsV2", "file": LIST_VIEW + ":30"})
+            inv["endpoints"].append({"path": "/x/{}/y", "type": "NoVerb", "file": LIST_VIEW + ":40"})
+        self.edit("inventory.json", add)
+        self.edit("understand_result.json", lambda r: r["useCases"][0].update(files=[LIST_VIEW]))
+        warnings = self.warnings()
+        eps = out.load(self.out, "endpoints.json")["endpoints"]
+        self.assertEqual(len(eps), 2)
+        e = next(x for x in eps if x["path"].endswith("/payslips"))
+        self.assertEqual([c["type"] for c in e["clients"]], ["GetPayslips", "GetPayslipsV2"])
+        self.assertEqual(e["client"], e["clients"][0])
+        self.assertEqual(e["label"], "VERIFIED")  # only the second client file is in the use case's files
+        self.assertEqual([w for w in warnings if "NoVerb" in w and "no method" in w and "left out" in w].__len__(), 1)
+
+    def test_alias_and_endpoint_order_follow_the_ids_not_the_result_order(self):
+        index = os.path.join(self.tmp, "contend.json")
+        out.save(self.tmp, "contend.json", {"capabilities": [
+            {"id": "CAP-900", "name": "Overview", "implementations": {"ios-app": {"files": [LIST_VIEW, GETTER]}}}]})
+        cfg = out.load_config(self.out)
+        cfg["capabilityIndex"] = index
+        out.save(self.out, "app-spec.json", cfg)
+
+        def prepare(result):
+            result["useCases"][0]["files"] = [LIST_VIEW, GETTER]
+            result["useCases"][2]["files"] = [LIST_VIEW]
+            result["useCases"][2]["endpoints"] = ["GET /employees/{id}/payslips"]
+        self.edit("understand_result.json", prepare)
+        render.catalogs(self.out)
+        first = (out.load(self.out, "use-cases.json"), out.load(self.out, "endpoints.json"))
+        aliases = {u["id"]: u["alias"] for u in first[0]["useCases"]}
+        self.assertEqual(aliases["UC-001"], "CAP-900")  # the larger overlap wins although UC-003 may be listed first
+        self.assertIsNone(aliases["UC-003"])
+        self.edit("understand_result.json", lambda r: r["useCases"].reverse())
+        render.catalogs(self.out)
+        self.assertEqual((out.load(self.out, "use-cases.json"), out.load(self.out, "endpoints.json")), first)
+        e = next(x for x in first[1]["endpoints"] if x["path"].endswith("/payslips"))
+        self.assertEqual(e["useCases"], ["UC-001", "UC-003"])
+
+    def test_renamed_use_case_with_the_same_files_keeps_its_id(self):
+        render.catalogs(self.out)
+        self.edit("understand_result.json", lambda r: r["useCases"][0].update(name="See all my payslips"))
+        render.catalogs(self.out)
+        cases = {u["name"]: u["id"] for u in out.load(self.out, "use-cases.json")["useCases"]}
+        self.assertEqual(cases["See all my payslips"], "UC-001")
+        self.assertEqual(len(cases), 3)
+        saved = out.load(self.out, "ids.json")
+        self.assertEqual(saved["UC"]["view payslip list"], "UC-001")  # the old key stays
+        self.assertEqual(saved["max"]["UC"], 3)
+        self.assertEqual(saved["UCfiles"]["UC-001"], sorted({LIST_VIEW, GETTER}))
+
+    def test_a_new_use_case_with_other_files_gets_a_new_id(self):
+        render.catalogs(self.out)
+        self.edit("understand_result.json", lambda r: r["useCases"][0].update(name="Something else", files=[LIST_VIEW + ":1", "Other.swift"]))
+        render.catalogs(self.out)
+        ids_ = {u["name"]: u["id"] for u in out.load(self.out, "use-cases.json")["useCases"]}
+        self.assertEqual(ids_["Something else"], "UC-004")
+
+    def test_warning_unknown_screen_in_use_case_flow_step_and_rule(self):
+        def change(r):
+            r["useCases"][0]["screens"].append("GhostScreen")
+            r["flows"][0]["steps"][0]["screen"] = "GhostFlowScreen"
+        self.edit("understand_result.json", change)
+        self.edit("rules_result.json", lambda r: r["rules"][0].update(useCase="Ghost use case"))
+        warnings = self.warnings()
+        self.assertIn("use case View payslip list names the screen GhostScreen, which understand_result.json does not have", warnings)
+        self.assertIn("flow Read the latest payslip names the screen GhostFlowScreen, which understand_result.json does not have", warnings)
+        self.assertIn("rule Payslips are newest first names the use case Ghost use case, which understand_result.json does not have", warnings)
+        self.assertEqual(len(warnings), 3)
+
+    def test_warning_cited_endpoint_missing_from_inventory(self):
+        self.edit("understand_result.json", lambda r: r["useCases"][0]["endpoints"].append("GET /nothing/here/{id}"))
+        self.assertEqual(self.warnings(), ["use case View payslip list cites GET /nothing/here/{id}, which is not in the inventory"])
+
+    def test_warning_unknown_use_case_in_a_screen(self):
+        self.edit("understand_result.json", lambda r: r["screens"][1]["useCases"].append("Ghost"))
+        self.assertEqual(self.warnings(), ["screen PayslipDetailView names the use case Ghost, which understand_result.json does not have"])
+
+    def test_warning_duplicates_keep_the_first(self):
+        def change(r):
+            r["useCases"].append({**r["useCases"][0], "files": ["Other.swift"]})
+            r["screens"].append(dict(r["screens"][0]))
+            r["flows"].append(dict(r["flows"][0]))
+        self.edit("understand_result.json", change)
+        self.edit("rules_result.json", lambda r: r["rules"].append(dict(r["rules"][0])))
+        warnings = self.warnings()
+        self.assertIn("use case View payslip list appears twice; the first is kept", warnings)
+        self.assertIn(f"screen PayslipListView appears twice in {LIST_VIEW}; the first is kept", warnings)
+        self.assertIn("flow Read the latest payslip appears twice; the first is kept", warnings)
+        self.assertTrue(any(w.startswith("rule Payslips are newest first appears twice in ") for w in warnings))
+        self.assertEqual(len(warnings), 4)
+        self.assertEqual(len(out.load(self.out, "use-cases.json")["useCases"]), 3)
+        self.assertEqual(len(out.load(self.out, "rules.json")["rules"]), 2)
+
+    def test_warning_merge_into_an_unknown_id(self):
+        write_overrides(self.out, {"merge": [{"into": "UC-099", "from": ["UC-002"]}]})
+        self.assertEqual(self.warnings(), ["merge into UC-099 ignored: no such use case"])
+        self.assertIn("UC-002", [u["id"] for u in out.load(self.out, "use-cases.json")["useCases"]])
+
+    def test_merge_chain_points_every_reference_at_the_last_kept_id(self):
+        write_overrides(self.out, {"merge": [{"into": "UC-002", "from": ["UC-003"]}, {"into": "UC-001", "from": ["UC-002"]}]})
+        render.catalogs(self.out)
+        cases = out.load(self.out, "use-cases.json")["useCases"]
+        self.assertEqual([u["id"] for u in cases], ["UC-001"])
+        self.assertEqual(sorted(cases[0]["screens"]), ["SCR-001", "SCR-002"])
+        self.assertNotIn("UC-002", json.dumps(out.load(self.out, "flows.json")))
+        self.assertNotIn("UC-003", json.dumps(out.load(self.out, "screens.json")))
+
+    def test_cli_prints_warnings_on_stderr(self):
+        self.edit("understand_result.json", lambda r: r["useCases"][0]["endpoints"].append("GET /nothing/here/{id}"))
+        code, stdout, err = run_cli(["render.py", "catalogs", self.out], module=render)
+        self.assertEqual(code, 0)
+        self.assertEqual(err, "warning: use case View payslip list cites GET /nothing/here/{id}, which is not in the inventory\n")
+        self.assertEqual(stdout, "useCases 3, screens 2, flows 1, rules 2, endpoints 2\n")
 
 
 class TestAlias(unittest.TestCase):
