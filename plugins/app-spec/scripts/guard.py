@@ -149,6 +149,19 @@ def targets_of(token, cwd):
     return [resolve(token, cwd)], True
 
 
+def repo_top(path):
+    """The git repository a folder belongs to (the nearest folder with a .git entry), or None."""
+    d = os.path.realpath(path)
+    for _ in range(64):
+        if os.path.exists(os.path.join(d, ".git")):
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            return None
+        d = parent
+    return None
+
+
 # ---------------------------------------------------------------- the output folder(s)
 
 CONFIG = "app-spec.json"
@@ -553,6 +566,13 @@ def check_segment(argv, op, cwd, prot, f, prev_paths, depth, raw):
             root = prot.root_of(where)
             if root:
                 f.add("ask", f"`git {sub}` would change the repository in {root} (fetching or committing writes its refs)")
+            else:
+                # an output folder inside the app (or a repository above it): the repository still holds the app
+                top = repo_top(where)
+                held = top and (prot.root_of(top) or prot.holds(top))
+                if held:
+                    f.add("ask", f"`git {sub}` in the repository {top} would change {held}: app-spec never edits the source app or a "
+                                 "contract repository")
         return cwd, mentioned
     if verb == "find":
         options_at = next((k for k, a in enumerate(args[1:]) if a.startswith("-")), len(args) - 1)

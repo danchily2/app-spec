@@ -150,6 +150,46 @@ class Shell(GuardBase):
         self.assertIsNone(self.bash("cp a $DEST"))
 
 
+class GitFromTheOutputFolder(GuardBase):
+    """The output folder may lie inside the app's repository: a git write there still rewrites the app."""
+
+    def setUp(self):
+        super().setUp()
+        os.makedirs(os.path.join(self.APP, ".git"))
+        self.INNER = os.path.join(self.APP, "spec-out")
+        os.makedirs(self.INNER)
+        with open(os.path.join(self.INNER, "app-spec.json"), "w") as fh:
+            json.dump({"version": 1, "app": {"path": self.APP}, "contracts": []}, fh)
+        self.UNRELATED = os.path.join(os.path.dirname(self.APP), "other-repo")
+        os.makedirs(os.path.join(self.UNRELATED, ".git"))
+
+    def test_whole_tree_git_writes_from_the_output_folder_ask(self):
+        for cmd in ("git reset --hard HEAD~1", "git checkout main", "git stash", "git clean -fdx", "git switch main",
+                    "git restore .", "git apply x.patch", "git am x.mbox", "git merge main", "git rebase main", "git pull",
+                    "git cherry-pick abc", "git revert abc", "git rm -r .", "git mv a b", "git commit -a -m x"):
+            got = self.bash(cmd, cwd=self.INNER, project=self.INNER)
+            self.assertIsNotNone(got, cmd)
+            self.assertEqual(got["decision"], "ask", cmd)
+
+    def test_git_dash_c_from_outside_asks(self):
+        self.assertEqual(self.bash(f"git -C {self.INNER} reset --hard", cwd=self.OTHER, project=self.INNER)["decision"], "ask")
+        self.assertEqual(self.bash(f"cd {self.INNER} && git clean -fdx", cwd=self.OTHER, project=self.INNER)["decision"], "ask")
+        self.assertEqual(self.bash(f"git --work-tree={self.INNER} checkout .", cwd=self.OTHER, project=self.INNER)["decision"], "ask")
+
+    def test_a_repository_above_a_protected_root_asks(self):
+        monorepo = os.path.dirname(self.APP)
+        os.makedirs(os.path.join(monorepo, ".git"))
+        self.assertEqual(self.bash("git reset --hard", cwd=self.OUT)["decision"], "ask")
+
+    def test_git_in_an_unrelated_repository_and_reads_pass(self):
+        self.assertIsNone(self.bash("git reset --hard", cwd=self.UNRELATED, project=self.INNER))
+        self.assertIsNone(self.bash(f"git -C {self.UNRELATED} checkout main", cwd=self.INNER, project=self.INNER))
+        self.assertIsNone(self.bash("git status", cwd=self.APP, project=self.INNER))
+        self.assertIsNone(self.bash("git status", cwd=self.INNER, project=self.INNER))
+        self.assertIsNone(self.bash("git log --oneline", cwd=self.INNER, project=self.INNER))
+        self.assertIsNone(self.bash("git diff", cwd=self.INNER, project=self.INNER))
+
+
 class Discovery(GuardBase):
     def test_no_config_means_no_decision(self):
         os.remove(os.path.join(self.OUT, "app-spec.json"))
