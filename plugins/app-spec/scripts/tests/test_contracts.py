@@ -85,7 +85,7 @@ class TestEnrich(unittest.TestCase):
         self.assertEqual(e["backend"]["auth"], "PayslipUsersReadPolicy")
         pdf = self.pdf()
         self.assertIsNone(pdf["backend"])
-        self.assertIn(pdf["label"], ("INFERRED", "UNKNOWN"))
+        self.assertEqual(pdf["label"], "UNKNOWN")
 
     def test_enrich_is_idempotent(self):
         contracts.enrich(self.out, ASPNET)
@@ -126,6 +126,54 @@ class TestEnrich(unittest.TestCase):
         out.save(self.out, "endpoints.json", eps)
         contracts.enrich(self.out, ASPNET)
         self.assertEqual(self.eps()[0]["label"], "UNKNOWN")
+
+    def _repo(self, routes):
+        """An express repo with one file per (name, [paths]) pair."""
+        repo = os.path.join(self.tmp, "repo%d" % len(os.listdir(self.tmp)))
+        os.makedirs(os.path.join(repo, "routes"))
+        for name, paths in routes.items():
+            with open(os.path.join(repo, "routes", name + ".ts"), "w") as fh:
+                fh.write("import express from 'express';\nconst router = express.Router();\n")
+                fh.writelines(f"router.get('{p}', h);\n" for p in paths)
+        return repo
+
+    def _one(self, path, repo):
+        base = self.payslips()
+        out.save(self.out, "endpoints.json", {"version": 1, "endpoints": [dict(base, path=path, backend=None)]})
+        contracts.enrich(self.out, repo)
+        return self.eps()[0]
+
+    def test_closest_route_wins_over_longer_tail_match(self):
+        repo = self._repo({"a": ["/admin/payslips/:id"], "b": ["/api/v1/payslips/:id"]})
+        e = self._one("/api/v1/payslips/{}", repo)
+        self.assertEqual(e["backend"]["file"], "routes/b.ts")
+
+    def test_closer_segment_count_wins_without_exact_match(self):
+        repo = self._repo({"a": ["/api/v1/payslips/:id"], "b": ["/admin/payslips/:id"]})
+        e = self._one("/payslips/{}", repo)
+        self.assertEqual(e["backend"]["file"], "routes/b.ts")
+
+    def test_exact_route_wins_over_longer_tail_match(self):
+        repo = self._repo({"a": ["/admin/payslips/:id"], "b": ["/payslips/:id"]})
+        e = self._one("/payslips/{}", repo)
+        self.assertEqual(e["backend"]["file"], "routes/b.ts")
+
+    def test_parameter_route_preferred_over_literal(self):
+        repo = self._repo({"a": ["/employees/me/payslips"], "b": ["/employees/:id/payslips"]})
+        e = self._one("/employees/{}/payslips", repo)
+        self.assertEqual(e["backend"]["file"], "routes/b.ts")
+
+    def test_equal_routes_in_two_files_are_ambiguous(self):
+        repo = self._repo({"a": ["/admin/payslips/:id"], "b": ["/staff/payslips/:id"]})
+        e = self._one("/payslips/{}", repo)
+        self.assertIsNone(e["backend"])
+        self.assertEqual(e["label"], "INFERRED")
+        d = e["disagreements"]
+        self.assertEqual(len(d), 1)
+        self.assertEqual((d[0]["field"], d[0]["note"]), ("route", "ambiguous backend route"))
+        self.assertIn("routes/a.ts:3 | routes/b.ts:3", d[0]["backend"])
+        contracts.enrich(self.out, repo)
+        self.assertEqual(self.eps()[0]["disagreements"], d)
 
     def test_cli(self):
         code, _, err = run_cli(["contracts.py", self.out, "--repo", ASPNET, "--framework", "aspnet"])

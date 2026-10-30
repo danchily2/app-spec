@@ -239,13 +239,26 @@ def _cited(endpoint, cases):
     return False
 
 
+def _rank(endpoint_path, route, path):
+    """Sort key of a matching route: lower is a closer fit. Exact normalized path, then the smallest difference in
+    segment count, then the most literal segments that agree from the end of the path."""
+    sa, sb = endpoint_path.strip("/").split("/"), path.strip("/").split("/")
+    agree = sum(1 for x, y in zip(reversed(sa), reversed(sb)) if x == y and x != "{}")
+    return (0 if path == endpoint_path else 1, abs(len(sa) - len(sb)), -agree)
+
+
 def _best(endpoint, routes):
-    """The route that names this endpoint: an exact normalized path first, then the longest looser match."""
-    hits = [(r, p) for r, p in routes if r["method"] == endpoint["method"] and endpoints_match(endpoint["path"], p)]
+    """(route, ambiguous): the closest route that names this endpoint. When the two closest routes rank equal and sit
+    in different files, route is None and ambiguous lists them."""
+    hits = [(_rank(endpoint["path"], r, p), r["file"], r["line"], r) for r, p in routes
+            if r["method"] == endpoint["method"] and endpoints_match(endpoint["path"], p)]
     if not hits:
-        return None
-    exact = [h for h in hits if h[1] == endpoint["path"]]
-    return (exact or sorted(hits, key=lambda h: -len(h[1])))[0][0]
+        return None, []
+    hits.sort(key=lambda h: h[:3])
+    tied = [h for h in hits if h[0] == hits[0][0]]
+    if len({h[1] for h in tied}) > 1:
+        return None, [h[3] for h in tied]
+    return hits[0][3], []
 
 
 def enrich(out_dir, repo_root, framework="auto"):
@@ -263,9 +276,19 @@ def enrich(out_dir, repo_root, framework="auto"):
     matched = 0
     for e in data.get("endpoints", []):
         if not e.get("backend"):
-            route = _best(e, routes)
+            route, ambiguous = _best(e, routes)
             if route:
                 e["backend"] = {"repo": repo_root, "file": route["file"], "line": route["line"], "auth": route["auth"]}
+            elif ambiguous:
+                note = {"field": "route", "client": (e.get("client") or {}).get("file"),
+                        "backend": " | ".join(f"{r['file']}:{r['line']}" for r in ambiguous),
+                        "note": "ambiguous backend route"}
+                if note not in e.setdefault("disagreements", []):
+                    e["disagreements"].append(note)
+        if e.get("backend") and e.get("disagreements"):
+            e["disagreements"] = [d for d in e["disagreements"] if d.get("note") != "ambiguous backend route"]
+            if not e["disagreements"]:
+                del e["disagreements"]
         cited = _cited(e, cases) if have_cases else e.get("label") == "VERIFIED"
         if e.get("backend"):
             matched += 1
