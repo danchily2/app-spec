@@ -16,11 +16,13 @@ findings that remain, then `Next:` with its reason. Add nothing it does not say,
 Exit code 2 means `OUT` is not an output folder: say so, and name the command that starts a run,
 `/app-spec:spec <app> --module <name> --out OUT`.
 
-Finish by naming the exact next command, as `status.py` printed it after `Next:`. When it names a stage that runs
-inside `/app-spec:spec` (the understand or rules workflow), the next command is that `/app-spec:spec` line.
-
 ## In Devin
 
 - Write the plugin's real folder out instead of `${CLAUDE_PLUGIN_ROOT}`, here and in the `Next:` command
   `status.py` prints. The session-start note prints that folder.
 - This command needs no Workflow tool and asks nothing.
+
+## Finish
+
+Name the exact next command, as `status.py` printed it after `Next:`. When it names a stage that runs inside
+`/app-spec:spec` (the understand or rules workflow), the next command is that `/app-spec:spec` line.

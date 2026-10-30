@@ -56,6 +56,12 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/review.py" accept OUT --kind <kind> --id 
 After the last one, run `ledger.py OUT` again so the coverage shows the recorded reasons. Say that an accepted item
 leaves the spec on the next `render.py spec`, and that the grader then checks it is listed in Appendix F.
 
+## In Devin
+
+- Write the plugin's real folder out instead of `${CLAUDE_PLUGIN_ROOT}`; the session-start note prints it.
+- AskUserQuestion is `ask_user_question`. Run the critic with `run_subagent` and the profile `app-spec:spec-critic`.
+- This command needs no Workflow tool.
+
 ## Finish
 
 Report the ledger and grade verdicts, the coverage per class, the findings by severity with the Blocker and High ones
@@ -67,9 +73,3 @@ named, and the reasons recorded. Name the next command exactly:
 - With `--accept` reasons recorded: "Next: `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/render.py" spec OUT NAME_ARG`,
   then `/app-spec:review OUT`."
 - Otherwise: "Next: a person reads `OUT/NAME`; it is ready for planning."
-
-## In Devin
-
-- Write the plugin's real folder out instead of `${CLAUDE_PLUGIN_ROOT}`; the session-start note prints it.
-- AskUserQuestion is `ask_user_question`. Run the critic with `run_subagent` and the profile `app-spec:spec-critic`.
-- This command needs no Workflow tool.

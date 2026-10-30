@@ -237,6 +237,18 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/review.py" questions OUT
 It writes `OPEN_QUESTIONS.md` from the writer's open questions, every rule question and every `UNKNOWN` endpoint, each
 with its id, what was searched and who can answer.
 
+## In Devin
+
+- `${CLAUDE_PLUGIN_ROOT}` is not set in Devin's shell: write the plugin's real folder out in every command. The
+  session-start note prints it.
+- AskUserQuestion is `ask_user_question` (1 to 4 questions, 2 to 4 options each).
+- There is no Workflow tool: take the "Without the Workflow tool" path of steps 3 and 4, and run every agent with
+  `run_subagent` and the profile `app-spec:<agent>`. For several in parallel, start them in the background and wait
+  for each with `read_subagent`.
+- Devin has no plugin options: the passes default to `options.passes` in `app-spec.json`, else 2. `APP_SPEC_GUARD=false`
+  turns the guard off.
+- Put the printed `Write(...)` deny rules in `.devin/config.json`, not `.claude/settings.json`.
+
 ## Finish
 
 Report:
@@ -254,15 +266,3 @@ Report:
 The next step is a person: they read `OUT/NAME` with `REVIEW.md` and `OPEN_QUESTIONS.md` before any plan or issue is
 made from it. Name it exactly: "Next: read `OUT/NAME`. After you edit it, run `/app-spec:review OUT`." Any time,
 `/app-spec:status OUT` says where the run stands.
-
-## In Devin
-
-- `${CLAUDE_PLUGIN_ROOT}` is not set in Devin's shell: write the plugin's real folder out in every command. The
-  session-start note prints it.
-- AskUserQuestion is `ask_user_question` (1 to 4 questions, 2 to 4 options each).
-- There is no Workflow tool: take the "Without the Workflow tool" path of steps 3 and 4, and run every agent with
-  `run_subagent` and the profile `app-spec:<agent>`. For several in parallel, start them in the background and wait
-  for each with `read_subagent`.
-- Devin has no plugin options: the passes default to `options.passes` in `app-spec.json`, else 2. `APP_SPEC_GUARD=false`
-  turns the guard off.
-- Put the printed `Write(...)` deny rules in `.devin/config.json`, not `.claude/settings.json`.
