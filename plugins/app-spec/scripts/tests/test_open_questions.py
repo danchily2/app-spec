@@ -90,6 +90,69 @@ class TestStructuralUnknowns(unittest.TestCase):
         self.assertFalse(check(grade.run(self.dest, "BAD2.md"), "prose-complete")["pass"])
 
 
+class TestEveryCatalogGap(unittest.TestCase):
+    """Complete prose, and every kind of gap a catalog can have: each UNKNOWN names a listed open question."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mkdtemp()
+        cls.dest = make_good(cls.tmp, "gaps")
+
+        def cases(data):
+            data["useCases"][0]["evidence"] = "UNKNOWN"
+            data["useCases"][1].update(files=["Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipDetailView.swift"],
+                                       screens=[])  # a file without a line, and no screen declaration to fall back on
+            data["useCases"][2].update(files=[], screens=[])
+
+        def screens(data):
+            data["screens"][0].update(actions=[], file=None)
+
+        def endpoints(data):
+            data["endpoints"][0].update(label=None, auth=None, errors=[{"status": 500}], backend=None,
+                                        response={"fields": [{"name": "id"}]})
+
+        def rules(data):
+            data["rules"][0].update(priority=None, category=None, plainEnglish=None, source=None)
+            data["rules"][1].update(confidence="Low", question=None)
+
+        edit(cls.dest, "use-cases.json", cases)
+        edit(cls.dest, "screens.json", screens)
+        edit(cls.dest, "endpoints.json", endpoints)
+        edit(cls.dest, "rules.json", rules)
+        prose = out.load(cls.dest, "prose.json")
+        prose["screens"]["SCR-002"].pop("states")  # the catalog's states show, one with UNKNOWN evidence
+        out.save(cls.dest, "prose.json", prose)
+        edit(cls.dest, "screens.json", lambda d: d["screens"][1].update(
+            states=[{"name": "error", "shows": "A retry button", "evidence": "UNKNOWN"}]))
+        render.spec(cls.dest)
+        cls.text = read_text(cls.dest, "SPEC.md")
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, True)
+
+    def test_unknowns_have_owner_passes(self):
+        c = check(grade.run(self.dest), "unknowns-have-owner")
+        self.assertTrue(c["pass"], c["detail"])
+
+    def test_every_unknown_in_the_body_names_a_listed_open_question(self):
+        body = self.text.split("## Appendix A.", 1)[0]
+        listed = set(re.findall(r"^- \*\*(OQ-\d{3}):\*\*", section(self.text, "## Open questions"), re.M))
+        for line in body.splitlines():
+            if ("UNKNOWN" in line and "UNKNOWN — " not in line  # the writer's placeholders are prose-complete's job
+                    and not line.startswith("- **OQ-") and not line.startswith("Evidence labels")):
+                refs = set(re.findall(r"open question (OQ-\d{3})", line))
+                self.assertTrue(refs and refs <= listed, line)
+
+    def test_a_missing_line_is_not_an_unknown_fact(self):
+        caps = section(self.text, "## Capabilities")
+        self.assertIn("line not resolved", caps)
+
+    def test_catalog_gaps_leave_no_placeholder_for_the_grader(self):
+        c = check(grade.run(self.dest), "prose-complete")
+        self.assertTrue(c["pass"], c["detail"])
+
+
 class TestAcceptedLedgerItems(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()

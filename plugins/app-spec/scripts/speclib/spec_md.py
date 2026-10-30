@@ -158,18 +158,23 @@ def _design(c, case):
     if cite:
         return f"carry-as-is ({c.app} {cite})"
     if files:
-        return f"carry-as-is ({c.app} {files[0]}, line UNKNOWN)"
-    return f"carry-as-is ({c.app} UNKNOWN: no file cited)"
+        return f"carry-as-is ({c.app} {files[0]}, line not resolved)"
+    return f"carry-as-is ({c.app}, {_oq(c, case['id'])})"
+
+
+def _evidence(c, ref, label):
+    """An evidence label as the spec shows it: a known label as it is, else the open question that asks for it."""
+    return label if label in ("VERIFIED", "INFERRED", "PROPOSED") else _oq(c, ref)
 
 
 def capabilities(c):
     rows = []
     for case in c.cases:
         screens = ", ".join(c.screen_names[s] for s in case.get("screens") or [] if s in c.screen_names) or "none"
-        notes = " ".join(p for p in (f"{case.get('evidence') or 'UNKNOWN'}.", _text(case.get("description")),
+        notes = " ".join(p for p in (f"{_evidence(c, case['id'], case.get('evidence'))}.", _text(case.get("description")),
                                      f"Personas: {', '.join(_items(case.get('personas')))}." if _items(case.get("personas")) else "") if p)
         rows.append([c.shown[case["id"]], case["name"], _design(c, case), screens, notes])
-    return _table(["CAP", "Name", "Design", "Screens", "Notes"], rows) if rows else ["UNKNOWN — no use cases in the catalog"]
+    return _table(["CAP", "Name", "Design", "Screens", "Notes"], rows) if rows else ["No use cases in the catalog."]
 
 
 def _states(c, screen):
@@ -184,9 +189,30 @@ def _states(c, screen):
     else:
         for st in screen.get("states") or []:
             if isinstance(st, dict) and st.get("name"):
-                lines.append(f"  - **{_text(st['name'])}:** {_text(st.get('shows')) or _unknown('nothing recorded')}. "
-                             f"{st.get('evidence') or 'UNKNOWN'}.")
+                lines.append(f"  - **{_text(st['name'])}:** {_text(st.get('shows')) or _oq(c, screen['id'])}. "
+                             f"{_evidence(c, screen['id'], st.get('evidence'))}.")
     return lines or ["  - " + _unknown("no states found for this screen")]
+
+
+def _catalog_states(c, screen):
+    """The catalog's states when the writer gave none for the screen: they are what the spec shows."""
+    written = ((c.prose.get("screens") or {}).get(screen["id"]) or {}).get("states")
+    if isinstance(written, list) and written:
+        return []
+    return [st for st in screen.get("states") or [] if isinstance(st, dict) and st.get("name")]
+
+
+def _screen_gaps(c, s):
+    gaps = []
+    unsure = [_text(st["name"]) for st in _catalog_states(c, s)
+              if st.get("evidence") not in ("VERIFIED", "INFERRED", "PROPOSED") or not _text(st.get("shows"))]
+    if unsure:
+        gaps.append(f"what the user sees in the {', '.join(unsure)} state{'s' if len(unsure) > 1 else ''}")
+    if not _items(s.get("actions")):
+        gaps.append("the actions a user has")
+    if not s.get("file"):
+        gaps.append("where the screen is declared")
+    return gaps
 
 
 def screens(c):
@@ -196,16 +222,22 @@ def screens(c):
         actions = [_text(a) for a in _items(s.get("actions"))]
         lines += [f"### {s['name']} ({s['id']}) — {c.show(s.get('useCases') or [])}", "",
                   f"- **Purpose/content:** {purpose or _unknown('purpose not written yet')}",
-                  f"- **Actions:** {'; '.join(actions) or _unknown('no actions found')}",
+                  f"- **Actions:** {'; '.join(actions) or _oq(c, s['id'])}",
                   "- **States:**", *_states(c, s),
-                  f"- **Source:** {s.get('file') or _unknown('no declaration cited')}", ""]
-    return lines or ["UNKNOWN — no screens in the catalog"]
+                  f"- **Source:** {s.get('file') or _oq(c, s['id'])}", ""]
+    return lines or ["No screens in the catalog."]
 
 
-def _field_rows(fields):
-    return [[f.get("name"), f.get("type") or "UNKNOWN",
-             {True: "yes", False: "no"}.get(f.get("required"), "UNKNOWN"), f.get("nullable") or "UNKNOWN"]
+def _field_rows(fields, missing="not recorded"):
+    return [[f.get("name"), f.get("type") or missing,
+             {True: "yes", False: "no"}.get(f.get("required"), missing), f.get("nullable") or missing]
             for f in fields if isinstance(f, dict)]
+
+
+def _incomplete_fields(e):
+    return [_text(f.get("name")) or "unnamed" for key in ("request", "response")
+            for f in ((e.get(key) or {}).get("fields") or [])
+            if isinstance(f, dict) and not (f.get("type") and f.get("required") in (True, False) and f.get("nullable"))]
 
 
 def _clients(e):
@@ -221,8 +253,15 @@ def _endpoint_gaps(e):
         gaps.append("the auth it sends")
     if not _field_rows(((e.get("response") or {}).get("fields")) or []):
         gaps.append("the response fields")
-    if not [x for x in e.get("errors") or [] if isinstance(x, dict)]:
+    incomplete = _incomplete_fields(e)
+    if incomplete:
+        gaps.append(f"the type, required flag or nullability of {', '.join(incomplete)}")
+    errors = [x for x in e.get("errors") or [] if isinstance(x, dict)]
+    if not errors:
         gaps.append("the errors it handles and what the user sees")
+    silent = [str(x.get("status")) for x in errors if not _text(x.get("reaction"))]
+    if silent:
+        gaps.append(f"what the user sees on {', '.join(silent)}")
     if not _clients(e):
         gaps.append("the client that builds it")
     if not isinstance(e.get("backend"), dict):
@@ -230,10 +269,30 @@ def _endpoint_gaps(e):
     return gaps
 
 
+def _case_gaps(case):
+    gaps = []
+    if case.get("evidence") not in ("VERIFIED", "INFERRED", "PROPOSED"):
+        gaps.append(f"the code that implements it (evidence {_text(case.get('evidence')) or 'not recorded'})")
+    if not _items(case.get("files")) and not case.get("screens"):
+        gaps.append("the files that implement it")
+    return gaps
+
+
+def _rule_gaps(r):
+    return [what for key, what in (("priority", "priority"), ("category", "category"),
+                                   ("plainEnglish", "plain-English statement"), ("source", "source lines"))
+            if not _text(r.get(key))]
+
+
+def _files(values):
+    return ", ".join(f"`{v}`" for v in values if v)
+
+
 def open_question_entries(c):
-    """Every open question of section 8 and OPEN_QUESTIONS.md, in order: the writer's, then one `OQ-NNN` per endpoint
-    the catalog leaves incomplete, then one per rule below High confidence. Each is a dict with `id`, `question`,
-    `searched`, `owner` and, for the structural ones, `ref` (the endpoint or rule id the question belongs to)."""
+    """Every open question of section 8 and OPEN_QUESTIONS.md, in order: the writer's, then one `OQ-NNN` per use case,
+    screen and endpoint the catalog leaves incomplete, then one per rule below High confidence or with a field missing.
+    Each is a dict with `id`, `question`, `searched`, `owner` and, for the structural ones, `ref` (the catalog id the
+    question belongs to). Every UNKNOWN the renderer writes from a catalog points at one of these."""
     if getattr(c, "_open", None) is not None:
         return c._open
     entries = []
@@ -244,6 +303,19 @@ def open_question_entries(c):
                             "owner": _cited(q.get("owner")) or _unknown("not recorded"), "ref": None})
     owner = f"owner of {c.app}"
     structural = []
+    for case in c.cases:
+        gaps = _case_gaps(case)
+        if gaps:
+            structural.append({"question": f'What are {", ".join(gaps)} of the use case "{_text(case["name"])}" '
+                                           f"({c.shown[case['id']]})?",
+                               "searched": _files(_items(case.get("files"))) or "the module's core files",
+                               "owner": owner, "ref": case["id"]})
+    for s in c.screens:
+        gaps = _screen_gaps(c, s)
+        if gaps:
+            structural.append({"question": f"What are {', '.join(gaps)} of the screen {s['name']} ({s['id']})?",
+                               "searched": _files([s.get("file")]) or "the module's screen files",
+                               "owner": owner, "ref": s["id"]})
     for e in c.endpoints:
         gaps = _endpoint_gaps(e)
         if gaps:
@@ -251,9 +323,15 @@ def open_question_entries(c):
             structural.append({"question": f"What are {', '.join(gaps)} of {e['method']} {e['path']} ({e['id']})?",
                                "searched": files or "the module's network clients", "owner": owner, "ref": e["id"]})
     for r in c.rules:
-        if r.get("confidence") != "High" and not (r.get("useCase") and c.is_dropped("useCase", r["useCase"])):
-            question = _text(r.get("question")) or (f'Is the rule "{_text(r.get("name"))}" right as stated? Its '
-                                                     f"confidence is {r.get('confidence') or 'not recorded'}.")
+        missing = _rule_gaps(r)
+        if (r.get("confidence") != "High" or missing) and not (r.get("useCase") and c.is_dropped("useCase", r["useCase"])):
+            if r.get("confidence") != "High":
+                question = _text(r.get("question")) or (f'Is the rule "{_text(r.get("name"))}" right as stated? Its '
+                                                         f"confidence is {r.get('confidence') or 'not recorded'}.")
+            else:
+                question = f'What completes the rule "{_text(r.get("name"))}"?'
+            if missing:
+                question += f" Its {', '.join(missing)} {'is' if len(missing) == 1 else 'are'} not recorded."
             structural.append({"question": f"{question} ({r['id']})",
                                "searched": f"`{r.get('source')}`" if r.get("source") else "the module's code",
                                "owner": owner, "ref": r["id"]})
@@ -280,7 +358,7 @@ def endpoints(c):
         if isinstance(backend, dict) and backend.get("auth"):
             lines[-1] += f"; backend: {_text(backend['auth'])}"
         for label, key in (("Request fields", "request"), ("Response fields", "response")):
-            rows = _field_rows(((e.get(key) or {}).get("fields")) or [])
+            rows = _field_rows(((e.get(key) or {}).get("fields")) or [], _oq(c, e["id"]))
             if rows:
                 lines += [f"- **{label}:**", ""] + _table(["Name", "Type", "Required", "Nullable"], rows) + [""]
             else:
@@ -288,7 +366,7 @@ def endpoints(c):
         errors = [x for x in e.get("errors") or [] if isinstance(x, dict)]
         if errors:
             lines.append("- **Errors and UI reaction:**")
-            lines += [f"  - {x.get('status')}: {_text(x.get('reaction')) or _unknown('no reaction recorded')}" for x in errors]
+            lines += [f"  - {x.get('status')}: {_text(x.get('reaction')) or _oq(c, e['id'])}" for x in errors]
         else:
             lines.append("- **Errors and UI reaction:** " + _oq(c, e["id"]))
         clients = _clients(e)
@@ -304,7 +382,7 @@ def endpoints(c):
                 lines.append(f"- **Disagreement on `{d.get('field')}`:** client `{d.get('client')}`, backend `{d.get('backend')}`. "
                              f"{_text(d.get('note'))}")
         lines.append("")
-    return lines or ["UNKNOWN — no endpoints in the catalog"]
+    return lines or ["No endpoints in the catalog."]
 
 
 def _param(p):
@@ -315,10 +393,11 @@ def _param(p):
 
 def _rule(c, r):
     uc = r.get("useCase")
+    gap = _oq(c, r["id"])
     lines = [f"### {r['id']} — {_text(r.get('name'))}", "",
-             f"- **Priority:** {r.get('priority') or 'UNKNOWN'}; **category:** {r.get('category') or 'UNKNOWN'}; "
-             f"**confidence:** {r.get('confidence') or 'UNKNOWN'}; **use case:** {c.shown.get(uc, uc) if uc else 'none'}",
-             f"- **Rule:** {_text(r.get('plainEnglish')) or _unknown('no plain-English statement')}",
+             f"- **Priority:** {r.get('priority') or gap}; **category:** {r.get('category') or gap}; "
+             f"**confidence:** {r.get('confidence') or gap}; **use case:** {c.shown.get(uc, uc) if uc else 'none'}",
+             f"- **Rule:** {_text(r.get('plainEnglish')) or gap}",
              f"- **Given:** {_text(r.get('given'))}",
              f"- **When:** {_text(r.get('when'))}",
              f"- **Then:** {_text(r.get('then'))}"]
@@ -330,7 +409,7 @@ def _rule(c, r):
         lines.append("- **Edge cases:** " + "; ".join(edges))
     if r.get("suspectedDefect"):
         lines.append(f"- **Suspected defect in the old app (do not copy):** {_text(r['suspectedDefect'])}")
-    lines.append(f"- **Source:** `{r.get('source')}`" if r.get("source") else "- **Source:** " + _unknown("no source cited"))
+    lines.append(f"- **Source:** `{r.get('source')}`" if r.get("source") else "- **Source:** " + gap)
     if r.get("confidence") != "High":
         oq = next((q["id"] for q in open_question_entries(c) if q.get("ref") == r["id"]), None)
         if r.get("question") and oq:

@@ -384,12 +384,17 @@ One entry per shape check of the grader, in this order: `sections`, `rules-per-u
 when every check passes.
 
 `unknowns-have-owner` fails for a line of sections 1 to 8 that holds `UNKNOWN` without the words `searched` and `owner`,
-unless every `OQ-NNN` the line names as `open question OQ-NNN` is listed in section 8. The renderer writes the gaps the
-catalogs leave as `UNKNOWN (open question OQ-NNN)`: one open question per endpoint whose label is `UNKNOWN` or that has
-no auth, response fields, errors, client or backend, and one per rule below High confidence. Each such question says
-what was searched (the client files or the rule's source) and its owner, `owner of <app name>`. The ids run from
-`OQ-001` in that order after the writer's own questions, and `review.py questions` writes `OPEN_QUESTIONS.md` from the
-same list. The prose placeholder `UNKNOWN — <what is missing>` is left to `prose-complete`, which fails while one
+unless every `OQ-NNN` the line names as `open question OQ-NNN` is listed in section 8. Every UNKNOWN the renderer writes
+from a catalog in sections 1 to 8 is `UNKNOWN (open question OQ-NNN)`, with one open question per catalog entry that has
+gaps: a use case with evidence other than VERIFIED, INFERRED or PROPOSED, or with no file and no screen; a screen whose
+catalog states have no known evidence or no text, or that has no actions or no declaration; an endpoint whose label is
+`UNKNOWN` or that has no auth, response fields, errors, client or backend, a field without type, required flag or
+nullability, or an error without a reaction; a rule below High confidence, or without priority, category, statement or
+source. Each question says what was searched (the entry's files, declaration, clients or source) and its owner,
+`owner of <app name>`. The ids run from `OQ-001` in that order (use cases, screens, endpoints, rules) after the
+writer's own questions, and `review.py questions` writes `OPEN_QUESTIONS.md` from the same list. What is not a
+question is written so that it is not an unknown fact: a cited file whose line could not be resolved reads
+`line not resolved`, and an empty catalog reads `No endpoints in the catalog.` (and so on). The prose placeholder `UNKNOWN — <what is missing>` is left to `prose-complete`, which fails while one
 remains before Appendix F.
 
 `overrides-reflected` knows, besides the catalog ids, every item key the ledger counts (a screen as `<file> <name>`, a
