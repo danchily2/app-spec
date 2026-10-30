@@ -5,12 +5,10 @@ struct PayslipListView: View {
 
     var body: some View {
         NavigationStack {
-            List(items, id: \.self) { item in
-                Text(item)
-            }
-            .navigationTitle("Payslips")
-            Text("Your payslips")
+            Text(String(localized: "payslip.list.title"))
                 .accessibilityIdentifier("pay.list.title")
+            List(items, id: \.self, rowContent: PayslipRow.init)
+                .navigationTitle("Payslips")
             Button("Refresh") {}
         }
     }

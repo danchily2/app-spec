@@ -151,7 +151,7 @@ What one analyst reads. `module.py` writes one file per shard, and workflows pas
 | Field | Meaning |
 | --- | --- |
 | `id`, `kind`, `name`, `files`, `loc` | As the same fields of the shard entry in `module.json` |
-| `hints` | The inventory entries whose file is inside the shard, as lists of routes, screens, endpoints and events. Empty lists when the inventory has not run yet |
+| `hints` | The inventory entries whose file is inside the shard, as lists of routes, screens, endpoints and events. Empty lists when the inventory has not run yet. `inventory.py` fills them: screens and routes by name, endpoints as `METHOD /path`, events by name |
 
 ### inventory.json and INVENTORY.md
 
