@@ -411,6 +411,8 @@ def main(argv=None):
         ap.error("--scope needs --capabilities")
     if not args.module and not args.scope:
         ap.error("--module is required unless --scope is given")
+    if args.scope is not None and not _scope_ids(args.scope):
+        ap.error("--scope has no capability ids")
     root = os.path.realpath(args.app)
     if not os.path.isdir(root):
         die(f"{args.app} is not a folder")
@@ -422,6 +424,9 @@ def main(argv=None):
     index, scope = _scope_fields(args)
     if scope:
         core_files = scope_from_index(index, scope, args.app_name or os.path.basename(root))
+        for rel in core_files:  # an index out of date with the checkout fails here, before any analysis
+            if not os.path.isfile(os.path.join(root, rel)):
+                die(f"index file not found: {os.path.join(root, rel)}")
         core_folders = _topmost(os.path.dirname(rel) for rel in core_files)
     else:
         core_folders = resolve_module(root, stack, args.module)

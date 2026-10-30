@@ -19,6 +19,15 @@
       }
     },
     {
+      "id": "CAP-004",
+      "name": "Payslip view removed from the checkout",
+      "implementations": {
+        "ios-app": {
+          "files": ["Modules/PayslipsFeature/Sources/PayslipsFeature/RemovedView.swift"]
+        }
+      }
+    },
+    {
       "id": "CAP-003",
       "name": "Payslip list on Android",
       "implementations": {

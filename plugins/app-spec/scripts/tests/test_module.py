@@ -100,6 +100,19 @@ class TestModule(unittest.TestCase):
         mod = out.load(self.tmp, "module.json")
         self.assertEqual(mod["core"], ["Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipListView.swift"])
 
+    def test_cli_scope_with_no_ids_exits_2(self):
+        rc, _, err = run_cli(["module.py", IOS, "--capabilities", INDEX, "--scope", ",", "--out", self.tmp])
+        self.assertEqual(rc, 2)
+        self.assertIn("--scope has no capability ids", err)
+        self.assertFalse((Path(self.tmp) / "app-spec.json").exists())
+
+    def test_cli_scope_file_missing_on_disk_exits_2(self):
+        rc, _, err = run_cli(["module.py", IOS, "--capabilities", INDEX, "--scope", "CAP-004", "--out", self.tmp])
+        self.assertEqual(rc, 2)
+        missing = os.path.join(os.path.realpath(IOS), "Modules/PayslipsFeature/Sources/PayslipsFeature/RemovedView.swift")
+        self.assertIn(f"index file not found: {missing}", err)
+        self.assertFalse((Path(self.tmp) / "app-spec.json").exists())
+
     def test_scope_exit_messages(self):
         rc, _, err = run_cli(["module.py", IOS, "--capabilities", INDEX, "--scope", "CAP-999", "--out", self.tmp])
         self.assertEqual(rc, 2)
