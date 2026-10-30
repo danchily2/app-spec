@@ -107,12 +107,36 @@ class TestModule(unittest.TestCase):
             self.assertEqual(shard["hints"], {"routes": [], "screens": [], "endpoints": [], "events": []})
             self.assertNotIn("file", shard)
 
-    def test_cli_keeps_existing_config(self):
+    def test_cli_rerun_updates_owned_fields_and_keeps_the_rest(self):
         run_cli(["module.py", IOS, "--module", "Payslips", "--out", self.tmp])
-        before = (Path(self.tmp) / "app-spec.json").read_text(encoding="utf-8")
-        rc, _, _ = run_cli(["module.py", IOS, "--module", "Payslips", "--out", self.tmp, "--locale", "sv"])
+        cfg = out.load_config(self.tmp)
+        cfg["options"]["passes"] = 4
+        cfg["extra"] = "added by a person"
+        out.save(self.tmp, "app-spec.json", cfg)
+        rc, _, _ = run_cli(["module.py", IOS, "--module", "Modules/CalendarFeature", "--out", self.tmp, "--confirmed"])
         self.assertEqual(rc, 0)
-        self.assertEqual((Path(self.tmp) / "app-spec.json").read_text(encoding="utf-8"), before)
+        again = out.load_config(self.tmp)
+        self.assertTrue(again["module"]["confirmed"])
+        self.assertEqual(again["module"]["query"], ["Modules/CalendarFeature"])
+        self.assertEqual(again["options"]["passes"], 4)
+        self.assertEqual(again["options"]["locale"], "en")
+        self.assertEqual(again["extra"], "added by a person")
+        self.assertEqual(again["created"], cfg["created"])
+        run_cli(["module.py", IOS, "--module", "Modules/CalendarFeature", "--out", self.tmp, "--locale", "sv"])
+        last = out.load_config(self.tmp)
+        self.assertTrue(last["module"]["confirmed"])  # not passing --confirmed leaves the stored value
+        self.assertEqual(last["options"]["locale"], "sv")
+
+    def test_rn_exported_constant_creates_no_touch_point(self):
+        app = os.path.join(self.tmp, "rn")
+        shutil.copytree(FIX / "rn-app", app)
+        with open(os.path.join(app, "src/payslips/PayslipListScreen.tsx"), "a", encoding="utf-8") as fh:
+            fh.write("\nexport const styles = {};\nexport const config = {};\nexport const usePayslipCount = () => 1;\n")
+        write(app, "src/other/Other.tsx", "import { styles, config } from './x';\nexport const Other = () => styles && config;\n")
+        write(app, "src/other/Count.tsx", "const n = usePayslipCount();\n")
+        core = ["src/payslips/PayslipListScreen.tsx"]
+        tps = touchpoints.find(app, "react-native", core, [])
+        self.assertEqual(tps, [{"file": "src/other/Count.tsx", "reason": "uses type usePayslipCount"}])
 
     def test_touch_point_reasons_in_order(self):
         app = os.path.join(self.tmp, "app")

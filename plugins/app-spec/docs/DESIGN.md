@@ -43,7 +43,7 @@ catalogs and ids.
 
 ```
 <out>/
-  app-spec.json         run configuration and source identity       (written once; never regenerated)
+  app-spec.json         run configuration and source identity       (written by module.py, which updates its own fields in place; never rewritten from scratch)
   overrides.json        a person's corrections                       (written by a person or `review --accept`; never regenerated)
   module.json           core, touch points, string keys, shards
   shards/<id>.json      what each analyst reads
@@ -59,13 +59,13 @@ catalogs and ids.
   OPEN_QUESTIONS.md
 ```
 
-A re-run of `spec` regenerates every file except three. `app-spec.json` and `overrides.json` are never touched. `ids.json` is updated in place by `render.py`: existing keys keep their ids, retired keys stay, new keys take `max + 1`, so no id is ever reused. A `spec` re-run resets `review.json` and `REVIEW.md`, and the `review` command appends one pass to them.
+A re-run of `spec` regenerates every file except three. `overrides.json` is never touched. `app-spec.json` is updated in place by `module.py`, which sets `module.query`, `contracts`, `capabilityIndex`, `scope` and `app.commit`, `app.branch`, `app.clean` from the current arguments and repository state, sets `module.confirmed` to true when `--confirmed` is passed and `options.locale` when `--locale` is passed, and keeps every other field. `ids.json` is updated in place by `render.py`: existing keys keep their ids, retired keys stay, new keys take `max + 1`, so no id is ever reused. A `spec` re-run resets `review.json` and `REVIEW.md`, and the `review` command appends one pass to them.
 
 ### app-spec.json
 
 ```json
 {"version":1,
- "app":{"path":"/abs/path","name":"me-ios","stack":"ios","commit":"<sha>","branch":"main","clean":true},
+ "app":{"path":"/abs/path","name":"me-ios","stack":"ios-native","commit":"<sha>","branch":"main","clean":true},
  "module":{"query":["payslips"],"confirmed":false},
  "contracts":[{"path":"/abs/path","name":"me-api","commit":"<sha>"}],
  "capabilityIndex":null,
@@ -80,7 +80,7 @@ A re-run of `spec` regenerates every file except three. `app-spec.json` and `ove
 | --- | --- |
 | `app.path` | Absolute path of the analysed app. The guard denies writes under it |
 | `app.name` | Short name of the app, used in header lines |
-| `app.stack` | `ios`, `android` or `rn`, from stack detection |
+| `app.stack` | `ios-native`, `android-native` or `react-native`, from stack detection |
 | `app.commit` | The app's HEAD sha when the run started |
 | `app.branch` | The branch checked out at that time |
 | `app.clean` | `true` when the working tree had no uncommitted changes |

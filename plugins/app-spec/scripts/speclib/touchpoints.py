@@ -17,8 +17,10 @@ STACK_EXTS = {
 }
 
 # Names too common to say anything when they appear in another file.
-GENERIC_NAMES = {"State", "Action", "Event", "Events", "Model", "Models", "Items", "Error", "Result", "Config",
-                 "Props", "Style", "Styles", "Theme", "Route", "Routes", "Types", "Utils", "Helper", "Helpers"}
+# Compared in lower case.
+GENERIC_NAMES = {"state", "action", "event", "events", "model", "models", "items", "error", "result", "config",
+                 "props", "style", "styles", "theme", "route", "routes", "types", "utils", "helper", "helpers",
+                 "index", "default"}
 MIN_NAME = 5
 
 _DECL = {
@@ -57,8 +59,10 @@ def declared(stack, text):
     if stack == "android-native":
         names += [(m.group(1), "") for m in _COMPOSABLE.finditer(text)]
     for name, rest in names:
-        if len(name) < MIN_NAME or name in GENERIC_NAMES:
+        if len(name) < MIN_NAME or name.lower() in GENERIC_NAMES:
             continue
+        if stack == "react-native" and name[0].islower() and not re.match(r"use[A-Z]", name):
+            continue  # a lowercase export that is neither a hook nor a component is a helper or a constant
         if _EVENT_FAMILY.fullmatch(name):
             found["families"].add(name)
         elif _REQUEST.search(name) or _REQUEST.search(rest):

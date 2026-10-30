@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Resolve the module to specify, find its touch points and split it into shards.
 
-    python3 module.py <app> --module <name|path> [--module ...] --out DIR [--name NAME] [--contracts REPO ...]
+    python3 module.py <app> --module <name|path> [--module ...] --out DIR [--app-name NAME] [--contracts REPO ...]
                       [--max-lines N] [--confirmed] [--locale CODE]
 
 A --module value is a folder name (matched against package roots: Swift packages, Gradle modules, React Native screen
-and feature folders), or a folder or glob inside the app. Writes app-spec.json (once: an existing one is kept),
+and feature folders), or a folder or glob inside the app. Writes app-spec.json (a re-run updates the fields this script owns in place),
 module.json and shards/<id>.json (one file per shard, hints empty until inventory.py fills them). Exit code 2 when a
 name matches no folder or several unrelated folders. Standard library only.
 """
@@ -297,16 +297,34 @@ def _config(args, root, stack, contracts):
     git = git_info(root)
     return {
         "version": 1,
-        "app": {"path": root, "name": args.name or os.path.basename(root), "stack": stack, "commit": git["commit"],
+        "app": {"path": root, "name": args.app_name or os.path.basename(root), "stack": stack, "commit": git["commit"],
                 "branch": git["branch"], "clean": git["clean"]},
         "module": {"query": list(args.module), "confirmed": bool(args.confirmed)},
         "contracts": contracts,
         "capabilityIndex": None,
         "scope": None,
-        "options": {"passes": DEFAULTS["passes"], "locale": args.locale, "thresholds": dict(DEFAULTS["thresholds"]),
+        "options": {"passes": DEFAULTS["passes"], "locale": args.locale or "en", "thresholds": dict(DEFAULTS["thresholds"]),
                     "bannedNouns": list(DEFAULTS["bannedNouns"])},
         "created": now_iso().replace("+00:00", "Z"),
     }
+
+
+def _update_config(cfg, args, root, contracts):
+    """A re-run: set the fields this script owns, keep every other field as it is."""
+    git = git_info(root)
+    app = cfg.setdefault("app", {})
+    app.update({"commit": git["commit"], "branch": git["branch"], "clean": git["clean"]})
+    module = cfg.setdefault("module", {})
+    module["query"] = list(args.module)
+    if args.confirmed:
+        module["confirmed"] = True
+    module.setdefault("confirmed", False)
+    cfg["contracts"] = contracts
+    cfg["capabilityIndex"] = None
+    cfg["scope"] = None
+    if args.locale:
+        cfg.setdefault("options", {})["locale"] = args.locale
+    return cfg
 
 
 def _contracts(paths):
@@ -338,11 +356,11 @@ def main(argv=None):
     ap.add_argument("app")
     ap.add_argument("--module", action="append", required=True, help="a folder name, folder or glob; repeat for several")
     ap.add_argument("--out", required=True)
-    ap.add_argument("--name", help="short name of the app, used in header lines (default: the app folder's name)")
+    ap.add_argument("--app-name", help="short name of the app, used in header lines (default: the app folder's name)")
     ap.add_argument("--contracts", nargs="*", default=[], metavar="REPO", help="backend repositories read as contracts")
     ap.add_argument("--max-lines", type=int, default=DEFAULT_MAX_LINES)
     ap.add_argument("--confirmed", action="store_true", help="a person confirmed the proposed scope")
-    ap.add_argument("--locale", default="en")
+    ap.add_argument("--locale", help="source-language code of the strings (default en; a re-run keeps the stored one)")
     args = ap.parse_args(argv)
     if args.max_lines < 1:
         die("--max-lines must be at least 1")
@@ -364,9 +382,9 @@ def main(argv=None):
     shards += make_shards(root, [t["file"] for t in touch], "touch", args.max_lines)
 
     contracts = _contracts(args.contracts)
-    kept = os.path.isfile(os.path.join(dest, out.CONFIG))
-    if not kept:
-        out.save(dest, out.CONFIG, _config(args, root, stack, contracts))
+    updated = os.path.isfile(os.path.join(dest, out.CONFIG))
+    out.save(dest, out.CONFIG, _update_config(out.load_config(dest), args, root, contracts) if updated
+             else _config(args, root, stack, contracts))
     entries = _write_shards(dest, shards)
     total = sum(s["loc"] for s in shards)
     out.save(dest, "module.json", {"version": 1, "core": core_files, "touchPoints": touch, "stringKeys": keys,
@@ -383,7 +401,7 @@ def main(argv=None):
     print(f"String keys: {len(keys)}")
     print(f"Shards: {len(shards)} ({sum(1 for s in shards if s['kind'] == 'core')} core, "
           f"{sum(1 for s in shards if s['kind'] == 'touch')} touch), {total} lines")
-    print(f"Wrote {dest}: " + ("kept the existing app-spec.json, " if kept else "app-spec.json, ")
+    print(f"Wrote {dest}: " + ("updated app-spec.json, " if updated else "app-spec.json, ")
           + "module.json, shards/")
     return 0
 
