@@ -94,6 +94,24 @@ class TestFields(unittest.TestCase):
         self.assertEqual([(e["kind"], e["textKey"], e["text"], e["identifier"]) for e in s["elements"]],
                          [("text", "pay.title", None, "pay.title.label"), ("button", None, "Save", None)])
 
+    def test_fields_uikit_reused_local_name_keeps_each_element_apart(self):
+        path = self.write("Two.swift", 'import UIKit\n\nfinal class TwoViewController: UIViewController {\n'
+                          '    lazy var titleLabel: UILabel = {\n        let label = UILabel()\n'
+                          '        label.text = NSLocalizedString("pay.title", comment: "")\n'
+                          '        label.accessibilityIdentifier = "pay.title.id"\n        return label\n    }()\n\n'
+                          '    lazy var subLabel: UILabel = {\n        let label = UILabel()\n'
+                          '        label.text = "Sub"\n        return label\n    }()\n}\n')
+        s = fields.extract("ios-native", self.tmp, [path])[0]
+        self.assertEqual([(e["textKey"], e["text"], e["identifier"]) for e in s["elements"]],
+                         [("pay.title", None, "pay.title.id"), (None, "Sub", None)])
+
+    def test_fields_uikit_member_path_does_not_attach_to_a_variable(self):
+        path = self.write("Member.swift", 'import UIKit\n\nfinal class MemberViewController: UIViewController {\n'
+                          '    private let titleLabel = UILabel()\n\n    override func viewDidLoad() {\n'
+                          '        header.titleLabel.text = "x"\n        self.titleLabel.text = "mine"\n    }\n}\n')
+        s = fields.extract("ios-native", self.tmp, [path])[0]
+        self.assertEqual([e["text"] for e in s["elements"]], ["mine"])
+
     def test_fields_compose_lambda_content_belongs_to_nested_elements(self):
         path = self.write("S.kt", '@Composable\nfun PayScreen() {\n    Button(onClick = {}, modifier = Modifier.testTag("pay.go")) {\n'
                           '        Text("Go")\n    }\n    LazyColumn {\n    }\n}\n\n@Composable\nfun helper() {\n    Text("x")\n}\n')

@@ -147,6 +147,20 @@ def _scan_calls(text, start, end, kinds, rel):
 
 # ---------------------------------------------------------------- iOS
 
+def _enclosing_end(text, pos, floor):
+    """Index of the `}` closing the innermost block that holds `pos`, searching back no further than `floor`."""
+    depth = 0
+    for i in range(pos - 1, floor - 1, -1):
+        if text[i] == "}":
+            depth += 1
+        elif text[i] == "{":
+            if depth == 0:
+                close = match_brace(text, i)
+                return close if close > 0 else len(text)
+            depth -= 1
+    return len(text)
+
+
 def _uikit_elements(text, start, end, rel):
     """UILabel() style elements. The statements `name.text = ...` that follow carry the key, text and identifier."""
     pattern = re.compile(r"(?<![\w.])(" + "|".join(sorted(UIKIT_KINDS, key=len, reverse=True)) + r")\s*\(")
@@ -158,8 +172,12 @@ def _uikit_elements(text, start, end, rel):
         name = decl.group(1) if decl else None
         statements = ""
         if name:
+            # a local `let` belongs to its closure or method, so a name reused by another property stays apart;
+            # a stored property of the class can be set anywhere in the class body
+            block_end = _enclosing_end(text, m.start(), start + 1)
+            lo, hi = (start, end) if block_end >= end else (m.start(), block_end)
             statements = "\n".join(s.group(0) for s in re.finditer(
-                r"(?:self\.)?\b" + re.escape(name) + r"\.(?:\w+\s*=[^\n;]*|setTitle\([^\n]*)", text[start:end]))
+                r"(?<![\w.])(?:self\.)?" + re.escape(name) + r"\.(?:\w+\s*=[^\n;]*|setTitle\([^\n]*)", text[lo:hi]))
         args = (text[m.end():close] if close > 0 else "") + "\n" + statements
         literal = re.search(r"\.setTitle\(\s*\"((?:[^\"\\]|\\.)*)\"|\.(?:text|placeholder)\s*=\s*\"((?:[^\"\\]|\\.)*)\"", statements)
         elements.append({"kind": UIKIT_KINDS[m.group(1)], "textKey": _first(_TEXT_KEY, args),
