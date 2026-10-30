@@ -1,0 +1,28 @@
+{
+  "name": "app-spec",
+  "displayName": "App Spec",
+  "version": "0.1.0",
+  "description": "Turn one module of one existing mobile app (native iOS, React Native or native Android) into a spec complete enough to plan and build the same feature in a new app without reading the old code again. Start with /app-spec:spec and get a deterministic inventory of the module, its use cases, screens, fields, endpoints, business rules and flows, a coverage ledger that lists every uncovered item with a reason, and a reviewed spec in a fixed template with numbered acceptance criteria. A critic grades the draft and sends gaps back for up to two more passes. Includes a source write guard, and the spec never reproduces secrets.",
+  "author": {
+    "name": "Dan-Mihai Cuc",
+    "email": "dan-mihai.cuc@visma.com"
+  },
+  "license": "Apache-2.0",
+  "keywords": ["mobile", "ios", "android", "react-native", "spec", "migration", "modernization"],
+  "userConfig": {
+    "guard": {
+      "type": "boolean",
+      "title": "Source write guard",
+      "description": "Deny file edits under the analysed app's path and under each contract repository's path, and ask before shell commands that would write there. Only active where an output folder holds app-spec.json.",
+      "default": true
+    },
+    "passes": {
+      "type": "number",
+      "title": "Review passes",
+      "description": "Most review rounds the spec command runs before it hands the spec over with the remaining findings attached.",
+      "default": 2,
+      "min": 1,
+      "max": 5
+    }
+  }
+}

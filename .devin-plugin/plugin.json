@@ -1,0 +1,17 @@
+{
+  "name": "app-spec-marketplace",
+  "version": "0.1.0",
+  "description": "Meta-plugin for Devin: installing this repository installs App Spec from plugins/app-spec. Claude Code reads .claude-plugin/marketplace.json instead.",
+  "author": {
+    "name": "Dan-Mihai Cuc",
+    "email": "dan-mihai.cuc@visma.com"
+  },
+  "license": "Apache-2.0",
+  "requiredPlugins": [
+    {
+      "source": "git-subdir",
+      "url": "https://github.com/danchily2/app-spec.git",
+      "path": "plugins/app-spec"
+    }
+  ]
+}

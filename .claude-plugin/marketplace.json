@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "app-spec",
+  "description": "App Spec: point it at one module of one mobile app and get a reviewed spec, in a fixed template, that is deep enough to plan and build the same feature in a new app.",
+  "owner": {
+    "name": "Dan-Mihai Cuc",
+    "email": "dan-mihai.cuc@visma.com"
+  },
+  "plugins": [
+    {
+      "name": "app-spec",
+      "source": "./plugins/app-spec",
+      "description": "Turn one module of an existing mobile app (native iOS, React Native, native Android) into a reviewed spec with a coverage ledger, ready to plan and build in a new app.",
+      "version": "0.1.0",
+      "category": "development",
+      "tags": ["mobile", "ios", "android", "react-native", "spec", "migration"]
+    }
+  ]
+}

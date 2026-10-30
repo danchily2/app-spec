@@ -1,0 +1,9 @@
+App Spec
+Copyright 2026 Dan-Mihai Cuc
+
+This plugin copies part of its scripts and agents from App Fusion by Dan-Mihai Cuc
+(https://github.com/danchily2/app-fusion, Apache License 2.0): the stack analysts, the business rules
+extractor, the stack extractors, the guard, the Devin session note and the test harness. App Fusion is in
+turn modeled on the code-modernization plugin by Anthropic
+(https://github.com/anthropics/claude-plugins-official/tree/main/plugins/code-modernization, Apache License 2.0).
+The remaining text, agents, workflows and scripts were written for App Spec.
