@@ -269,7 +269,38 @@ class TestCatalogs(unittest.TestCase):
 
     def test_warning_cited_endpoint_missing_from_inventory(self):
         self.edit("understand_result.json", lambda r: r["useCases"][0]["endpoints"].append("GET /nothing/here/{id}"))
-        self.assertEqual(self.warnings(), ["use case View payslip list cites GET /nothing/here/{id}, which is not in the inventory"])
+        warnings = self.warnings()
+        eps = out.load(self.out, "endpoints.json")["endpoints"]
+        ghost = next(e for e in eps if e["path"] == "/nothing/here/{}")
+        self.assertEqual(warnings, [f"use case View payslip list cites GET /nothing/here/{{id}}, which is not in the "
+                                    f"inventory; kept as {ghost['id']} with label UNKNOWN"])
+        self.assertEqual((ghost["method"], ghost["label"], ghost["inInventory"], ghost["clients"], ghost["useCases"]),
+                         ("GET", "UNKNOWN", False, [], ["UC-001"]))
+        self.assertIn("not in the inventory", ghost["reason"])
+        self.assertIn(ghost["id"], self.uc(self.out, "View payslip list")["endpoints"])
+        self.assertEqual(out.load(self.out, "render-warnings.json"), [
+            {"kind": "endpoint", "item": "GET /nothing/here/{id}", "why": warnings[0]}])
+
+    def test_a_cited_endpoint_missing_from_inventory_reaches_the_spec_and_the_ledger(self):
+        import ledger
+        self.edit("understand_result.json", lambda r: r["useCases"][0]["endpoints"].append("GET /nothing/here/{id}"))
+        render.catalogs(self.out)
+        ghost = next(e for e in out.load(self.out, "endpoints.json")["endpoints"] if e["path"] == "/nothing/here/{}")
+        led = ledger.compute(self.out)
+        self.assertEqual(led["classes"]["endpoints"]["total"], 3)
+        self.assertNotIn("GET /nothing/here/{}", [u["item"] for u in led["classes"]["endpoints"]["uncovered"]])
+        text = render.spec(self.out)
+        self.assertRegex(text, r"### " + ghost["id"] + r" — GET /nothing/here/\{\} \(UNKNOWN \(open question OQ-\d{3}\)\)")
+        self.assertRegex(text, r"- \*\*OQ-\d{3}:\*\* What are the contract \(.*not in the inventory.*\).*\(" + ghost["id"] + r"\)\?")
+
+    def test_render_warnings_file_is_written_every_run(self):
+        render.catalogs(self.out)
+        self.assertEqual(out.load(self.out, "render-warnings.json"), [])
+        self.edit("understand_result.json", lambda r: r["useCases"][0]["screens"].append("GhostScreen"))
+        render.catalogs(self.out)
+        self.assertEqual(out.load(self.out, "render-warnings.json"), [
+            {"kind": "screen", "item": "GhostScreen",
+             "why": "use case View payslip list names the screen GhostScreen, which understand_result.json does not have"}])
 
     def test_warning_unknown_use_case_in_a_screen(self):
         self.edit("understand_result.json", lambda r: r["screens"][1]["useCases"].append("Ghost"))
@@ -317,8 +348,9 @@ class TestCatalogs(unittest.TestCase):
         self.edit("understand_result.json", lambda r: r["useCases"][0]["endpoints"].append("GET /nothing/here/{id}"))
         code, stdout, err = run_cli(["render.py", "catalogs", self.out], module=render)
         self.assertEqual(code, 0)
-        self.assertEqual(err, "warning: use case View payslip list cites GET /nothing/here/{id}, which is not in the inventory\n")
-        self.assertEqual(stdout, "useCases 3, screens 2, flows 1, rules 2, endpoints 2\n")
+        self.assertEqual(err, "warning: use case View payslip list cites GET /nothing/here/{id}, which is not in the inventory; "
+                              "kept as EP-003 with label UNKNOWN\n")
+        self.assertEqual(stdout, "useCases 3, screens 2, flows 1, rules 2, endpoints 3\n")
 
 
 class TestAlias(unittest.TestCase):

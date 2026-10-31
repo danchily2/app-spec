@@ -6,7 +6,8 @@
 Compares inventory.json, fields.json and module.json with the catalogs (use-cases.json, screens.json, endpoints.json)
 and overrides.json in the output folder `<out>`, and writes ledger.json and LEDGER.md. Eight classes are counted:
 screens, fields, endpoints, strings, events, storage, permissions and platform. An item is covered when a catalog
-entry that the spec keeps references it. An item that `overrides.json` drops with a reason is covered with that reason:
+entry that the spec keeps references it. An endpoint that a use case cites but the inventory lacks (`inInventory: false`
+in endpoints.json) is an endpoint item too. An item that `overrides.json` drops with a reason is covered with that reason:
 it is left out of the spec, listed in Appendix F and listed here. An item with no reference and no reason is listed
 with `reason: null`. A class passes when covered items, with or without a reason, reach its threshold; the ledger passes
 when every class passes. A class with no items passes. Thresholds come from `options.thresholds` in app-spec.json over
@@ -167,6 +168,12 @@ class _Ledger:
                 used_by |= {c["id"] for c in self.cases if entry["id"] in _strings(c.get("endpoints"))}
             rows.append((f"{method} {path}" if method else path, [entry["id"]] if entry else [],
                          bool(used_by & self.case_ids), None))
+        for entry in self.endpoints:  # cited by a use case but not in the inventory: a catalog item of its own
+            if entry.get("inInventory") is False:
+                used_by = set(entry.get("useCases") or []) | {c["id"] for c in self.cases
+                                                              if entry["id"] in _strings(c.get("endpoints"))}
+                rows.append((f"{str(entry.get('method') or '').upper()} {entry.get('path')}", [entry["id"]],
+                             bool(used_by & self.case_ids), None))
         return self.count("endpoint", rows)
 
     def strings_class(self):

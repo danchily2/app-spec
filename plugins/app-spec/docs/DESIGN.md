@@ -54,6 +54,7 @@ catalogs and ids.
   patches/<name>.json   partial results of a follow-up run or a review fix, before they are folded in
   ids.json              the id registry                              (updated in place by render.py; never regenerated)
   use-cases.json, screens.json, flows.json, rules.json, endpoints.json   the catalogs, rendered
+  render-warnings.json  what the last `render.py catalogs` could not resolve, as [{kind, item, why}]
   prose.json            the spec writer's prose, as returned
   ledger.json, LEDGER.md            coverage per class
   grade.json            shape checks
@@ -333,7 +334,8 @@ Fields are as in `understand_result.json` with names replaced by ids.
 | `auth` | The auth policy or token the app sends, or `null` |
 | `backend` | Where a contract repository defines the route, with its authorization, or `null` when no backend file was given or found. `repo` is the contract's `name` from `app-spec.json` (else its folder name), never its absolute path: the path stays in `app-spec.json`, so a committed spec shows no home folder |
 | `label` | `VERIFIED` when read in the code, `INFERRED` when deduced, `UNKNOWN` when not found. `VERIFIED` needs both the client and the backend cited, `INFERRED` only the client, `UNKNOWN` neither. After `contracts.py` runs, `VERIFIED` means `backend` is set and a use case cites the endpoint with a client file, an endpoint with a backend match but no citing use case is `INFERRED`, an endpoint without a backend match that was `VERIFIED` from the client side becomes `INFERRED`, and `UNKNOWN` stays `UNKNOWN` |
-| `reason` | Optional. Why the contract reader left the label `UNKNOWN`, naming the field it could not read |
+| `reason` | Optional. Why the contract reader left the label `UNKNOWN`, naming the field it could not read, or why `render.py` set it |
+| `inInventory` | Optional, only `false`. A use case cites the endpoint but no inventory endpoint matches it. `render.py` keeps it with label `UNKNOWN`, no client and a `reason`, so the spec shows it with an open question and the ledger counts it as an endpoint item (covered when a kept use case cites it) instead of dropping it |
 | `contractsRun` | Top level, next to `endpoints`. One `{repo, at}` entry per contract repository `contracts.py` read (`repo` is its name, `at` the UTC time), written even when no route matched. `status.py` counts the contracts step done when every configured repository is listed. `render.py catalogs` writes the file from scratch without it, so the step runs again after every render |
 
 **Merge of the contract reader.** `contracts.py` runs first and sets `backend` and the route-based label; then the
@@ -341,6 +343,16 @@ contract reader runs per batch of up to 10 endpoints, and `merge_contracts.py` w
 `errors` and `auth` into the entry with the same id, appends its disagreements, never lowers a `VERIFIED` label unless
 the reader returns `UNKNOWN` with a field-level `reason`, never raises a label to `VERIFIED`, and reports its
 `injectionFlags`. The envelopes are kept in `contracts_result.json` and applied again after every `render.py catalogs`.
+
+### render-warnings.json
+
+```json
+[{"kind":"endpoint","item":"GET /nothing/{id}","why":"use case View payslips cites GET /nothing/{id}, which is not in the inventory; kept as EP-003 with label UNKNOWN"}]
+```
+
+Written by every `render.py catalogs` run, an empty list when every reference resolved; the same sentences go to
+stderr. `kind` is `endpoint`, `screen`, `useCase`, `flow`, `rule` or `merge`; `item` is the name or citation as the
+workflow result wrote it; `why` says what was done with it. The spec skill reports every entry in its Finish.
 
 ### ids.json
 

@@ -8,7 +8,9 @@
 fields.json, app-spec.json and overrides.json from the output folder `<out>`. It assigns stable ids through ids.json
 (updated in place: existing keys keep their ids, new keys take max + 1) and writes use-cases.json, screens.json,
 flows.json, rules.json and endpoints.json. It never writes ids.json's old keys away, app-spec.json or overrides.json.
-Prints the counts, and any reference it could not resolve, to stderr. Exit code 2 when `<out>` is not an output
+Prints the counts, and any reference it could not resolve to stderr; writes the same warnings to render-warnings.json
+as a list of `{kind, item, why}` (an empty list when there are none). An endpoint a use case cites that the inventory
+does not have is kept in endpoints.json with label UNKNOWN and `inInventory: false`. Exit code 2 when `<out>` is not an output
 folder or understand_result.json is missing. Standard library only.
 
 `spec` compiles the catalogs, fields.json, inventory.json, module.json, overrides.json, ledger.json (when present) and
@@ -82,7 +84,12 @@ class _Catalogs:
         self.fields = (out.load(dest, "fields.json", {}) or {}).get("screens", [])
         self.overrides = out.load(dest, "overrides.json", {}) or {}
         self.registry = Registry(os.path.join(dest, "ids.json"))
-        self.warnings = []
+        self.warnings = []  # the sentences, printed to stderr
+        self.records = []   # the same as {kind, item, why}, written to render-warnings.json
+
+    def _warn(self, kind, item, why):
+        self.warnings.append(why)
+        self.records.append({"kind": kind, "item": str(item), "why": why})
 
     # ------------------------------------------------------------ ids
 
@@ -100,7 +107,7 @@ class _Catalogs:
                 continue
             sid = self.registry.assign("SCR", self._screen_key(screen["name"], screen.get("file")))
             if sid in entries:
-                self.warnings.append(f"screen {screen['name']} appears twice in {_path(screen.get('file'))}; the first is kept")
+                self._warn("screen", screen["name"], f"screen {screen['name']} appears twice in {_path(screen.get('file'))}; the first is kept")
                 continue
             entries[sid] = screen
             by_name.setdefault(norm(screen["name"]), []).append(sid)
@@ -115,8 +122,9 @@ class _Catalogs:
             method = str(e.get("method") or "").upper()
             path = _endpoint_path(e.get("path"))
             if not method or not path:
-                self.warnings.append(f"inventory endpoint {e.get('type') or e.get('path')} in {_path(e.get('file'))} has "
-                                     f"no {'method' if not method else 'path'} and is left out of endpoints.json")
+                self._warn("endpoint", e.get("type") or e.get("path"),
+                           f"inventory endpoint {e.get('type') or e.get('path')} in {_path(e.get('file'))} has "
+                           f"no {'method' if not method else 'path'} and is left out of endpoints.json")
                 continue
             eid = self.registry.assign("EP", f"{method} {path}")
             client = {"file": _path(e.get("file")), "type": e.get("type")}
@@ -131,15 +139,31 @@ class _Catalogs:
         return entries
 
     def _resolve_endpoints(self, cites, endpoints, owner):
-        """EP ids of the inventory endpoints that the citations `METHOD /path` name."""
+        """EP ids of the endpoints that the citations `METHOD /path` name. A citation no inventory endpoint matches is
+        kept as its own entry with label `UNKNOWN`, `inInventory: false` and no client, so the spec shows it with an
+        open question and the ledger counts it; a citation without a method or path is reported and left out."""
         found = []
         for cite in cites:
             method, _, raw = str(cite).strip().partition(" ")
-            path = _endpoint_path(raw)
+            method, path = method.upper(), _endpoint_path(raw.strip())
             hit = [eid for eid, e in endpoints.items()
-                   if e["method"] == method.upper() and (e["path"] == path or endpoints_match(path, e["path"]))]
+                   if e["method"] == method and (e["path"] == path or endpoints_match(path, e["path"]))]
             if not hit:
-                self.warnings.append(f"use case {owner} cites {cite}, which is not in the inventory")
+                if not method.isalpha() or not path.startswith("/"):
+                    self._warn("endpoint", cite, f"use case {owner} cites {cite}, which is not an endpoint "
+                                                 f"(METHOD /path) and is left out")
+                    continue
+                eid = self.registry.assign("EP", f"{method} {path}")
+                if eid not in endpoints:
+                    endpoints[eid] = {"id": eid, "method": method, "path": path, "raw": raw.strip() or None,
+                                      "useCases": [], "client": None, "clients": [],
+                                      "request": {"fields": []}, "response": {"fields": []}, "errors": [], "auth": None,
+                                      "backend": None, "label": "UNKNOWN", "inInventory": False,
+                                      "reason": f"cited by the use case {owner} but not in the inventory: no client "
+                                                f"file of the module builds it"}
+                self._warn("endpoint", cite, f"use case {owner} cites {cite}, which is not in the inventory; "
+                                             f"kept as {eid} with label UNKNOWN")
+                hit = [eid]
             found += hit
         return _unique(found)
 
@@ -154,7 +178,7 @@ class _Catalogs:
             files = sorted({_path(f) for f in _strings(raw.get("files"))})
             uid = self._use_case_id(raw["name"], files, current, cases)
             if uid in cases:
-                self.warnings.append(f"use case {raw['name']} appears twice; the first is kept")
+                self._warn("useCase", raw["name"], f"use case {raw['name']} appears twice; the first is kept")
                 continue
             self.registry.data["UCfiles"][uid] = files  # after the duplicate check: the kept use case's files
             case = {"id": uid, "alias": None, "name": raw["name"], "description": raw.get("description", "")}
@@ -186,7 +210,7 @@ class _Catalogs:
             if hit:
                 ids.append(hit[0])
             else:
-                self.warnings.append(f"{where} names the screen {name}, which understand_result.json does not have")
+                self._warn("screen", name, f"{where} names the screen {name}, which understand_result.json does not have")
         return _unique(ids)
 
     def _merge(self, cases):
@@ -195,7 +219,7 @@ class _Catalogs:
         for merge in self.overrides.get("merge", []) or []:
             into = merge.get("into")
             if into not in cases:
-                self.warnings.append(f"merge into {into} ignored: no such use case")
+                self._warn("merge", into, f"merge into {into} ignored: no such use case")
                 continue
             for src in merge.get("from", []) or []:
                 if src == into or src not in cases:
@@ -251,7 +275,7 @@ class _Catalogs:
             if uid:
                 ids.append(retired.get(uid, uid))
             else:
-                self.warnings.append(f"{where} names the use case {name}, which understand_result.json does not have")
+                self._warn("useCase", name, f"{where} names the use case {name}, which understand_result.json does not have")
         return _unique(ids)
 
     def _fields_for(self, screen):
@@ -304,7 +328,7 @@ class _Catalogs:
                 continue
             fid = self.registry.assign("FLOW", norm(raw["name"]))
             if fid in flows:
-                self.warnings.append(f"flow {raw['name']} appears twice; the first is kept")
+                self._warn("flow", raw["name"], f"flow {raw['name']} appears twice; the first is kept")
                 continue
             steps = []
             for step in raw.get("steps") or []:
@@ -323,7 +347,7 @@ class _Catalogs:
                 continue
             rid = self.registry.assign("RULE", self._rule_key(raw["name"], raw.get("source")))
             if rid in rules:
-                self.warnings.append(f"rule {raw['name']} appears twice in {_path(raw.get('source'))}; the first is kept")
+                self._warn("rule", raw["name"], f"rule {raw['name']} appears twice in {_path(raw.get('source'))}; the first is kept")
                 continue
             name = raw.get("useCase")
             uc = self._use_case_ids([name], uc_by_name, retired, f"rule {raw['name']}")[0:1] if name else []
@@ -349,6 +373,8 @@ class _Catalogs:
                 if files & {c["file"] for c in e["clients"]}:
                     e["label"] = "VERIFIED"
         for e in endpoints.values():
+            if e.get("inInventory") is False:
+                continue  # cited by a use case only: no client file backs it, so it stays UNKNOWN
             if e["label"] != "VERIFIED":
                 e["label"] = "UNKNOWN" if "{}" in e["path"] and not e["useCases"] else "INFERRED"
 
@@ -380,6 +406,7 @@ class _Catalogs:
         out.save(self.dest, "flows.json", {"version": 1, "flows": sorted(flows, key=_number)})
         out.save(self.dest, "rules.json", {"version": 1, "rules": sorted(rules, key=_number)})
         out.save(self.dest, "endpoints.json", {"version": 1, "endpoints": sorted(endpoints.values(), key=_number)})
+        out.save(self.dest, "render-warnings.json", self.records)
         self.registry.save()
         return {"useCases": len(use_cases), "screens": len(screens), "flows": len(flows), "rules": len(rules),
                 "endpoints": len(endpoints), "warnings": self.warnings}
