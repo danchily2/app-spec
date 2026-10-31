@@ -79,7 +79,7 @@ class TestEnrich(unittest.TestCase):
         contracts.enrich(self.out, ASPNET)
         e = self.payslips()
         self.assertEqual(e["label"], "VERIFIED")
-        self.assertEqual(e["backend"]["repo"], ASPNET)
+        self.assertEqual(e["backend"]["repo"], "backend-aspnet")
         self.assertEqual(e["backend"]["file"], "Controllers/PayslipController.cs")
         self.assertEqual(e["backend"]["line"], 11)
         self.assertEqual(e["backend"]["auth"], "PayslipUsersReadPolicy")
@@ -99,7 +99,7 @@ class TestEnrich(unittest.TestCase):
         contracts.enrich(self.out, EMPTY)
         self.assertEqual(self.eps(), first)
         contracts.enrich(self.out, EXPRESS)
-        self.assertEqual(self.payslips()["backend"]["repo"], ASPNET)
+        self.assertEqual(self.payslips()["backend"]["repo"], "backend-aspnet")
         self.assertEqual(self.payslips()["label"], "VERIFIED")
 
     def test_express_repo_matches_too(self):
@@ -191,7 +191,15 @@ class TestEnrich(unittest.TestCase):
         out.save(self.out, "app-spec.json", cfg)
         code, _, err = run_cli(["contracts.py", self.out])
         self.assertEqual(code, 0, err)
-        self.assertEqual(self.payslips()["backend"]["repo"], ASPNET)
+        self.assertEqual(self.payslips()["backend"]["repo"], "me-api")  # the configured name, never the path
+
+    def test_backend_repo_is_a_name_and_the_spec_has_no_home_path(self):
+        contracts.enrich(self.out, ASPNET)
+        render.spec(self.out)
+        with open(os.path.join(self.out, "SPEC.md"), encoding="utf-8") as fh:
+            text = fh.read()
+        self.assertNotIn(ASPNET, text)
+        self.assertIn("- **Backend:** backend-aspnet `Controllers/PayslipController.cs:11`", text)
 
 
 if __name__ == "__main__":

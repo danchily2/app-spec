@@ -4,8 +4,10 @@
     python3 contracts.py <out> [--repo PATH ...] [--framework auto|aspnet|express]
 
 Reads endpoints.json (written by render.py catalogs) from the output folder `<out>` and, for each endpoint, looks for
-a route with the same method and path in a contract repository. A match fills `backend` (repo as given, file, line,
-authorization) and an unmatched endpoint keeps `backend` null. Without --repo, every repository in the `contracts`
+a route with the same method and path in a contract repository. A match fills `backend` (the repository's name, file,
+line, authorization) and an unmatched endpoint keeps `backend` null. The name is the `name` of the matching entry in the
+`contracts` list of app-spec.json, else the repository folder's name: an absolute path stays in app-spec.json only, so
+the spec never shows a home folder. Without --repo, every repository in the `contracts`
 list of app-spec.json is read, one after the other. A later repository never clears or replaces a match an earlier one
 made, and a second run gives the same file. Backend files are read, never executed or written. Standard library only.
 """
@@ -261,6 +263,16 @@ def _best(endpoint, routes):
     return hits[0][3], []
 
 
+def repo_name(out_dir, repo_root):
+    """The name a spec shows for the contract repository `repo_root`: its configured `name`, else its folder name."""
+    real = os.path.realpath(repo_root)
+    cfg = out.load(out_dir, out.CONFIG, {}) or {}
+    for c in (cfg.get("contracts") if isinstance(cfg, dict) else None) or []:
+        if isinstance(c, dict) and c.get("path") and c.get("name") and os.path.realpath(str(c["path"])) == real:
+            return str(c["name"])
+    return os.path.basename(real.rstrip(os.sep)) or real
+
+
 def enrich(out_dir, repo_root, framework="auto"):
     """Fill `backend` and the labels of endpoints.json from the routes of one repository. Return the counts."""
     data = out.load(out_dir, "endpoints.json")
@@ -273,12 +285,13 @@ def enrich(out_dir, repo_root, framework="auto"):
     use_cases = out.load(out_dir, "use-cases.json", {}) or {}
     cases = {u.get("id"): u for u in use_cases.get("useCases", [])}
     have_cases = bool(cases)
+    name = repo_name(out_dir, repo_root)
     matched = 0
     for e in data.get("endpoints", []):
         if not e.get("backend"):
             route, ambiguous = _best(e, routes)
             if route:
-                e["backend"] = {"repo": repo_root, "file": route["file"], "line": route["line"], "auth": route["auth"]}
+                e["backend"] = {"repo": name, "file": route["file"], "line": route["line"], "auth": route["auth"]}
             elif ambiguous:
                 note = {"field": "route", "client": (e.get("client") or {}).get("file"),
                         "backend": " | ".join(f"{r['file']}:{r['line']}" for r in ambiguous),

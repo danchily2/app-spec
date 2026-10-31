@@ -331,7 +331,7 @@ Fields are as in `understand_result.json` with names replaced by ids.
 | `disagreements` | Optional. Each place where a client field is absent from or differs in the backend: `field`, `client` and `backend` as `file:line`, and a `note` |
 | `errors` | Each status the code handles and what the user sees |
 | `auth` | The auth policy or token the app sends, or `null` |
-| `backend` | Where a contract repository defines the route, with its authorization, or `null` when no backend file was given or found |
+| `backend` | Where a contract repository defines the route, with its authorization, or `null` when no backend file was given or found. `repo` is the contract's `name` from `app-spec.json` (else its folder name), never its absolute path: the path stays in `app-spec.json`, so a committed spec shows no home folder |
 | `label` | `VERIFIED` when read in the code, `INFERRED` when deduced, `UNKNOWN` when not found. `VERIFIED` needs both the client and the backend cited, `INFERRED` only the client, `UNKNOWN` neither. After `contracts.py` runs, `VERIFIED` means `backend` is set and a use case cites the endpoint with a client file, an endpoint with a backend match but no citing use case is `INFERRED`, an endpoint without a backend match that was `VERIFIED` from the client side becomes `INFERRED`, and `UNKNOWN` stays `UNKNOWN` |
 | `reason` | Optional. Why the contract reader left the label `UNKNOWN`, naming the field it could not read |
 
