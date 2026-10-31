@@ -417,6 +417,22 @@ class TestFixRound1(GradeCase):
         glued = self.mutated("ph_glued", lambda t: t.replace("### Permissions", "Note: " + hint + " and more\n\n### Permissions"))
         self.assertFalse(check(grade.run(glued), "prose-complete")["pass"])
 
+    def test_renderer_and_grader_agree_on_use_cases_without_a_rule(self):
+        """UC-003 carries the cited no-rule sentence in its criterion: neither the renderer nor the grader lists it."""
+        text = read_text(self.good, "SPEC.md")
+        self.assertNotIn("no rule extracted for", text)
+        self.assertTrue(check(grade.run(self.good), "rules-per-use-case")["pass"])
+        dest = self.copy("no_rule_uncited")
+
+        def uncite(p):
+            p["criteria"][2]["evidence"] = ""
+        edit(dest, "prose.json", uncite)
+        text = render.spec(dest)
+        self.assertIn("no rule extracted for UC-003;", text)
+        c = check(grade.run(dest), "rules-per-use-case")
+        self.assertFalse(c["pass"])
+        self.assertIn("UC-003", c["detail"])
+
     def test_a_bare_citation_does_not_satisfy_the_no_rule_sentence(self):
         dest = self.mutated("bare", lambda t: t.replace(f"`{LIST}:12`", f"{LIST}:12"))
         c = check(grade.run(dest), "rules-per-use-case")

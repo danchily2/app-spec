@@ -331,14 +331,30 @@ def open_question_entries(c):
             else:
                 question = f'What completes the rule "{_text(r.get("name"))}"?'
             if missing:
-                question += f" Its {', '.join(missing)} {'is' if len(missing) == 1 else 'are'} not recorded."
-            structural.append({"question": f"{question} ({r['id']})",
-                               "searched": f"`{r.get('source')}`" if r.get("source") else "the module's code",
+                question += f" The rule card does not record its {_and(missing)}."
+            structural.append({"question": f"{question} ({r['id']})", "searched": _rule_searched(c, r),
                                "owner": owner, "ref": r["id"]})
     for n, entry in enumerate(structural, 1):
         entry["id"] = f"OQ-{n:03d}"
     c._open = entries + structural
     return c._open
+
+
+def _and(items):
+    """`a`, `a and b`, `a, b and c`."""
+    items = list(items)
+    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def _rule_searched(c, r):
+    """What was searched for the rule `r`: its source lines, else the rule card and the files of its use case."""
+    if r.get("source"):
+        return f"`{r.get('source')}`"
+    case = next((u for u in c.all_cases if u["id"] == r.get("useCase")), None)
+    files = _files(sorted({str(f) for f in _items(case.get("files"))})) if case else ""
+    if case and files:
+        return f"the rule card in `rules_result.json` and the files of {c.shown.get(case['id'], case['id'])} ({files})"
+    return "the rule card in `rules_result.json`, which names no source lines and no use case with files"
 
 
 def _oq(c, ref):
@@ -431,12 +447,38 @@ def rules(c):
              for u in c.cases]
     lines += ["### Permissions", ""] + _table(["CAP", "Personas", "Permissions and gates"], perms) + [""]
     ruled = {r.get("useCase") for r in shown}
-    bare = [c.shown[u["id"]] for u in c.cases if u["id"] not in ruled]
+    bare = [c.shown[u["id"]] for u in c.cases if u["id"] not in ruled and not _says_no_rule(c, u)]
     if bare:
         lines += ["### Use cases without a rule", "",
                   _unknown("no rule extracted for " + ", ".join(bare)
                            + f'; add a rule or write "{NO_RULE}" with a citation'), ""]
     return lines
+
+
+_SPAN = re.compile(r"`([^`\n]+)`")
+_CITE_ONLY = re.compile(r"^" + CITE_RE + r"$")
+
+
+def _has_citation(line):
+    """True when `line` holds a backticked `path:line` or `path:line-line`, as the grader reads one."""
+    return any(_CITE_ONLY.match(part) and re.match(r"^\S+?:\d+(?:-\d+)?$", part) for span in _SPAN.finditer(line)
+               for part in re.split(r"\s*[,;]\s*", span.group(1).strip()))
+
+
+def _says_no_rule(c, case):
+    """True when the spec states the cited sentence NO_RULE for `case`: in an acceptance criterion that names it, or in
+    the block of one of its screens. The same test as the grader's rules-per-use-case, so both list the same use cases."""
+    shown = {case["id"], c.shown[case["id"]]}
+    lines = [t for t in criteria(c) if (m := re.match(r"^- \*\*AC\d+ \(([^)]*)\):\*\*", t))
+             and {i.strip() for i in m.group(1).split(",")} & shown]
+    ids = set(case.get("screens") or []) | {s["id"] for s in c.screens if case["id"] in (s.get("useCases") or [])}
+    inside = False
+    for t in screens(c):
+        if t.startswith("### "):
+            inside = any(f"({s})" in t for s in ids)
+        if inside:
+            lines.append(t)
+    return any(NO_RULE in t and _has_citation(t) for t in lines)
 
 
 def criteria(c):

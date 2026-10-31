@@ -411,8 +411,11 @@ gaps: a use case with evidence other than VERIFIED, INFERRED or PROPOSED, or wit
 catalog states have no known evidence or no text, or that has no actions or no declaration; an endpoint whose label is
 `UNKNOWN` or that has no auth, response fields, errors, client or backend, a field without type, required flag or
 nullability, or an error without a reaction; a rule below High confidence, or without priority, category, statement or
-source. Each question says what was searched (the entry's files, declaration, clients or source) and its owner,
-`owner of <app name>`. The ids run from `OQ-001` in that order (use cases, screens, endpoints, rules) after the
+source. Each question says what was searched (the entry's files, declaration, clients or source; for a rule without
+source lines, the rule card in `rules_result.json` and the files of its use case) and its owner,
+`owner of <app name>`. Section 5 ends with `UNKNOWN — no rule extracted for <ids>` for the use cases that have no
+rule and no cited `No client-side rule; the server decides.` in one of their criteria or screen blocks: the same test
+`rules-per-use-case` applies, so the renderer and the grader name the same use cases. The ids run from `OQ-001` in that order (use cases, screens, endpoints, rules) after the
 writer's own questions, and `review.py questions` writes `OPEN_QUESTIONS.md` from the same list. What is not a
 question is written so that it is not an unknown fact: a cited file whose line could not be resolved reads
 `line not resolved`, and an empty catalog reads `No endpoints in the catalog.` (and so on). The prose placeholder `UNKNOWN — <what is missing>` is left to `prose-complete`, which fails while one

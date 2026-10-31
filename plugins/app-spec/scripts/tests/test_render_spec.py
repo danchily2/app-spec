@@ -55,6 +55,18 @@ class TestSpec(unittest.TestCase):
 
     # ------------------------------------------------------------ the brief
 
+    def test_a_rule_without_fields_asks_in_plain_grammar_and_names_what_was_searched(self):
+        data = out.load(self.out, "rules.json")
+        data["rules"][0].update(source=None, priority=None)
+        out.save(self.out, "rules.json", data)
+        text = render.spec(self.out)
+        line = next(l for l in text.splitlines() if l.startswith("- **OQ-") and "(RULE-001)" in l)
+        self.assertIn("The rule card does not record its priority and source lines.", line)
+        self.assertNotIn(" is not recorded", line)
+        self.assertNotIn("the module's code", line)
+        self.assertIn("Searched: the rule card in `rules_result.json` and the files of UC-001 (", line)
+        self.assertIn("`EmployeeServices/Payslips/Sources/Payslips/GetPayslips.swift`", line)
+
     def test_spec_has_template_headings_in_order(self):
         text = render.spec(self.out)
         heads = [l for l in text.splitlines() if l.startswith("## ")]
