@@ -225,7 +225,7 @@ assigns ids.
 | `flows[].name`, `persona` | Flow name and who walks it |
 | `flows[].steps[]` | Ordered steps: the `screen` name, the `useCases` names, and the `action` |
 | `rejected` | Fragments a referee rejected, each with the reason |
-| `unverified` | Claims whose citations the referee could not check |
+| `unverified` | `{name, why}` per use case the referee could not fully confirm: no verdict (the use case stays, VERIFIED lowered to INFERRED), or a real verdict with `badEvidence`. In the second case the use case stays, lowered to INFERRED, and the refuted items leave it: a file by its exact location (or every location of a path the referee names without a line), a screen by name, an endpoint by method and path. `why` lists the removed items and any `badEvidence` entry that matched none. A refuted screen also stops naming the use case |
 | `injectionFlags` | Instruction-shaped text found in analysed content, with `file:line`. Never acted on |
 | `rerunShards` | Ids of shards that failed and need a re-run |
 | `stats` | Counts and timings of the run |

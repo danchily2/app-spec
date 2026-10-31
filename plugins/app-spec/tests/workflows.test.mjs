@@ -80,6 +80,46 @@ test('understand: a real verdict with bad evidence lowers the label to INFERRED 
   assert.deepEqual(r.rejected, [])
 })
 
+test('understand: a real verdict keeps the use case and removes only the refuted files, screens and endpoints', async () => {
+  const claim = {
+    name: 'View payslips', description: 'd', evidence: 'VERIFIED',
+    files: ['Modules/Pay/List.swift:3-9', 'Modules/Invented/Ghost.swift:999', 'Modules/Pay/Old.swift'],
+    screens: ['PayslipListView', 'GhostScreen'],
+    endpoints: ['GET /payslips', 'GET /nope/{id}'],
+    events: ['payslip_open'],
+  }
+  const respond = label => {
+    if (label === 'map') return { useCases: [claim], screens: [{ name: 'PayslipListView', file: 'Modules/Pay/List.swift:3', useCases: ['View payslips'] }], flows: [] }
+    if (label.startsWith('verify:')) {
+      return { real: true, reason: 'mostly', badEvidence: ['Modules/Invented/Ghost.swift:999', 'ghostscreen', 'get  /nope/{id}', 'Modules/Pay/Old.swift', 'GET /never-cited'] }
+    }
+    return undefined
+  }
+  const { result: r } = await run(wf('understand-module.js'), args, respond)
+  assert.equal(r.useCases.length, 1, 'the use case is kept')
+  const u = r.useCases[0]
+  assert.deepEqual(u.files, ['Modules/Pay/List.swift:3-9'])
+  assert.deepEqual(u.screens, ['PayslipListView'])
+  assert.deepEqual(u.endpoints, ['GET /payslips'])
+  assert.deepEqual(u.events, ['payslip_open'], 'evidence the referee did not name stays')
+  assert.equal(u.evidence, 'INFERRED')
+  assert.equal(r.unverified.length, 1)
+  assert.equal(r.unverified[0].name, 'View payslips')
+  for (const x of ['Modules/Invented/Ghost.swift:999', 'GhostScreen', 'GET /nope/{id}', 'Modules/Pay/Old.swift', 'GET /never-cited']) {
+    assert.ok(r.unverified[0].why.includes(x), x)
+  }
+  assert.deepEqual(r.rejected, [])
+})
+
+test('understand: a refuted path without a line removes every citation of that file', async () => {
+  const claim = { name: 'A', description: 'd', evidence: 'INFERRED', files: ['X.swift:1-4', 'X.swift:9', 'Y.swift:2'] }
+  const respond = label =>
+    label === 'map' ? { useCases: [claim], screens: [], flows: [] }
+      : label.startsWith('verify:') ? { real: true, reason: 'r', badEvidence: ['X.swift'] } : undefined
+  const { result: r } = await run(wf('understand-module.js'), args, respond)
+  assert.deepEqual(r.useCases[0].files, ['Y.swift:2'])
+})
+
 test('understand: every referee is the stack analyst', async () => {
   for (const [stack, type] of [['ios-native', 'app-spec:ios-analyst'], ['android-native', 'app-spec:android-analyst'], ['react-native', 'app-spec:rn-analyst']]) {
     const { calls } = await run(wf('understand-module.js'), { ...args, app: { ...app, stack } })
