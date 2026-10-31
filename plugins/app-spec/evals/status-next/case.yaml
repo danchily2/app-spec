@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: status-next
+description: On an output folder that holds the catalogs and no spec, /app-spec:status names render.py spec as the next command.
+tags: [smoke, status]
+context:
+  scaffold_script: scaffold.sh

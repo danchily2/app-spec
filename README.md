@@ -7,6 +7,12 @@ The plugin lives in [`plugins/app-spec`](plugins/app-spec). Its contract is
 [`plugins/app-spec/docs/DESIGN.md`](plugins/app-spec/docs/DESIGN.md). The approved design is
 [`docs/superpowers/specs/2026-10-30-app-spec-design.md`](docs/superpowers/specs/2026-10-30-app-spec-design.md).
 
+## What you get
+
+A spec of the module in a fixed template, with numbered acceptance criteria, a coverage ledger that lists every item
+not covered with a reason, and a critic's review. The analysed app is never written to. See the
+[plugin README](plugins/app-spec/README.md) for the path, how completeness is measured, and safety.
+
 ## Install
 
 Claude Code:

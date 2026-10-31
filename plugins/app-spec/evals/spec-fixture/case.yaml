@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: spec-fixture
+description: >-
+  A headless /app-spec:spec run on the synthetic iOS app's Payslips module writes the output folder. The graders check
+  structure only: SPEC.md with the eight headings in order, a ledger.json, and an app-spec.json that records the scope
+  as not confirmed. They do not require ledger.json to pass: a headless run on a tiny fixture may not reach full
+  coverage, and a full run needs the Workflow tool and many agents, which an eval can lack.
+tags: [spec, slow]
+context:
+  scaffold_script: scaffold.sh
