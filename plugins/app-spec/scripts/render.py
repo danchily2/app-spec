@@ -153,10 +153,10 @@ class _Catalogs:
                 continue
             files = sorted({_path(f) for f in _strings(raw.get("files"))})
             uid = self._use_case_id(raw["name"], files, current, cases)
-            self.registry.data["UCfiles"][uid] = files
             if uid in cases:
                 self.warnings.append(f"use case {raw['name']} appears twice; the first is kept")
                 continue
+            self.registry.data["UCfiles"][uid] = files  # after the duplicate check: the kept use case's files
             case = {"id": uid, "alias": None, "name": raw["name"], "description": raw.get("description", "")}
             for field in UC_LISTS:
                 case[field] = _strings(raw.get(field))

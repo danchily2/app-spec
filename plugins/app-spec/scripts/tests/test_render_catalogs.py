@@ -291,6 +291,14 @@ class TestCatalogs(unittest.TestCase):
         self.assertEqual(len(out.load(self.out, "use-cases.json")["useCases"]), 3)
         self.assertEqual(len(out.load(self.out, "rules.json")["rules"]), 2)
 
+    def test_a_duplicate_use_case_does_not_overwrite_the_kept_files(self):
+        render.catalogs(self.out)
+        kept = out.load(self.out, "ids.json")["UCfiles"]["UC-001"]
+        self.assertTrue(kept)
+        self.edit("understand_result.json", lambda r: r["useCases"].append({**r["useCases"][0], "files": ["Other.swift"]}))
+        render.catalogs(self.out)
+        self.assertEqual(out.load(self.out, "ids.json")["UCfiles"]["UC-001"], kept)
+
     def test_warning_merge_into_an_unknown_id(self):
         write_overrides(self.out, {"merge": [{"into": "UC-099", "from": ["UC-002"]}]})
         self.assertEqual(self.warnings(), ["merge into UC-099 ignored: no such use case"])
