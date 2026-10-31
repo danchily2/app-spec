@@ -3,7 +3,7 @@
 
 Reads the hook input (JSON on stdin), from Claude Code or from Devin, which names its tools differently. It finds the
 output folder(s) (a folder with app-spec.json) from the project folder, the shell's folder, the path a file tool writes
-and the paths a shell command names, walking up and one level below the project folder, so it works when the agent was
+and the paths a shell command names, walking up, and down two levels below the project folder (the default output folder is ./specs/<name>), so it works when the agent was
 started above or inside the output folder. Outside every output folder it does nothing. Each app-spec.json protects
 app.path and every contracts[].path. Nothing inside the output folder is protected: the scripts write there.
   - a file write (Claude Code's Edit, Write, MultiEdit, NotebookEdit; Devin's edit, write, notebook_edit and every file
@@ -200,7 +200,7 @@ def protected_roots(cfg, base=None):
 
 
 def find_outputs(candidates, below):
-    """Every folder with app-spec.json at or above a candidate path, or one level below the `below` folders."""
+    """Every folder with app-spec.json at or above a candidate path, or one or two levels below the `below` folders."""
     found = []
 
     def add(folder):
@@ -221,6 +221,7 @@ def find_outputs(candidates, below):
                 if parent == d:
                     break
                 d, seen = parent, seen + 1
+    budget = 2000  # grandchildren looked at in all: the default output folder is ./specs/<name>, two levels down
     for c in [x for x in below if x]:
         try:
             children = sorted(os.listdir(c))[:400]
@@ -228,8 +229,19 @@ def find_outputs(candidates, below):
             continue
         for n in children:
             child = os.path.join(c, n)
-            if os.path.isdir(child):
-                add(child)
+            if not os.path.isdir(child):
+                continue
+            add(child)
+            if n.startswith(".") or n == "node_modules" or budget <= 0:
+                continue
+            try:
+                grandchildren = sorted(os.listdir(child))[:400]
+            except OSError:
+                continue
+            budget -= len(grandchildren)
+            for g in grandchildren:
+                if os.path.isdir(os.path.join(child, g)):
+                    add(os.path.join(child, g))
     return found
 
 

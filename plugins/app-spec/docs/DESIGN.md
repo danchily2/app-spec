@@ -569,8 +569,8 @@ All agents are read-only. They write nothing outside the output folder.
 
 - `hooks/hooks.json` registers the guard on `PreToolUse` for `Edit|Write|MultiEdit|NotebookEdit|Bash` in Claude Code and
   for `edit|write|notebook_edit|apply_patch|exec|write_to_process` in Devin.
-- The guard finds `app-spec.json` from the output folder named in the command, the project folder, or the paths a tool
-  call names. It denies file tool writes under `app.path` and under each contract repository's path. It asks before a
+- The guard finds `app-spec.json` from the output folder named in the command, the project folder (and two levels below it,
+  so the default `./specs/<name>` is found), or the paths a tool call names. It denies file tool writes under `app.path` and under each contract repository's path. It asks before a
   shell command that would write there. It does nothing when no `app-spec.json` is found.
 - `APP_SPEC_GUARD=false` turns the guard off in Devin. In Claude Code the `guard` option does the same.
 - `hooks/devin-context.sh` runs `scripts/devin_context.py` at session start. It prints the plugin's real folder, the

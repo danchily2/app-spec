@@ -211,6 +211,15 @@ class Discovery(GuardBase):
         payload = {"tool_name": "Write", "tool_input": {"file_path": self.APP + "/x.swift"}}
         self.assertEqual(self.run_guard(payload, cwd=self.OTHER, project=base)["decision"], "deny")
 
+    def test_config_found_two_levels_below_the_project_folder(self):
+        # the default output folder is ./specs/<name>: two levels below the folder the session starts in
+        base = os.path.join(os.path.dirname(self.OUT), "workdir")
+        deep = os.path.join(base, "specs", "payslips")
+        os.makedirs(os.path.dirname(deep))
+        os.rename(self.OUT, deep)
+        payload = {"tool_name": "Edit", "tool_input": {"file_path": self.APP + "/x.swift"}}
+        self.assertEqual(self.run_guard(payload, cwd=base, project=base)["decision"], "deny")
+
     def test_config_found_from_a_subfolder_of_the_output_folder(self):
         sub = os.path.join(self.OUT, "shards")
         os.makedirs(sub)
