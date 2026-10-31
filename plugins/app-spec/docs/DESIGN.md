@@ -422,6 +422,12 @@ remains before Appendix F.
 field as `<SCR id or file>.<slug>`, an endpoint as `METHOD /path`), so a reason recorded with `review --accept` for any
 uncovered item is a known drop. Citations are checked when backticked as `path:line` or `path:line-line`, where the path has a `/` or a
 source-file extension (a host with a port is not one). The renderer backticks every citation in prose evidence.
+`citations-resolve` also checks every location the renderer writes bare from a catalog, whose text format stays as it
+is: the Design column of section 2 (`carry-as-is (<app> <path:line>)`, or `<path>, line not resolved`, from a use
+case's `files` or its first screen's declaration), a screen's `- **Source:**` line in section 3 (from `screens[].file`)
+and the Source column of Appendix A (from an element's `file` and `line`). A location with a line must fall inside the
+file's line count; a path alone must name a file. Both are looked up under the app root and every contract root, so a
+location a mapper or analyst invented, such as `Modules/Invented/Ghost.swift:999`, fails the grade.
 
 ### review.json and REVIEW.md
 

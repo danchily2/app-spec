@@ -262,6 +262,65 @@ class TestOtherChecks(GradeCase):
         self.assertEqual(c["detail"].count("not found"), 20)
 
 
+class TestCatalogCitations(GradeCase):
+    """Every citation the renderer takes from a catalog is graded, backticked or not (the Design column, a screen's
+    Source line and the Source column of Appendix A keep their bare text format)."""
+
+    GHOST = "Modules/Invented/Ghost.swift:999"
+
+    def rendered(self, name, catalog, change):
+        dest = self.copy(name)
+        edit(dest, catalog, change)
+        render.spec(dest)
+        return dest
+
+    def failing_cites(self, dest):
+        c = check(grade.run(dest), "citations-resolve")
+        return c["pass"], c["detail"]
+
+    def test_an_invented_file_in_a_use_case_fails_through_the_design_column(self):
+        dest = self.rendered("design_ghost", "use-cases.json",
+                             lambda d: d["useCases"][0].update(files=[self.GHOST]))
+        self.assertIn(f"carry-as-is (ios-app {self.GHOST})", read_text(dest, "SPEC.md"))
+        passed, detail = self.failing_cites(dest)
+        self.assertFalse(passed)
+        self.assertIn(f"{self.GHOST} (line ", detail)
+        self.assertIn("file not found", detail)
+
+    def test_a_design_line_beyond_the_file_fails(self):
+        dest = self.rendered("design_long", "use-cases.json", lambda d: d["useCases"][0].update(files=[f"{LIST}:9999"]))
+        passed, detail = self.failing_cites(dest)
+        self.assertFalse(passed)
+        self.assertIn(f"{LIST}:9999", detail)
+        self.assertIn("the file has", detail)
+
+    def test_a_design_file_without_a_line_must_exist(self):
+        dest = self.rendered("design_noline", "use-cases.json",
+                             lambda d: d["useCases"][0].update(files=["Modules/Invented/Ghost.swift"], screens=[]))
+        self.assertIn("carry-as-is (ios-app Modules/Invented/Ghost.swift, line not resolved)", read_text(dest, "SPEC.md"))
+        passed, detail = self.failing_cites(dest)
+        self.assertFalse(passed)
+        self.assertIn("Modules/Invented/Ghost.swift", detail)
+
+    def test_an_invented_screen_declaration_fails_through_the_source_line(self):
+        dest = self.rendered("screen_ghost", "screens.json", lambda d: d["screens"][0].update(file=self.GHOST))
+        self.assertIn(f"- **Source:** {self.GHOST}", read_text(dest, "SPEC.md"))
+        passed, detail = self.failing_cites(dest)
+        self.assertFalse(passed)
+        self.assertIn(self.GHOST, detail)
+
+    def test_an_invented_element_fails_through_appendix_a(self):
+        def change(d):
+            d["screens"][0]["elements"][0].update(file="Modules/Invented/Ghost.swift", line=999)
+        dest = self.rendered("element_ghost", "screens.json", change)
+        passed, detail = self.failing_cites(dest)
+        self.assertFalse(passed)
+        self.assertIn(self.GHOST, detail)
+
+    def test_the_good_spec_still_resolves_every_bare_citation(self):
+        self.assertTrue(check(grade.run(self.good), "citations-resolve")["pass"])
+
+
 class TestOverrides(GradeCase):
     def with_overrides(self, name, data, edit_catalog=None):
         dest = self.copy(name)

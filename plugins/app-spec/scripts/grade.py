@@ -8,6 +8,10 @@ Reads the spec (`SPEC.md`, or `FILE` inside the output folder `<out>`), the cata
 
     {"version": 1, "checks": [{"name", "pass", "detail"}], "pass": bool}
 
+`citations-resolve` checks every backticked `path:line` outside Appendix F and code blocks, and every location the
+renderer writes bare from a catalog: the Design column of section 2, a screen's Source line and the Source column of
+Appendix A. Each must lie in a file under the app root or a contract root, within its line count.
+
 The checks, in this order: sections, rules-per-use-case, criteria-per-use-case, criteria-numbering, citations-resolve,
 unknowns-have-owner, prose-complete, no-duplicate-use-cases, banned-nouns, overrides-reflected. `detail` names every
 failing item, at most 20, then `and N more`. Nothing here judges whether a sentence is true: that is the critic's job.
@@ -240,20 +244,58 @@ class _Grader:
                 return self._lengths[path]
         return None
 
+    def _resolve(self, text, number, path, first=None, last=None):
+        """The failure of one citation, or `None`. Without a line range only the file must exist."""
+        length = self._length(path)
+        if length is None:
+            return f"{text} (line {number}): file not found"
+        if first is None:
+            return None
+        if first < 1 or last < first:
+            return f"{text} (line {number}): not a line range"
+        if last > length:
+            return f"{text} (line {number}): the file has {length} lines"
+        return None
+
+    def _bare(self, value):
+        """`(text, path, first, last)` of a bare catalog location: `path:line`, `path:line-line` or a path alone."""
+        value = value.strip()
+        m = _CITE.match(value)
+        if m:
+            return value, m.group(1), int(m.group(2)), int(m.group(3) or m.group(2))
+        return value, value, None, None
+
+    def _catalog_cites(self):
+        """`(number, text, path, first, last)` of every citation the renderer writes from a catalog without backticks:
+        the Design column of section 2 (`carry-as-is (<app> <location>)`), a screen's `- **Source:**` line in section
+        3 and the Source column of Appendix A. The renderer keeps their text format; the grader still resolves them."""
+        app = re.escape(str(self.ctx.app))
+        design = re.compile(r"^carry-as-is \(" + app + r" (.+?)(, line not resolved)?\)$")
+        for number, text in self.spec.lines([HEADINGS[1]]):
+            cells = [c.strip() for c in _ROW_SPLIT.split(text.strip().strip("|"))] if text.startswith("|") else []
+            m = design.match(cells[2]) if len(cells) > 2 else None
+            if m:
+                yield (number, *self._bare(m.group(1)))
+        for number, text in self.spec.lines([HEADINGS[2]]):
+            m = re.match(r"^- \*\*Source:\*\* (.+)$", text)
+            if m and not m.group(1).startswith(("UNKNOWN", "`")):
+                yield (number, *self._bare(m.group(1)))
+        rows = [(n, t) for n, t in self.spec.lines([APPENDICES[0]]) if t.startswith("|")]
+        for number, text in rows:
+            cells = [c.strip() for c in _ROW_SPLIT.split(text.strip().strip("|"))]
+            if len(cells) == 7 and cells[6] and cells[6] != "Source" and not set(cells[6]) <= {"-"}:
+                yield (number, *self._bare(cells[6]))
+
     def citations_resolve(self):
         items = []
         for number, line, code, section in self.spec.rows:
             if code or section == APPENDIX_F:
                 continue
             for text, path, first, last in _cites(line):
-                length = self._length(path)
-                if length is None:
-                    items.append(f"{text} (line {number}): file not found")
-                elif first < 1 or last < first:
-                    items.append(f"{text} (line {number}): not a line range")
-                elif last > length:
-                    items.append(f"{text} (line {number}): the file has {length} lines")
-        return items
+                items.append(self._resolve(text, number, path, first, last))
+        for number, text, path, first, last in self._catalog_cites():
+            items.append(self._resolve(text, number, path, first, last))
+        return [i for i in items if i]
 
     # ------------------------------------------------------------ unknowns
 
