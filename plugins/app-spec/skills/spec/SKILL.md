@@ -14,7 +14,7 @@ Write the spec of one module of one app. The arguments are `$ARGUMENTS`:
 | `--out DIR` | The output folder. Default `./specs/<first module name in lower case>`. Must be outside the app and every contract repository, and hold no contract repository |
 | `--name FILE` | The spec's file name inside `--out`. Default `SPEC.md` |
 | `--contracts REPO ...` | Backend repositories read as contract sources. Read-only |
-| `--capabilities FILE --scope CAP,...` | An App Fusion `capability_index.json` for `CAP-NNN` aliases; with `--scope`, those capabilities' files are the module |
+| `--capabilities FILE --scope CAP,...` | An App Fusion program's `capabilities.json` (with each capability's `implementations` per app) for `CAP-NNN` aliases; with `--scope`, those capabilities' files are the module |
 | `--bar FILE` | A local hand-written spec the critic reads as the bar, next to the rubric. Never copied into the spec |
 | `--passes N` | Most review passes, 1 to 5; any other value stops the run. Default: the `passes` plugin option, else 2 |
 | `--headless` | Ask nothing: take every proposal and say so in the report |

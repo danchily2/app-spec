@@ -32,7 +32,7 @@ Other words used below:
 | Output folder | The folder `<out>` that holds every file a run writes. The only place the plugin writes |
 | Shard | A slice of the module's files that one analyst reads. At most 9,000 non-blank lines by default |
 | Contract repository | A backend repository read-only as a source for endpoint contracts |
-| Capability index | An optional `capability_index.json` from an App Fusion program, used only to alias `CAP-NNN` ids |
+| Capability index | An optional `capabilities.json` of an App Fusion program, with each capability's `implementations` per app, used only to alias `CAP-NNN` ids and, with `--scope`, to pick the module's files |
 
 ## Output folder
 
@@ -92,7 +92,7 @@ A re-run of `spec` regenerates every file except three. `overrides.json` is neve
 | `module.query` | The module name or the folders and globs the person gave |
 | `module.confirmed` | `true` when a person confirmed the proposed scope, `false` for a headless run |
 | `contracts` | Backend repositories read as contract sources, each with its path, name and HEAD sha. Empty list when none |
-| `capabilityIndex` | Path to a `capability_index.json`, or `null` |
+| `capabilityIndex` | Path to the App Fusion `capabilities.json` given with `--capabilities`, or `null` |
 | `scope` | List of `CAP-NNN` ids that define the module through the capability index, or `null` |
 | `options.passes` | Most review rounds. Default 2, range 1 to 5 |
 | `options.specName` | File name of the spec inside `<out>`, as the spec skill wrote it with `--name`. Optional, default `SPEC.md`. `status.py` reads it |
