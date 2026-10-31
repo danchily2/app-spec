@@ -220,6 +220,43 @@ class Discovery(GuardBase):
         payload = {"tool_name": "Edit", "tool_input": {"file_path": self.APP + "/x.swift"}}
         self.assertEqual(self.run_guard(payload, cwd=base, project=base)["decision"], "deny")
 
+    def _workdir_with_output_at(self, *parts):
+        base = os.path.join(os.path.dirname(self.OUT), "workdir")
+        deep = os.path.join(base, *parts)
+        os.makedirs(os.path.dirname(deep))
+        os.rename(self.OUT, deep)
+        return base
+
+    def test_config_three_levels_below_the_project_folder_is_not_found(self):
+        base = self._workdir_with_output_at("a", "b", "payslips")
+        payload = {"tool_name": "Edit", "tool_input": {"file_path": self.APP + "/x.swift"}}
+        self.assertIsNone(self.run_guard(payload, cwd=base, project=base))
+
+    def test_dot_folders_and_node_modules_are_not_scanned(self):
+        for hidden in (".cache", "node_modules"):
+            base = self._workdir_with_output_at(hidden, "payslips")
+            payload = {"tool_name": "Edit", "tool_input": {"file_path": self.APP + "/x.swift"}}
+            self.assertIsNone(self.run_guard(payload, cwd=base, project=base), hidden)
+            os.rename(os.path.join(base, hidden, "payslips"), self.OUT)
+            os.rmdir(os.path.join(base, hidden))
+            os.rmdir(base)
+
+    def test_specs_is_found_after_large_sibling_folders_that_sort_before_it(self):
+        base = self._workdir_with_output_at("specs", "payslips")
+        for n in range(5):  # each one holds more folders than the per-child cap
+            big = os.path.join(base, f"big{n}")
+            for i in range(450):
+                os.makedirs(os.path.join(big, f"d{i:03d}"))
+        payload = {"tool_name": "Edit", "tool_input": {"file_path": self.APP + "/x.swift"}}
+        self.assertEqual(self.run_guard(payload, cwd=base, project=base)["decision"], "deny")
+
+    def test_decisions_are_unchanged_with_a_deep_output_folder(self):
+        base = self._workdir_with_output_at("specs", "payslips")
+        self.assertEqual(self.run_guard({"tool_name": "Write", "tool_input": {"file_path": self.BACKEND + "/x"}}, cwd=base, project=base)["decision"], "deny")
+        self.assertIsNone(self.run_guard({"tool_name": "Write", "tool_input": {"file_path": self.OTHER + "/x"}}, cwd=base, project=base))
+        self.assertIsNone(self.run_guard({"tool_name": "Bash", "tool_input": {"command": f"cat {self.APP}/Main.swift"}}, cwd=base, project=base))
+        self.assertEqual(self.run_guard({"tool_name": "Bash", "tool_input": {"command": f"rm {self.APP}/Main.swift"}}, cwd=base, project=base)["decision"], "ask")
+
     def test_config_found_from_a_subfolder_of_the_output_folder(self):
         sub = os.path.join(self.OUT, "shards")
         os.makedirs(sub)

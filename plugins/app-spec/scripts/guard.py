@@ -221,24 +221,27 @@ def find_outputs(candidates, below):
                 if parent == d:
                     break
                 d, seen = parent, seen + 1
-    budget = 2000  # grandchildren looked at in all: the default output folder is ./specs/<name>, two levels down
+    # The default output folder is ./specs/<name>, two levels down. A child named specs is scanned first, each child
+    # has its own cap, and a total ceiling keeps a huge project fast, so one large folder cannot starve the scan.
+    ceiling = 4000
     for c in [x for x in below if x]:
         try:
-            children = sorted(os.listdir(c))[:400]
+            children = os.listdir(c)
         except OSError:
             continue
+        children = sorted(children, key=lambda n: (n != "specs", n))[:400]
         for n in children:
             child = os.path.join(c, n)
             if not os.path.isdir(child):
                 continue
             add(child)
-            if n.startswith(".") or n == "node_modules" or budget <= 0:
+            if n.startswith(".") or n == "node_modules" or ceiling <= 0:
                 continue
             try:
                 grandchildren = sorted(os.listdir(child))[:400]
             except OSError:
                 continue
-            budget -= len(grandchildren)
+            ceiling -= len(grandchildren)
             for g in grandchildren:
                 if os.path.isdir(os.path.join(child, g)):
                     add(os.path.join(child, g))
