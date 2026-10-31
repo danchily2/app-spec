@@ -9,7 +9,8 @@ A --module value is a folder name (matched against package roots: Swift packages
 and feature folders), or a folder or glob inside the app. With --scope, the files of the named capabilities in
 --capabilities are the core, and --module is not needed. Writes app-spec.json (a re-run updates the fields this script owns in place),
 module.json and shards/<id>.json (one file per shard, hints empty until inventory.py fills them). Exit code 2 when a
-name matches no folder or several unrelated folders. Standard library only.
+name matches no folder or several unrelated folders, or when --out lies inside the app or a --contracts repository, or
+a --contracts repository lies inside --out. Standard library only.
 """
 
 import argparse
@@ -419,6 +420,12 @@ def main(argv=None):
     dest = os.path.realpath(args.out)
     if dest == root or dest.startswith(root + os.sep):
         die(f"--out {args.out} is inside the app; write the output folder outside it")
+    for repo in args.contracts or []:  # the tools write only under --out, so --out and a contract must not nest
+        real = os.path.realpath(repo)
+        if dest == real or dest.startswith(real + os.sep):
+            die(f"--out {args.out} is inside the contract repository {repo}; write the output folder outside it")
+        if real.startswith(dest + os.sep):
+            die(f"the contract repository {repo} is inside --out {args.out}; keep contract repositories outside it")
     stack = detect.detect(root)["stack"]
 
     index, scope = _scope_fields(args)

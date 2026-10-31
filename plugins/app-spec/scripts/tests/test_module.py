@@ -76,6 +76,27 @@ class TestModule(unittest.TestCase):
         self.assertTrue((Path(self.tmp) / "module.json").exists())
         self.assertIn("EmployeeServices/Payslips", stdout)
 
+    def test_cli_refuses_out_inside_a_contract_repository(self):
+        backend = os.path.join(self.tmp, "backend")
+        os.makedirs(os.path.join(backend, "src"))
+        dest = os.path.join(backend, "specs", "payslips")
+        rc, _, err = run_cli(["module.py", IOS, "--module", "Payslips", "--out", dest, "--contracts", backend])
+        self.assertEqual(rc, 2)
+        self.assertIn("inside the contract repository", err)
+        self.assertFalse(os.path.exists(dest), "nothing is written into the contract repository")
+        rc, _, _ = run_cli(["module.py", IOS, "--module", "Payslips", "--out", backend, "--contracts", backend])
+        self.assertEqual(rc, 2)
+        self.assertFalse(os.path.exists(os.path.join(backend, "app-spec.json")))
+
+    def test_cli_refuses_a_contract_repository_inside_out(self):
+        dest = os.path.join(self.tmp, "o")
+        backend = os.path.join(dest, "backend")
+        os.makedirs(backend)
+        rc, _, err = run_cli(["module.py", IOS, "--module", "Payslips", "--out", dest, "--contracts", backend])
+        self.assertEqual(rc, 2)
+        self.assertIn("inside --out", err)
+        self.assertFalse(os.path.exists(os.path.join(dest, "app-spec.json")))
+
     def test_cli_ambiguous_name_exits_2(self):
         rc, _, err = run_cli(["module.py", IOS, "--module", "Feature", "--out", self.tmp])
         self.assertEqual(rc, 2)
