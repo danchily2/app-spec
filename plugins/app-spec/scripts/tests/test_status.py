@@ -5,7 +5,7 @@ import tempfile
 import time
 import unittest
 
-from helpers import FIX, run_cli
+from helpers import FIX, SCRIPTS, run_cli
 from speclib import out
 from test_render_catalogs import build_out
 
@@ -14,7 +14,7 @@ import status
 
 ORDER = ("app-spec.json", "module.json", "inventory.json", "fields.json", "understand_result.json",
          "rules_result.json", "use-cases.json", "screens.json", "flows.json", "rules.json", "endpoints.json",
-         "SPEC.md", "ledger.json", "grade.json", "review.json")
+         "overrides.json", "prose.json", "ledger.json", "SPEC.md", "grade.json", "review.json")  # each pass: ledger, spec, grade
 BASE = time.time() - 10_000
 
 
@@ -44,23 +44,25 @@ class TestStatus(unittest.TestCase):
         self.tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tmp, True)
 
-    def good(self, name="good", review=True, with_ledger=True):
-        """The ios fixture through catalogs, spec, ledger, grade and one review pass."""
+    def good(self, name="good", review=True, with_ledger=True, blocking=False):
+        """The ios fixture through catalogs, ledger, spec, grade and review passes: the last pass is clean unless
+        `blocking`, which leaves one Blocker and one High finding."""
         dest = build_out(self.tmp, name)
         render.catalogs(dest)
-        render.spec(dest)
         if with_ledger:
             out.save(dest, "ledger.json", {"version": 1, "pass": True, "thresholds": {}, "classes": {
                 "screens": {"total": 4, "covered": 4, "withReason": 0, "percent": 100, "pass": True, "uncovered": []},
                 "strings": {"total": 10, "covered": 9, "withReason": 0, "percent": 90, "pass": False, "uncovered": []}}})
+        render.spec(dest)
+        if with_ledger:
             out.save(dest, "grade.json", {"version": 1, "checks": [], "pass": True})
         if review:
+            last = [{"severity": "Blocker", "section": "Screens", "finding": "x", "fix": "y", "owner": "a"},
+                    {"severity": "High", "section": "Rules", "finding": "x", "fix": "y", "owner": "a"}] if blocking else []
             out.save(dest, "review.json", {"passes": [
                 {"n": 1, "ledger": {"pass": True}, "grade": {"pass": True}, "critic": [
                     {"severity": "High", "section": "Screens", "finding": "x", "fix": "y", "owner": "spec-writer"}]},
-                {"n": 2, "ledger": {"pass": True}, "grade": {"pass": True}, "critic": [
-                    {"severity": "Blocker", "section": "Screens", "finding": "x", "fix": "y", "owner": "a"},
-                    {"severity": "High", "section": "Rules", "finding": "x", "fix": "y", "owner": "a"},
+                {"n": 2, "ledger": {"pass": True}, "grade": {"pass": True}, "critic": last + [
                     {"severity": "Medium", "section": "Rules", "finding": "x", "fix": "y", "owner": "a"}]}]})
         settle(dest)
         return dest
@@ -175,9 +177,11 @@ class TestStatus(unittest.TestCase):
         self.assertIn("the catalogs predate understand_result.json: re-run render.py catalogs", status.report(dest)["stale"])
         self.assertIn('render.py" catalogs', cmd(dest))
 
-    def test_stale_spec_next_is_render_spec(self):
+    def test_stale_catalog_next_is_ledger_then_render_spec(self):
         dest = self.good()
         touch(dest, "screens.json", later=True)
+        self.assertIn('ledger.py" ', cmd(dest))
+        stamp(dest, "ledger.json", 5_010)
         self.assertIn('render.py" spec', cmd(dest))
 
     def test_review_stale(self):
@@ -191,12 +195,72 @@ class TestStatus(unittest.TestCase):
         dest = self.good()
         touch(dest, "SPEC.md", later=True)
         stale = status.report(dest)["stale"]
-        self.assertIn("the ledger predates the spec: run ledger.py", stale)
+        self.assertNotIn("the ledger predates the spec: run ledger.py", stale)  # the ledger does not read the spec
         self.assertIn("the grade predates the spec: run grade.py", stale)
+        dest = self.good("g2")
+        touch(dest, "use-cases.json", later=True)
+        self.assertIn("the ledger predates use-cases.json: run ledger.py", status.report(dest)["stale"])
+        dest = self.good("g3")
+        out.save(dest, "overrides.json", {"version": 1, "drop": [], "rename": [], "ids": {}, "merge": []})
+        touch(dest, "overrides.json", later=True)
+        stale = status.report(dest)["stale"]
+        self.assertIn("the ledger predates overrides.json: run ledger.py", stale)
+        self.assertIn("the spec predates overrides.json: re-run render.py spec", stale)
+        self.assertIn("ledger.py", cmd(dest), "the ledger runs before the spec it feeds")
+
+    def test_spec_rendered_before_the_ledger_is_stale(self):
+        """Appendix F reads ledger.json: a spec rendered before the ledger shows no coverage."""
+        dest = build_out(self.tmp, "early")
+        render.catalogs(dest)
+        render.spec(dest)
+        out.save(dest, "ledger.json", {"version": 1, "pass": True, "thresholds": {}, "classes": {}})
+        out.save(dest, "grade.json", {"version": 1, "checks": [], "pass": True})
+        out.save(dest, "review.json", {"passes": [{"n": 1, "ledger": {"pass": True}, "grade": {"pass": True}, "critic": []}]})
+        settle(dest)
+        stamp(dest, "ledger.json", 145)  # written after the spec, as the old pass order did
+        self.assertIn("the spec predates ledger.json: re-run render.py spec", status.report(dest)["stale"])
+        self.assertIn('render.py" spec', cmd(dest))
+
+    def test_a_ledger_rerun_with_the_same_coverage_does_not_stale_the_spec(self):
+        """The review command runs ledger.py after the spec; the same numbers must not send the user back to render."""
+        dest = self.good()
+        stamp(dest, "ledger.json", 145)
+        self.assertEqual(status.report(dest)["stale"], [])
+
+    def test_prose_newer_than_the_spec_is_stale(self):
+        dest = self.good()
+        out.save(dest, "prose.json", {"summary": "x"})
+        touch(dest, "prose.json", later=True)
+        self.assertIn("the spec predates prose.json: re-run render.py spec", status.report(dest)["stale"])
+        self.assertIn('render.py" spec', cmd(dest))
+
+    def test_failing_gates_send_the_user_to_review(self):
+        dest = self.good(blocking=True)
+        r = status.report(dest)
+        self.assertEqual(r["next"]["command"], f"/app-spec:review {dest}")
+        self.assertIn("2 Blocker/High finding(s) remain", r["next"]["reason"])
+        dest = self.good("led")
+        led = out.load(dest, "ledger.json")
+        led["pass"] = False
+        out.save(dest, "ledger.json", led)
+        render.spec(dest)
+        settle(dest)
+        r = status.report(dest)
+        self.assertEqual(r["stale"], [])
+        self.assertEqual(r["next"]["command"], f"/app-spec:review {dest}")
+        self.assertIn("the ledger fails (strings)", r["next"]["reason"])
+        dest = self.good("gr")
+        out.save(dest, "grade.json", {"version": 1, "pass": False, "checks": [
+            {"name": "citations-resolve", "pass": False, "detail": "x"}, {"name": "sections", "pass": True, "detail": ""}]})
+        settle(dest)
+        r = status.report(dest)
+        self.assertEqual(r["next"]["command"], f"/app-spec:review {dest}")
+        self.assertIn("the grade fails (citations-resolve)", r["next"]["reason"])
 
     def test_one_second_tolerance(self):
         dest = self.good()
         spec_t = os.path.getmtime(os.path.join(dest, "SPEC.md"))
+        os.utime(os.path.join(dest, "ledger.json"), (spec_t, spec_t))  # one pass writes the ledger and the spec together
         os.utime(os.path.join(dest, "use-cases.json"), (spec_t + 0.9, spec_t + 0.9))
         self.assertEqual(status.report(dest)["stale"], [])
         os.utime(os.path.join(dest, "use-cases.json"), (spec_t + 1.5, spec_t + 1.5))
@@ -224,12 +288,13 @@ class TestStatus(unittest.TestCase):
         out.save(dest, "app-spec.json", cfg)
         shutil.copy(os.path.join(dest, "SPEC.md"), os.path.join(dest, "my spec.md"))
         settle(dest)
-        stamp(dest, "ledger.json", 135)
+        stamp(dest, "ledger.json", 115)
         stamp(dest, "my spec.md", 125)
         stamp(dest, "grade.json", 120)
         c = cmd(dest)
         self.assertTrue(c.endswith('grade.py" ' + dest + " --name 'my spec.md'"), c)
         stamp(dest, "screens.json", 200)
+        stamp(dest, "ledger.json", 210)
         c = cmd(dest)
         self.assertTrue(c.endswith('render.py" spec ' + dest + " --name 'my spec.md'"), c)
 
@@ -253,7 +318,7 @@ class TestStatus(unittest.TestCase):
         self.assertEqual(cmd(dest), "(a person) read payslips.md")
 
     def test_coverage_and_passes(self):
-        r = status.report(self.good())
+        r = status.report(self.good(blocking=True))
         self.assertEqual(r["coverage"], {"screens": 100, "strings": 90})
         self.assertEqual(r["passes"], 2)
         self.assertEqual(r["blocking"], 2)
@@ -288,6 +353,18 @@ class TestStatus(unittest.TestCase):
         empty = os.path.join(self.tmp, "e")
         os.makedirs(empty)
         self.assertEqual(run_cli(["status.py", empty])[0], 0)
+
+
+class TestSkillPassOrder(unittest.TestCase):
+    def test_each_pass_runs_ledger_then_spec_then_grade(self):
+        """Appendix F of the spec reads ledger.json, so the ledger must run before the spec is rendered."""
+        path = SCRIPTS.parent / "skills" / "spec" / "SKILL.md"
+        text = path.read_text(encoding="utf-8")
+        step = text[text.index("## 7:"):text.index("## 8:")]
+        ledger, spec, grade = (step.index(x) for x in ('scripts/ledger.py" OUT', 'scripts/render.py" spec OUT',
+                                                       'scripts/grade.py" OUT'))
+        self.assertLess(ledger, spec)
+        self.assertLess(spec, grade)
 
 
 if __name__ == "__main__":

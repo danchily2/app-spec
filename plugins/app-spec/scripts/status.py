@@ -18,8 +18,9 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from speclib import out  # noqa: E402
+from speclib import out, spec_md  # noqa: E402
 from speclib.common import die  # noqa: E402
+from speclib.template import APPENDICES  # noqa: E402
 
 TOLERANCE = 1.0                      # seconds: file systems round times, and two writes of one run land together
 CATALOGS = ("use-cases.json", "screens.json", "flows.json", "rules.json", "endpoints.json")
@@ -115,7 +116,41 @@ def _stages(dest, cfg, spec_name):
     return stages
 
 
+def _appendix_f(text):
+    """The lines of Appendix F in a spec's text, without blank lines at either end."""
+    lines, inside = [], False
+    for line in text.splitlines():
+        if line.startswith("## "):
+            if inside:
+                break
+            inside = line.rstrip() == APPENDICES[5]
+            continue
+        if inside:
+            lines.append(line)
+    while lines and not lines[0].strip():
+        lines.pop(0)
+    while lines and not lines[-1].strip():
+        lines.pop()
+    return lines
+
+
+def _coverage_differs(dest, spec_name):
+    """True when the spec's Appendix F is not what `render.py spec` would write from the current ledger.json. Content,
+    not time: the review command runs ledger.py after the spec, and the same numbers must not stale the spec."""
+    try:
+        with open(os.path.join(dest, spec_name), encoding="utf-8") as fh:
+            written = _appendix_f(fh.read())
+        want = spec_md.coverage(spec_md.Context(dest))
+    except (OSError, UnicodeDecodeError, SystemExit, KeyError, TypeError, ValueError, AttributeError):
+        return False  # a missing catalog or a broken file is reported by its own stage
+    while want and not want[-1].strip():
+        want = want[:-1]
+    return written != want
+
+
 def _stale(dest, spec_name):
+    """What is out of date, in pipeline order. Each review pass runs the ledger, then the spec (its Appendix F reads
+    ledger.json), then the grader (it reads the spec): the ledger is compared with what it reads, never the spec."""
     lines = []
     spec_t = _mtime(dest, spec_name)
     if _newer(_mtime(dest, "module.json"), _mtime(dest, "inventory.json")) and os.path.isfile(os.path.join(dest, "inventory.json")):
@@ -124,15 +159,38 @@ def _stale(dest, spec_name):
     for name in RESULTS:
         if _newer(_mtime(dest, name), catalogs_t):
             lines.append(f"the catalogs predate {name}: re-run render.py catalogs")
-    for name in CATALOGS:
+    ledger_t = _mtime(dest, "ledger.json")
+    for name in (*CATALOGS, "overrides.json"):
+        if _newer(_mtime(dest, name), ledger_t):
+            lines.append(f"the ledger predates {name}: run ledger.py")
+    for name in (*CATALOGS, "overrides.json", "prose.json"):
         if _newer(_mtime(dest, name), spec_t):
             lines.append(f"the spec predates {name}: re-run render.py spec")
-    for what, name in (("ledger", "ledger.json"), ("grade", "grade.json")):
-        if _newer(spec_t, _mtime(dest, name)):
-            lines.append(f"the {what} predates the spec: run {name.split('.')[0]}.py")
+    if _newer(ledger_t, spec_t) and _coverage_differs(dest, spec_name):
+        lines.append("the spec predates ledger.json: re-run render.py spec")
+    if _newer(spec_t, _mtime(dest, "grade.json")):
+        lines.append("the grade predates the spec: run grade.py")
     if _newer(spec_t, _mtime(dest, "review.json")):
         lines.append("the review predates the spec: run review")
     return lines
+
+
+def _gates(dest, blocking):
+    """The gates that fail, each named with what fails: the ledger's classes, the grader's checks, the findings."""
+    failing = []
+    led = out.load(dest, "ledger.json", None)
+    if isinstance(led, dict) and led.get("pass") is False:
+        classes = led.get("classes") if isinstance(led.get("classes"), dict) else {}
+        names = [k for k, v in classes.items() if isinstance(v, dict) and v.get("pass") is False]
+        failing.append(f"the ledger fails ({', '.join(names) or 'see LEDGER.md'})")
+    grade = out.load(dest, "grade.json", None)
+    if isinstance(grade, dict) and grade.get("pass") is False:
+        checks = grade.get("checks") if isinstance(grade.get("checks"), list) else []
+        names = [str(c.get("name")) for c in checks if isinstance(c, dict) and c.get("pass") is False]
+        failing.append(f"the grade fails ({', '.join(names) or 'see grade.json'})")
+    if blocking:
+        failing.append(f"{blocking} Blocker/High finding(s) remain")
+    return failing
 
 
 def _review(dest):
@@ -153,7 +211,7 @@ def _coverage(dest):
     return {k: v.get("percent") for k, v in classes.items() if isinstance(v, dict)}
 
 
-def _next(dest, cfg, stages, stale, spec_name):
+def _next(dest, cfg, stages, stale, spec_name, blocking=0):
     q = shlex.quote(dest)
     skill = f"/app-spec:spec {q}"
     name_arg = "" if spec_name == DEFAULT_SPEC else f" --name {shlex.quote(spec_name)}"  # else render and grade use SPEC.md
@@ -181,26 +239,20 @@ def _next(dest, cfg, stages, stale, spec_name):
         return f"{script('render.py')} spec {q}{name_arg}", f"{spec_name} is not written yet"
     if stages["review"]["status"] != "done":
         return f"/app-spec:review {q}", "the spec has no review yet"
-    # Everything exists: the first stale step in pipeline order, the review last.
-    for line in stale:
-        if line.startswith("the inventory"):
-            return f"{script('inventory.py')} {q}", line
-    for line in stale:
-        if line.startswith("the catalogs"):
-            return f"{script('render.py')} catalogs {q}", line
-    for line in stale:
-        if line.startswith("the spec predates"):
-            return f"{script('render.py')} spec {q}{name_arg}", line
-    # The review loop runs the ledger and the grader itself, so a stale review comes before their own lines.
-    for line in stale:
-        if line.startswith("the review"):
-            return f"/app-spec:review {q}", line
-    for line in stale:
-        if line.startswith("the ledger"):
-            return f"{script('ledger.py')} {q}", line
-    for line in stale:
-        if line.startswith("the grade"):
-            return f"{script('grade.py')} {q}{name_arg}", line
+    # Everything exists: the first stale step in pipeline order. A pass runs ledger, spec, grade; the review runs the
+    # ledger and the grader itself, so a stale review comes before a stale grade.
+    for prefix, command in (("the inventory", f"{script('inventory.py')} {q}"),
+                            ("the catalogs", f"{script('render.py')} catalogs {q}"),
+                            ("the ledger", f"{script('ledger.py')} {q}"),
+                            ("the spec predates", f"{script('render.py')} spec {q}{name_arg}"),
+                            ("the review", f"/app-spec:review {q}"),
+                            ("the grade", f"{script('grade.py')} {q}{name_arg}")):
+        for line in stale:
+            if line.startswith(prefix):
+                return command, line
+    failing = _gates(dest, blocking)
+    if failing:
+        return f"/app-spec:review {q}", "; ".join(failing) + ": fix the spec or regenerate it, then review it again"
     return f"(a person) read {spec_name}", "the spec is ready for a person"
 
 
@@ -212,7 +264,7 @@ def report(dest):
     stages = _stages(dest, cfg, spec_name)
     stale = _stale(dest, spec_name)
     passes, blocking = _review(dest)
-    command, reason = _next(dest, cfg, stages, stale, spec_name)
+    command, reason = _next(dest, cfg, stages, stale, spec_name, blocking)
     return {"out": dest, "spec": spec_name, "stages": stages, "stale": stale, "coverage": _coverage(dest),
             "passes": passes, "blocking": blocking, "next": {"command": command, "reason": reason}}
 

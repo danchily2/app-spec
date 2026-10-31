@@ -373,6 +373,14 @@ a new one, so a renamed use case keeps its id.
 | `thresholds` | The percentages in force |
 | `pass` | `true` when every class passes: (covered + covered-with-reason) / total is at least its threshold, and a class with no items passes. An uncovered item without a reason counts against its class |
 
+The ledger reads the catalogs, `overrides.json`, `inventory.json`, `fields.json` and `module.json`, never the spec,
+and Appendix F of the spec reads `ledger.json`. So every review pass runs `ledger.py`, then `render.py spec`, then
+`grade.py`. `status.py` calls the ledger stale when a catalog or `overrides.json` is newer, and the spec stale when a
+catalog, `overrides.json` or `prose.json` is newer, or when its Appendix F differs from what the current `ledger.json`
+renders. With nothing stale, it names `/app-spec:review <out>` as the next command while `ledger.json` or `grade.json`
+has `pass: false` or the last review pass left a Blocker or High finding, with the failing gate as the reason; only
+then does a person read the spec.
+
 ### grade.json
 
 ```json

@@ -202,11 +202,13 @@ returns one JSON object. Save it as `OUT/prose.json` and check that it parses
 
 For pass `n` from 1:
 
-1. Render, count and grade. Exit code 1 of the ledger or the grader means "fail", not an error:
+1. Count, render and grade, in this order: the ledger reads only the catalogs, `overrides.json` and the inventory;
+   the spec's Appendix F reads `ledger.json`; the grader reads the spec. Exit code 1 of the ledger or the grader means
+   "fail", not an error:
 
    ```bash
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/render.py" spec OUT NAME_ARG
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/ledger.py" OUT
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/render.py" spec OUT NAME_ARG
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/grade.py" OUT NAME_ARG
    ```
 
