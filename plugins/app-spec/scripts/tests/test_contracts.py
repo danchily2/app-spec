@@ -138,15 +138,20 @@ class TestEnrich(unittest.TestCase):
         return repo
 
     def _one(self, path, repo):
-        base = self.payslips()
+        base = getattr(self, "_base", None) or self.payslips()
+        self._base = base
         out.save(self.out, "endpoints.json", {"version": 1, "endpoints": [dict(base, path=path, backend=None)]})
         contracts.enrich(self.out, repo)
         return self.eps()[0]
 
-    def test_closest_route_wins_over_longer_tail_match(self):
-        repo = self._repo({"a": ["/admin/payslips/:id"], "b": ["/api/v1/payslips/:id"]})
-        e = self._one("/api/v1/payslips/{}", repo)
-        self.assertEqual(e["backend"]["file"], "routes/b.ts")
+    def test_more_agreeing_literals_win_at_equal_length(self):
+        # each route alone matches; both are one segment longer, b agrees on one more literal from the end
+        alone = self._one("/v1/payslips/{}/lines", self._repo({"a": ["/api/:v/payslips/:id/lines"]}))
+        self.assertEqual(alone["backend"]["file"], "routes/a.ts")
+        repo = self._repo({"a": ["/api/:v/payslips/:id/lines"], "b": ["/api/v1/payslips/:id/lines"]})
+        e = self._one("/v1/payslips/{}/lines", repo)
+        self.assertEqual(e["backend"]["file"], "routes/b.ts")  # file order alone would pick routes/a.ts
+        self.assertNotIn("disagreements", e)
 
     def test_closer_segment_count_wins_without_exact_match(self):
         repo = self._repo({"a": ["/api/v1/payslips/:id"], "b": ["/admin/payslips/:id"]})
