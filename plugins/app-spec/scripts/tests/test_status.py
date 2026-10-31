@@ -5,7 +5,7 @@ import tempfile
 import time
 import unittest
 
-from helpers import run_cli
+from helpers import FIX, run_cli
 from speclib import out
 from test_render_catalogs import build_out
 
@@ -128,7 +128,7 @@ class TestStatus(unittest.TestCase):
     def test_contracts_done_and_undone(self):
         dest = self.good(review=False)
         cfg = out.load_config(dest)
-        cfg["contracts"] = [{"path": "/b", "name": "api", "commit": "abc"}]
+        cfg["contracts"] = [{"path": "/b", "name": "api", "commit": "abc"}, {"path": "/c", "name": "auth", "commit": None}]
         out.save(dest, "app-spec.json", cfg)
         settle(dest)
         r = status.report(dest)
@@ -136,13 +136,25 @@ class TestStatus(unittest.TestCase):
         self.assertIn('contracts.py" ' + dest, r["next"]["command"])
         eps = out.load(dest, "endpoints.json")
         eps["endpoints"][0]["backend"] = {"repo": "api", "file": "f", "line": 1, "auth": "x"}
+        eps["contractsRun"] = [{"repo": "api", "at": "2026-10-31T00:00:00Z"}]
         out.save(dest, "endpoints.json", eps)
         settle(dest)
-        self.assertEqual(status.report(dest)["stages"]["contracts"]["status"], "done")
-        eps["endpoints"][0]["backend"] = None
-        eps["endpoints"][0]["disagreements"] = [{"field": "a", "client": "c:1", "backend": "b:2", "note": "n"}]
+        self.assertEqual(status.report(dest)["stages"]["contracts"]["status"], "-", "one of two repositories read")
+        eps["contractsRun"].append({"repo": "auth", "at": "2026-10-31T00:00:00Z"})
         out.save(dest, "endpoints.json", eps)
         self.assertEqual(status.report(dest)["stages"]["contracts"]["status"], "done")
+
+    def test_contracts_done_when_no_route_matched(self):
+        """A contract repository with no matching route must not loop on contracts.py."""
+        dest = self.good(review=False)
+        cfg = out.load_config(dest)
+        cfg["contracts"] = [{"path": str(FIX / "backend-empty"), "name": "backend-empty", "commit": None}]
+        out.save(dest, "app-spec.json", cfg)
+        self.assertEqual(run_cli(["contracts.py", dest])[0], 0)
+        self.assertTrue(all(e["backend"] is None and not e.get("disagreements")
+                            for e in out.load(dest, "endpoints.json")["endpoints"]))
+        self.assertEqual(status.report(dest)["stages"]["contracts"]["status"], "done")
+        self.assertNotIn("contracts.py", cmd(dest))
 
     def test_no_contracts_means_done(self):
         self.assertEqual(status.report(self.good())["stages"]["contracts"]["status"], "done")

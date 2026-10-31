@@ -9,7 +9,9 @@ line, authorization) and an unmatched endpoint keeps `backend` null. The name is
 `contracts` list of app-spec.json, else the repository folder's name: an absolute path stays in app-spec.json only, so
 the spec never shows a home folder. Without --repo, every repository in the `contracts`
 list of app-spec.json is read, one after the other. A later repository never clears or replaces a match an earlier one
-made, and a second run gives the same file. Backend files are read, never executed or written. Standard library only.
+made, and a second run gives the same endpoints. Every run of a repository is recorded in `contractsRun`
+(`[{repo, at}]`, one entry per repository name), even when no route matched, so status.py knows the step ran;
+`render.py catalogs` writes endpoints.json from scratch, so the record goes with it and contracts.py runs again. Backend files are read, never executed or written. Standard library only.
 """
 
 import argparse
@@ -21,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from speclib import out  # noqa: E402
 from speclib.common import (SOURCE_EXT, die, endpoints_match, line_of, match_brace, normalize_endpoint,  # noqa: E402
-                            read_text, strip_comments, walk)
+                            now_iso, read_text, strip_comments, walk)
 
 VERBS = ("get", "post", "put", "delete", "patch", "head", "options")
 _NEST_AUTH = re.compile(r"@UseGuards\(\s*([A-Za-z0-9_]+)")
@@ -308,6 +310,10 @@ def enrich(out_dir, repo_root, framework="auto"):
             e["label"] = "VERIFIED" if cited else "INFERRED"
         elif e.get("label") == "VERIFIED":
             e["label"] = "INFERRED"
+    # The record that this repository was read, whether or not a route matched: status.py tests on it. A second run
+    # of the same repository replaces its own entry.
+    runs = [r for r in data.get("contractsRun") or [] if isinstance(r, dict) and r.get("repo") != name]
+    data["contractsRun"] = runs + [{"repo": name, "at": now_iso().replace("+00:00", "Z")}]
     out.save(out_dir, "endpoints.json", data)
     return {"framework": framework, "routes": len(routes), "endpoints": len(data.get("endpoints", [])),
             "matched": matched}

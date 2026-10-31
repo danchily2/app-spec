@@ -78,14 +78,16 @@ def _spec_name(cfg):
 
 
 def _contracts_done(dest, cfg):
-    """Done when no contract repository is configured, else when the endpoints show a contracts.py run."""
-    if not cfg.get("contracts"):
+    """Done when no contract repository is configured, else when `contractsRun` of endpoints.json names every one.
+    contracts.py records each repository it read there, whether or not a route matched."""
+    configured = [c for c in cfg.get("contracts") or [] if isinstance(c, dict)]
+    if not configured:
         return True
     doc = out.load(dest, "endpoints.json", {})
-    for e in (doc.get("endpoints") if isinstance(doc, dict) else None) or []:
-        if isinstance(e, dict) and (e.get("backend") is not None or e.get("disagreements")):
-            return True
-    return False
+    runs = (doc.get("contractsRun") if isinstance(doc, dict) else None) or []
+    read = {str(r.get("repo")) for r in runs if isinstance(r, dict) and r.get("repo")}
+    names = {str(c.get("name") or os.path.basename(str(c.get("path") or "").rstrip(os.sep))) for c in configured}
+    return names <= read
 
 
 def _stages(dest, cfg, spec_name):

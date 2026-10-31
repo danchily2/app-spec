@@ -193,6 +193,17 @@ class TestEnrich(unittest.TestCase):
         self.assertEqual(code, 0, err)
         self.assertEqual(self.payslips()["backend"]["repo"], "me-api")  # the configured name, never the path
 
+    def test_a_run_is_recorded_even_when_no_route_matches(self):
+        contracts.enrich(self.out, EMPTY)
+        doc = out.load(self.out, "endpoints.json")
+        self.assertEqual([r["repo"] for r in doc["contractsRun"]], ["backend-empty"])
+        self.assertTrue(doc["contractsRun"][0]["at"])
+        self.assertTrue(all(e["backend"] is None for e in doc["endpoints"]))
+        contracts.enrich(self.out, EMPTY)  # a second run replaces its own record
+        contracts.enrich(self.out, ASPNET)
+        self.assertEqual([r["repo"] for r in out.load(self.out, "endpoints.json")["contractsRun"]],
+                         ["backend-empty", "backend-aspnet"])
+
     def test_backend_repo_is_a_name_and_the_spec_has_no_home_path(self):
         contracts.enrich(self.out, ASPNET)
         render.spec(self.out)
