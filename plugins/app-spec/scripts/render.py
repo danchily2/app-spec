@@ -38,6 +38,7 @@ _LOCATION = re.compile(r":\d[\d,\-– ]*$")
 _PARAM = re.compile(r"\{[^}]*\}|(?<=/):[A-Za-z_]\w*|(?<=/)\$[A-Za-z_]\w*")
 # `GET {report.export.href} (absolute URL supplied by the report)`: the app follows a link the server sends
 _LINK = re.compile(r"^\{\s*([^{}]+?)\s*\}")
+_CITED_PATH = re.compile(r"(?<![\w@+.\-/])(?:[\w@+\-][\w@+.\-]*/)+[\w@+\-][\w@+.\-]*\.[A-Za-z]\w*")
 _PAGING = re.compile(r"\b(?:next|previous|prev)\b", re.I)
 
 
@@ -220,9 +221,10 @@ class _Catalogs:
     # ------------------------------------------------------------ use cases
 
     def _in_core(self, files):
-        """True when one of the files is a core file, or when the core is unknown or nothing is cited."""
-        files = [_path(f) for f in files if f]
-        return not self.core or not files or any(f in self.core for f in files)
+        """True when a path one of the citations names is a core file, or when the core is unknown or no citation
+        names a path. A citation can name several: `A.swift:99-110 (gating in B.swift:353-404)`."""
+        named = [m.group(0) for f in files if f for m in _CITED_PATH.finditer(str(f))]
+        return not self.core or not named or any(p in self.core for p in named)
 
     def _out_of_scope(self, kind, prefix, key, name, reason):
         entry = {"id": self.registry.assign(prefix, key), "name": name, "reason": reason}

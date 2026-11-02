@@ -173,6 +173,9 @@ Render the catalogs again, so the rules carry their use-case ids:
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/render.py" catalogs OUT
 ```
 
+A rule whose source names no core file now sits in `OUT/out-of-scope.json` too. Say how many, with the folders their
+sources are in: a folder that holds many of them may belong to the module (add it with `--module`).
+
 Every `render.py catalogs` run rewrites `OUT/render-warnings.json`: a list of `{kind, item, why}`, one per reference
 it could not resolve (a screen or use case no entry has, a duplicate, an ignored merge, an endpoint the inventory does
 not have). Read it after each run; it is empty when all resolved. An endpoint a use case cites that the inventory does

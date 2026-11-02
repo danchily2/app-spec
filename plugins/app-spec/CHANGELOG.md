@@ -22,8 +22,9 @@ Fixes found in a run on a native iOS payslips module.
 - **Neighbour use cases and rules stay out of the spec.** Touch shards are context: the analyst, mapper and extractor
   prompts say so, and what they find only in touch files goes to a new `outOfScope` list. `render.py catalogs` also
   moves a use case whose files are all outside the core, a rule whose source is outside it, and a rule of such a use
-  case to `out-of-scope.json`. The spec names them on one Dependencies line, and the skill asks a person to confirm
-  the list after step 3.
+  case to `out-of-scope.json`. Every path a citation names counts (`A.swift:9 (gating in B.swift:3)`), so one core
+  path keeps it in scope. The spec names them on one Dependencies line, and the skill asks a person to confirm the
+  list after step 3.
 - **Citation paths are made root-relative.** `merge_contracts.py` rewrites every string of a reader envelope, and
   `render.py spec` every string of `prose.json`, so an absolute path under the app or a contract root, or one that
   starts with the root's folder name (`me-api/...`), becomes relative to that root and resolves in the grader. The

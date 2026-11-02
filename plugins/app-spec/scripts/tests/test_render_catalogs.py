@@ -55,6 +55,18 @@ class TestOutOfScope(unittest.TestCase):
         change(data)
         out.save(self.out, name, data)
 
+    def test_a_citation_with_several_paths_is_in_scope_when_one_is_core(self):
+        item = "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift"
+        card = "Employee/StartPage/PayslipCard.swift"
+
+        def rules(r):
+            r["rules"][0]["source"] = f"{card}:3-5 (sorting in {item}:10-20; reset in {card}:9)"
+            r["rules"][1]["source"] = f"{card}:3-5 + {card}:7"
+        self.edit("rules_result.json", rules)
+        render.catalogs(self.out)
+        self.assertEqual([r["name"] for r in out.load(self.out, "rules.json")["rules"]], ["Payslips are newest first"])
+        self.assertEqual([r["name"] for r in out.load(self.out, "out-of-scope.json")["rules"]], ["Net pay is always shown"])
+
     def test_touch_only_use_cases_and_rules_leave_the_catalogs(self):
         card = "Employee/StartPage/PayslipCard.swift"
 
