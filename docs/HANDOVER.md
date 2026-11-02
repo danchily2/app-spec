@@ -106,6 +106,7 @@ scarlet-team-c calendar spec as the bar) to check that the fixes did not overfit
 | 1 | v0.1.0 | 486, filtered by hand to 33 | 31 (15, removed by hand) | 0/12 / 0 | 121 (2) | pass | fail, screens 16/35 | 1 / 0 | 6 |
 | 2 (Devin) | v0.2.0 | 21 | 11 (0) | 9/9 / 1 | ~30 (1) | fail | fail, screens 26/28 | 2 / 0 | N3 approvals |
 | v3 | branch `2ab0bd1`→`a1c1138` | 31 | 11 (0) | 9/9 / 5 | 85 (0) | pass | fail, fields 51/58, strings 0/1 | 0 / 2 | 5 plugin fixes made mid-run, 1 rule path patched by hand |
+| v4 | 0.4.0, headless, **partial** (usage limit hit after pass 1, $55.84) | 31 | 11 (0); 32 out of scope | 9 / 5 (4 INFERRED, not in inventory) | 87 (2); 84 referee corrections | fail (1 citation past end of file) | fail, fields 84.9%, strings 0/1 | 1 / 3 after pass 1 (pass 2 never ran) | 0 by hand; 1 denied workaround (transcript grep to save a contract batch) |
 
 ## Backlog, ranked
 
@@ -152,6 +153,21 @@ Fix in this order unless a later run shows a higher-impact defect. Ids P-n and N
    path scan to `"\(base)/employees/\(id)/allpayslips?..."`-style builders and record the function as the client.
 9. **P10/P26: route casing.** `normalize_endpoint` lowercases the path, and the spec shows the lowercased form
    (`exportfromalltenants`). Keep the original spelling for display and use lowercase only for matching.
+
+### Round 3b: defects the v4 run found
+
+19. **Range past the end of a file by a few lines** (`PayslipsListCoordinator.swift:25-124`, 123 lines) fails the
+    grade. Clamp the end of an agent's range to the file's length in `render.py catalogs` when the start is inside it.
+20. **Path completion reads only `source`.** `ViewModel/ViewModel.PayslipItem.swift:12-36` in a rule's other fields
+    stayed partial. Complete paths in every string field of use cases, screens and rules.
+21. **Touch-shard extractors put rules of kept use cases out of scope.** Four `scope` warnings: year-end rules in
+    `ReportsService.swift` were dropped. With a use-case index, a touch-shard rule that serves an indexed use case
+    goes into rules with that use case.
+22. **Coordinators become screens** (critic-1 High, SCR-015 to SCR-018). A mapped screen whose file holds only an
+    inventory coordinator, and no inventory screen, is not a screen.
+23. **No clear way to save an agent's answer.** The run grepped subagent transcripts for the contract batch (denied).
+    State in the skill how the answer reaches `save_json.py` (write it with the Write tool, then save).
+24. **84 of 87 rules corrected by referees.** Check whether the referees rewrite text that was right.
 
 ### Round 3: agent and schema consistency (group C)
 
@@ -215,3 +231,7 @@ Add one entry per round: date, items, commits, release tag, run folder, scorecar
   `48ac365` (7, event-enum cases a core file sends). Checked on a copy of the v4 folder: 12 endpoints (all three
   missing ones found; 2 Dottie start-page endpoints; no false ones after two narrowing passes), 46 string keys,
   6 events. Tests: 375 Python, 33 Node. Not released yet: release as 0.5.0 after the v4 assessment.
+- **v4 assessment (2026-11-02):** the run stopped on the account's 5-hour usage limit while it routed the pass-1
+  findings; pass 2 never ran, so the Blocker and 2 of the 3 High are spec content the loop had already routed. The
+  findings use `alsoAffects` as intended. New plugin defects are items 19-24 (Round 3b). Exit criteria not met. Group
+  C items done so far: P16 (`4680efb`), P27 (`c5b0b98`) on `fix/round3-agent-schemas`.
