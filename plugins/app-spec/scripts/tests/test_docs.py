@@ -27,6 +27,12 @@ class TestDocs(unittest.TestCase):
         self.assertIn("Never search session or transcript folders", skill)
         self.assertNotIn("transcript (`.jsonl`)", skill)
 
+    def test_the_skill_says_which_role_writes(self):
+        # P9: role prompts say read-only while the path without the Workflow tool needs one agent to save results
+        skill = (PLUGIN / "skills" / "spec" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("**Who writes.**", skill)
+        self.assertIn("write nothing while you act in that role", skill)
+
     def test_agents_name_the_injection_field_the_schemas_have(self):
         # P16: the mapper prompt said "the flags field"; the schema field is injectionSuspects
         for path in sorted((PLUGIN / "agents").glob("*.md")) + sorted((PLUGIN / "workflows").glob("*.js")):

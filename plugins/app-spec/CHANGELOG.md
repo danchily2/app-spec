@@ -5,6 +5,11 @@ changes.
 
 ## Unreleased
 
+- **The skill says which role writes (P9).** Every agent prompt says read-only, while the path without the Workflow
+  tool (and Devin, where one agent plays every role) needs that agent to save results. The skill now states that the
+  agents only return JSON, that only the session writes, under `OUT`, and that for one agent in every role
+  "read-only" means writing nothing while it acts in a role, then saving the JSON as the session.
+
 - **A rule names its use case by id and can name its conflicts (P23).** The rules schema had a free-text `useCase`,
   so a name copied with a small change lost the link to the use case, and no field said that two rules disagree.
   The extractor now copies the use case's id (`UC-NNN`) from the index (`render.py` still accepts a name from older
