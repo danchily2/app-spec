@@ -117,6 +117,17 @@ class TestBrief(GradeCase):
         self.assertFalse(c["pass"])
         self.assertIn(":9999", c["detail"])
 
+    def test_a_bare_file_name_that_one_file_has_resolves(self):
+        # payslips v5: the writer cited `MainPayslipFeature.swift:287-290` and citations-resolve failed, while the
+        # catalog range check accepts a bare name that exactly one file has
+        bare = os.path.basename(LIST)
+        dest = self.mutated("bare", lambda t: t.replace(f"`{LIST}:12`", f"`{bare}:12`", 1))
+        self.assertNotIn("citations-resolve", self.failing(dest))
+        far = self.mutated("bare-far", lambda t: t.replace(f"`{LIST}:12`", f"`{bare}:9999`", 1))
+        self.assertIn("citations-resolve", self.failing(far))
+        nowhere = self.mutated("bare-none", lambda t: t.replace(f"`{LIST}:12`", "`Nowhere.swift:1`", 1))
+        self.assertIn("citations-resolve", self.failing(nowhere))
+
     def test_override_unknown_id_is_drift_not_silence(self):
         dest = self.copy("ghost")
         write_overrides(dest, {"drop": [{"kind": "field", "id": "SCR-099.ghost", "reason": "x"}]})

@@ -27,7 +27,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ledger import _Ledger, _platform_values  # noqa: E402
-from speclib import out  # noqa: E402
+from speclib import out, paths  # noqa: E402
 from speclib.common import die  # noqa: E402
 from speclib.ids import norm  # noqa: E402
 from speclib.spec_md import NO_RULE, NO_RULE_RE, NO_RULE_REASON, OUT_OF_SCOPE_LEAD, Context, _element_rows, target  # noqa: E402
@@ -224,6 +224,12 @@ class _Grader:
 
     # ------------------------------------------------------------ citations
 
+    def _by_name(self):
+        """{file name: [paths relative to their root]} under every root, built once."""
+        if getattr(self, "_names", None) is None:
+            self._names = paths.file_index([(os.path.realpath(r), []) for r in self.roots])
+        return self._names
+
     def _length(self, rel):
         """The number of lines of `rel` under the app root or a contract root, or `None` when no root holds it."""
         for root in self.roots:
@@ -245,7 +251,12 @@ class _Grader:
         return None
 
     def _resolve(self, text, number, path, first=None, last=None):
-        """The failure of one citation, or `None`. Without a line range only the file must exist."""
+        """The failure of one citation, or `None`. Without a line range only the file must exist. A bare file name
+        (`MainPayslipFeature.swift:287`) stands for the one file of that name under the roots, as in the catalog
+        range check; no such file, or several, is a failure."""
+        if "/" not in path:
+            matches = self._by_name().get(path) or []
+            path = matches[0] if len(matches) == 1 else path
         length = self._length(path)
         if length is None:
             return f"{text} (line {number}): file not found"

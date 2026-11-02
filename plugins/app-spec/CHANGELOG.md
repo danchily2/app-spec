@@ -5,6 +5,11 @@ changes.
 
 ## Unreleased
 
+- **The grader resolves a bare file name as the catalog check does.** In v5 the writer cited
+  `MainPayslipFeature.swift:287-290` and `citations-resolve` failed with "file not found", while `render.py` accepts
+  a bare name that exactly one file under the roots has. `grade.py` now resolves such a name to that file and checks
+  the range there; a name no file or several files have still fails.
+
 - **A run records which plugin made it (N1).** Devin's plugin cache stayed on an old version, and nothing in the run
   folder said which code had run. `module.py` now writes `plugin: {version, commit}` to `app-spec.json` (the commit
   is null for an installed copy, which has no git checkout) and prints `app-spec <version>` as its first line.
