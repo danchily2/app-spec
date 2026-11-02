@@ -20,6 +20,15 @@ class TestDocs(unittest.TestCase):
             self.assertNotIn("capability_index.json", text, rel)
             self.assertIn("`capabilities.json`", text, rel)
 
+    def test_agents_name_the_injection_field_the_schemas_have(self):
+        # P16: the mapper prompt said "the flags field"; the schema field is injectionSuspects
+        for path in sorted((PLUGIN / "agents").glob("*.md")) + sorted((PLUGIN / "workflows").glob("*.js")):
+            text = path.read_text(encoding="utf-8")
+            self.assertNotIn("flags field", text, path.name)
+            self.assertNotIn("(or flags)", text, path.name)
+        mapper = (PLUGIN / "agents" / "use-case-mapper.md").read_text(encoding="utf-8")
+        self.assertIn("`injectionSuspects`", mapper)
+
     def test_structural_appendices_are_never_the_writers(self):
         critic = (PLUGIN / "agents" / "spec-critic.md").read_text(encoding="utf-8")
         self.assertIn("**Appendix A** (fields)", critic)

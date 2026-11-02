@@ -5,6 +5,12 @@ changes.
 
 ## Unreleased
 
+Agent and schema fixes from the Devin run-2 register, group C.
+
+- **The mapper names the injection field the schema has (P16).** `use-case-mapper.md` told the agent to report
+  instruction-shaped text in "the flags field", and the workflow prompt said "injectionSuspects (or flags)"; the
+  schema has only `injectionSuspects`, so a strict schema run could lose the flags. Both now say `injectionSuspects`.
+
 Inventory fixes from the Devin run-2 register, group B.
 
 - **Endpoints keep their original spelling in the spec (P10/P26).** `normalize_endpoint` lowercases a path so that
