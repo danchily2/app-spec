@@ -136,6 +136,27 @@ class TestInventory(unittest.TestCase):
         self.assertNotIn("/employee/api/v1/employees/viewthing", kept,
                          "only the service functions the module calls are followed, and View is no service")
 
+    def test_an_event_a_core_file_sends_is_kept_from_a_shared_enum(self):
+        # P14: the payslip events are cases of EmployeeAnalytics' `enum Event`, outside the module; the module sends
+        # them with `.log(event: .payslipOpen)`, and the run had 0 events
+        app = os.path.join(self.tmp, "ios-events")
+        shutil.copytree(IOS, app)
+        os.makedirs(os.path.join(app, "Analytics/Sources/Analytics"))
+        with open(os.path.join(app, "Analytics/Sources/Analytics/Events.swift"), "w") as f:
+            f.write("public enum Event: Equatable {\n    case payslipOpen\n    case exportAllPayslips(count: Int)\n"
+                    "    case calendarOpened\n}\n")
+        view = os.path.join(app, "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift")
+        with open(view, "a") as f:
+            f.write("\nfunc opened() -> Effect { .log(event: .payslipOpen) }\n"
+                    "func exported() { analytics.logEvent(name: .exportAllPayslips(count: 2)) }\n")
+        dest = build_out(self.tmp, app, "Payslips", "ios-events-out")
+        inv = inventory.run(dest)
+        kept = {e["name"]: e for e in inv["events"] if e.get("family") == "Event"}
+        self.assertEqual(sorted(kept), ["exportAllPayslips", "payslipOpen"])
+        self.assertEqual(kept["payslipOpen"]["scope"], "touch")
+        self.assertTrue(kept["payslipOpen"]["usedBy"].startswith(
+            "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift:"))
+
     def test_inventory_android_and_rn(self):
         for app in (ANDROID, RN):
             dest = build_out(self.tmp, app, "payslips", os.path.basename(app))

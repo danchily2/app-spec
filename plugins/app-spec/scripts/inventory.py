@@ -216,6 +216,31 @@ def _called_requests(root, core, endpoints, inside):
     return [dict(e, scope="touch", usedBy=used[name]) for name in sorted(used) for e in outside[name]]
 
 
+_SENT_EVENT = re.compile(r"\b(?:event|name)\s*:\s*\.([a-z][A-Za-z0-9_]*)"
+                         r"|\b(?:log|logEvent|track|trackEvent|send|sendEvent)\s*\(\s*\.([a-z][A-Za-z0-9_]*)")
+
+
+def _sent_events(root, core, events, inside):
+    """The events declared outside the module's files as cases of an event enum (`enum Event { case payslipOpen }` in
+    a shared analytics package) that a core file sends (`.log(event: .payslipOpen)`), as touch entries with `usedBy`,
+    the first core `file:line` that sends the case."""
+    outside = {}
+    for e in events:
+        if _path(e) not in inside and re.fullmatch(r"[a-z][A-Za-z0-9_]*", str(e.get("name") or "")) \
+                and str(e.get("family") or "") != "call":
+            outside.setdefault(e["name"], []).append(e)
+    if not outside:
+        return []
+    used = {}
+    for rel in core:
+        text = _read(root, rel)
+        for m in _SENT_EVENT.finditer(text or ""):
+            name = m.group(1) or m.group(2)
+            if name in outside:
+                used.setdefault(name, f"{rel}:{text.count(chr(10), 0, m.start()) + 1}")
+    return [dict(e, scope="touch", usedBy=used[name]) for name in sorted(used) for e in outside[name]]
+
+
 def run(dest):
     """Write inventory.json, INVENTORY.md and fields.json for the module in `dest`, fill the shard hints. Return the inventory."""
     cfg = out.load_config(dest)
@@ -238,6 +263,7 @@ def run(dest):
         if key in result:
             inv[key] = [dict(e, scope=scope(e)) for e in result[key] if _path(e) in inside]
     inv["endpoints"] = inv.get("endpoints", []) + _called_requests(root, core, result.get("endpoints", []), inside)
+    inv["events"] = inv.get("events", []) + _sent_events(root, core, result.get("events", []), inside)
     for key in ("routes", "endpoints", "events", "storage"):
         inv.setdefault(key, [])
     inv["strings"] = _scoped_strings(result["strings"], module.get("stringKeys", []))

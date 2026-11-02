@@ -35,6 +35,13 @@ Inventory fixes from the Devin run-2 register, group B.
   class had 0 of 1. `module.py` now maps every nested Swift `static let` whose value is a catalog key to its
   qualified name and resolves the core files' references through it: 46 keys on payslips.
 
+- **Events a module sends from a shared event enum are found (P14).** The payslip events are cases of
+  `enum Event` in the EmployeeAnalytics package, and the module sends them with `.log(event: .payslipOpen)`; the
+  inventory kept only events declared in the module's files and had 0. It now also keeps, as touch entries with
+  `usedBy`, the event-enum cases declared outside the module that a core file sends (`event: .x`, `name: .x`,
+  `log(.x)`, `track(.x)`): 6 on payslips (payslip open, year-end reports tab opened, export all payslips, and three
+  start-page events).
+
 ## 0.4.0 - 2026-11-02
 
 Fixes found in the v3 payslips rerun (0.3.0 code).
