@@ -204,3 +204,14 @@ Add one entry per round: date, items, commits, release tag, run folder, scorecar
   `~/.claude/plugins/installed_plugins.json` is still **0.1.0** (cache from 2026-10-31); update it to 0.4.0 before the
   run, or the run tests old code. Next: in a new session, update the plugin, run step 5 into
   `~/Documents/GitHub/vmm3/specs/payslips-v4`, fill the scorecard row, then pick Round 2.
+  Update: Dan updated the plugin to 0.4.0 (cache at `24c1f55`). The v4 run started as a headless new session
+  (`claude -p '/app-spec:spec ... --headless'`, script and stream log in the session scratchpad), so no person
+  answered the scope question; the report says so.
+- **Round 2 (2026-11-02, in parallel with the v4 run):** branch `fix/round2-inventory`, items 6-9 (group B). The v4
+  inventory (0.4.0) showed all four again: 5 endpoints (no `allpayslips`, `allreports`, report detail), 0 events,
+  7 strings. Commits: `cb10c6d` (9, `display` path in the app's spelling), `4b35743` (8a, URLs a Swift service
+  builds with `+`, client `url-builder`), `1711b61` (8b, request types a core file calls, or a called service
+  function calls, kept as touch with `usedBy`), `bb5d795` (6, `S.*` accessors resolved to catalog keys),
+  `48ac365` (7, event-enum cases a core file sends). Checked on a copy of the v4 folder: 12 endpoints (all three
+  missing ones found; 2 Dottie start-page endpoints; no false ones after two narrowing passes), 46 string keys,
+  6 events. Tests: 375 Python, 33 Node. Not released yet: release as 0.5.0 after the v4 assessment.
