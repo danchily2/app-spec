@@ -51,6 +51,9 @@ Fixes found in a run on a native iOS payslips module.
 - **`--module` takes a source file or a file glob.** `--module Employee/StartPage/.../PayslipCardDetailsProvider.swift`
   puts that one file in the core. A test now holds that a re-run with other modules leaves only its own
   `shards/*.json`, so the skill never needs to delete the folder.
+- **`save_json.py` saves what an agent or a workflow returned.** It reads a workflow task output, a transcript in
+  JSON Lines or plain text, takes the last fenced or bare JSON value that holds `--key` (or a list with `--list`),
+  unwraps `{"result": ...}`, checks that it parses and writes the file. Every "save as" step of the skills names it.
 
 ## 0.1.0 - 2026-10-30
 

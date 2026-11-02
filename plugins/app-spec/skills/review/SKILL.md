@@ -29,7 +29,9 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/grade.py" OUT NAME_ARG
 Give `app-spec:spec-critic` the folder `OUT`, the spec's name, the app root (`app.path`), the contract roots
 (`contracts[].path`) and the plugin folder `P`. Tell it that it must open at least one cited range per use case, and
 that it cannot see a fact the code does not show, so it never asks for one. Save its JSON list as
-`OUT/critic-review-<n>.json`, where `n` is the next pass number, and record the pass:
+`OUT/critic-review-<n>.json`, where `n` is the next pass number
+(`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/save_json.py" <answer> OUT/critic-review-<n>.json --list`), and record the
+pass:
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/review.py" append OUT --critic OUT/critic-review-<n>.json
