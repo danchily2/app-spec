@@ -271,6 +271,32 @@ class TestCatalogs(unittest.TestCase):
         text = render.spec(self.out)
         self.assertIn(f"### {ep['id']} — GET /employee/api/v1/employees/{{}}/Payslips", text)
 
+    def test_an_endpoint_reached_through_a_service_is_verified_by_its_caller(self):
+        # payslips v5: allreports and the report detail (request types outside the module, called from
+        # ReportsService.swift) stayed INFERRED with no reason
+        svc = "EmployeeServices/Payslips/Sources/Payslips/GetPayslips.swift"  # stands in for the calling service
+        inv = out.load(self.out, "inventory.json")
+        inv["endpoints"].append({"method": "GET", "path": "/employee/api/v1/employees/allreports",
+                                 "raw": "/employees/allreports", "client": "api-client-request", "type": "GetYearEndReports",
+                                 "file": "EmployeeServices/Reports/Request/GetYearEndReports.swift:3", "scope": "touch",
+                                 "usedBy": f"{svc}:9"})
+        inv["endpoints"].append({"method": "GET", "path": "/employee/api/v1/employees/unusedreport",
+                                 "raw": "/employees/unusedreport", "client": "api-client-request", "type": "GetUnused",
+                                 "file": "EmployeeServices/Reports/Request/GetUnused.swift:3", "scope": "touch",
+                                 "usedBy": "EmployeeServices/Reports/Service/ReportsService.swift:4"})
+        out.save(self.out, "inventory.json", inv)
+
+        def cite(u):
+            u["useCases"][0].setdefault("endpoints", []).extend(
+                ["GET /employee/api/v1/employees/allreports", "GET /employee/api/v1/employees/unusedreport"])
+        self.edit("understand_result.json", cite)  # use case 0 cites GetPayslips.swift, not ReportsService.swift
+        render.catalogs(self.out)
+        eps = {e["path"]: e for e in out.load(self.out, "endpoints.json")["endpoints"]}
+        self.assertEqual(eps["/employee/api/v1/employees/allreports"]["label"], "VERIFIED")
+        other = eps["/employee/api/v1/employees/unusedreport"]
+        self.assertEqual(other["label"], "INFERRED")
+        self.assertIn("EmployeeServices/Reports/Service/ReportsService.swift", other["reason"])
+
     def test_endpoint_label_unknown_when_unresolved(self):
         render.catalogs(self.out)
         eps = out.load(self.out, "endpoints.json")["endpoints"]

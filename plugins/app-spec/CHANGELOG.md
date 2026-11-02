@@ -5,6 +5,12 @@ changes.
 
 ## Unreleased
 
+- **An endpoint reached through a service can be verified, and an inferred one says why.** In v5 `allreports` and
+  the report detail (request types outside the module, called from `ReportsService.swift`) stayed `INFERRED` with
+  no reason, which the exit criteria do not allow. The calling file (`usedBy`) now counts as a client, so a use case
+  that cites the service verifies the endpoint, and every `INFERRED` endpoint gets a `reason` that names the client
+  files no use case cites.
+
 - **The grader resolves a bare file name as the catalog check does.** In v5 the writer cited
   `MainPayslipFeature.swift:287-290` and `citations-resolve` failed with "file not found", while `render.py` accepts
   a bare name that exactly one file under the roots has. `grade.py` now resolves such a name to that file and checks

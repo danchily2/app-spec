@@ -253,13 +253,17 @@ class _Catalogs:
                 continue
             eid = self.registry.assign("EP", f"{method} {path}")
             client = {"file": _path(e.get("file")), "type": e.get("type")}
+            # a request type outside the module that a service calls: the calling file is a client too, so a use
+            # case that cites the service verifies the endpoint
+            callers = [{"file": _path(e["usedBy"]), "type": f"calls {e.get('type')}"}] if e.get("usedBy") else []
             if eid in entries:
-                if client not in entries[eid]["clients"]:
-                    entries[eid]["clients"].append(client)
+                for c in [client] + callers:
+                    if c not in entries[eid]["clients"]:
+                        entries[eid]["clients"].append(c)
                 continue
             entries[eid] = {"id": eid, "method": method, "path": path, "display": _display_path(path, e.get("raw")),
                             "raw": e.get("raw"), "useCases": [],
-                            "client": client, "clients": [client],
+                            "client": client, "clients": [client] + callers,
                             "request": {"fields": []}, "response": {"fields": []}, "errors": [], "auth": None,
                             "backend": None, "label": "INFERRED"}
         return entries
@@ -641,6 +645,10 @@ class _Catalogs:
                 continue  # cited by a use case only: no client file backs it, so it stays UNKNOWN
             if e["label"] != "VERIFIED":
                 e["label"] = "UNKNOWN" if "{}" in e["path"] and not e["useCases"] else "INFERRED"
+                if e["label"] == "INFERRED" and not e.get("reason"):
+                    files = ", ".join(sorted({c["file"] for c in e["clients"] if c.get("file")})) or "none known"
+                    e["reason"] = (f"no use case that names it cites a client file ({files})" if e["useCases"]
+                                   else f"no use case names it; client files: {files}")
 
     def _rename(self, *catalogs):
         names = {r.get("id"): r.get("name") for r in self.overrides.get("rename", []) or [] if r.get("id") and r.get("name")}
