@@ -275,8 +275,13 @@ For pass `n` from 1:
      names. It returns the corrected entries in `USECASES_SCHEMA`, plus `"remove": [names]` for entries it folds away.
      Fold them in with `patch_result.py OUT understand <file>`.
    - `mapper`: the mapper alone, with the finding and the entries it names; fold in the same way.
-   - `rules`: re-run the rules extraction on the shard that holds the cited files (the workflow with `args.shards` cut
-     to it, or one extractor plus referees without the Workflow tool), and fold it in with
+   - `rules`: give one `app-spec:business-rules-extractor` the findings, the rule cards the findings name (from
+     `OUT/rules_result.json`, matched by the names in `OUT/rules.json`), the files they cite and the use-case index.
+     It returns `{"rules": [corrected cards], "remove": [names]}` in the card format of `RULES_SCHEMA`: it keeps each
+     card's name and source file, so the corrected card replaces the old one, corrects only what the finding names
+     (values, conditions, the line range), and lists in `remove` a card that the finding shows is wrong or a
+     duplicate. A finding that says a rule is missing adds a new card. Never re-run the extraction of a whole shard
+     for a finding: the new cards would sit beside the wrong old ones. Fold the answer in with
      `patch_result.py OUT rules <file>`.
    - `contracts`: give the contract reader the endpoints the findings name, save its envelope as a new
      `OUT/contracts/batch-<k>.json` with `save_json.py ... --key endpoints`, and run `merge_contracts.py OUT <that file>`.

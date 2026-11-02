@@ -29,6 +29,14 @@ class TestDocs(unittest.TestCase):
         # payslips v5: a 61.7 KB answer was stored as a file and joined by hand
         self.assertIn("the harness stores it as a file", skill)
 
+    def test_a_rules_finding_corrects_the_named_cards(self):
+        # payslips v5: step 7.5 re-ran the extraction on the shard; the new cards were added beside the wrong old ones
+        # (87 -> 162 rules) and critic-2 raised the same rule findings again
+        skill = " ".join((PLUGIN / "skills" / "spec" / "SKILL.md").read_text(encoding="utf-8").split())
+        self.assertIn("the rule cards the findings name", skill)
+        self.assertIn("keeps each card's name and source file", skill)
+        self.assertNotIn("re-run the rules extraction on the shard that holds the cited files (the workflow", skill)
+
     def test_the_skill_says_which_role_writes(self):
         # P9: role prompts say read-only while the path without the Workflow tool needs one agent to save results
         skill = (PLUGIN / "skills" / "spec" / "SKILL.md").read_text(encoding="utf-8")

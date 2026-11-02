@@ -56,7 +56,15 @@ of the technology, skip it.
 
 When the app makes the same decision in two places with different results, such as different limits, rounding, statuses
 or roles, report it as a conflict: which rules, and what differs, in one line. A person decides which one the rebuild
-keeps. You never pick.
+keeps. You never pick. Name each rule in the other's `conflictsWith`.
+
+## Correcting cards after a review
+
+When the caller sends review findings and the rule cards they name, do not extract again. Open the cited code,
+then return `{"rules": [...], "remove": [...]}`: each named card corrected where the finding shows it is wrong,
+with the same `name` and the same source file (only the line range may change), so it replaces the old card. Put in
+`remove` the name of a card the finding shows is wrong or a duplicate of another. Add a new card only when the
+finding says a rule is missing. A card you return unchanged is not a correction: leave it out.
 
 ## Output
 

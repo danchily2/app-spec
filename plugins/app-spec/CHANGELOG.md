@@ -5,6 +5,13 @@ changes.
 
 ## Unreleased
 
+- **A rules finding corrects the named cards instead of re-extracting the shard.** In v5 step 7.5 re-ran the
+  extraction on each shard a rules finding cited. The new cards got new source keys, so `patch_result.py` added them
+  beside the wrong old ones (87 rules became 162, with pairs such as RULE-031 and RULE-125), and critic-2 raised 4 of
+  its 5 Blocker and High findings again on the old cards. The rules owner now gets the findings and the cards they
+  name, keeps each card's name and source file so the corrected card replaces the old one, and lists wrong or
+  duplicate cards in `remove`. The rules extractor prompt has a section for this second job.
+
 - **An endpoint reached through a service can be verified, and an inferred one says why.** In v5 `allreports` and
   the report detail (request types outside the module, called from `ReportsService.swift`) stayed `INFERRED` with
   no reason, which the exit criteria do not allow. The calling file (`usedBy`) now counts as a client, so a use case
