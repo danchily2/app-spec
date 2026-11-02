@@ -5,20 +5,24 @@
     python3 review.py append <out> --critic FILE
     python3 review.py questions <out>
     python3 review.py uncovered <out>
+    python3 review.py route <out>
     python3 review.py accept <out> --kind KIND --id ID --reason TEXT
 
 `reset` deletes review.json and REVIEW.md: the spec skill runs it at the start of every run.
 
 `append` adds one pass to review.json, `{"n", "ledger": {"pass"}, "grade": {"pass"}, "critic": [findings]}`, with the
 verdicts of the current ledger.json and grade.json and the critic's findings from FILE (a JSON list of
-`{"severity", "section", "finding", "fix", "owner"}`; an entry without a known severity or owner is reported and left
-out). The appendices that are not prose are routed by section: an Appendix F finding (a coverage reason) goes to
+`{"severity", "section", "finding", "fix", "owner", "alsoAffects"?}`; an entry without a known severity or owner is
+reported and left out; `alsoAffects` keeps only agent owners other than `owner`). The appendices that are not prose are routed by section: an Appendix F finding (a coverage reason) goes to
 `person`, and an Appendix A finding (a field row) sent to `writer` goes to `analyst`. It then writes REVIEW.md from review.json: the scorecard of every pass, the findings that remain after the last
 pass, and the failing ledger classes and grade checks.
 
 `questions` writes OPEN_QUESTIONS.md with the entries, ids and order of the spec's section 8: the open questions of
 prose.json, then one `OQ-NNN` per endpoint the catalog leaves incomplete and one per rule below High confidence, each
 with what was searched and who can answer.
+
+`route` prints, as JSON `{owner: [findings]}`, the Blocker and High findings of the last pass for the agents: each
+under its owner and under every owner in its `alsoAffects`, the other owners whose sections state the same behaviour.
 
 `uncovered` prints, as JSON, every item ledger.json lists as uncovered without a reason, with the override `kind` and
 `id` that `accept` records for it. `accept` adds `{"kind", "id", "reason"}` to the `drop` list of overrides.json, or
@@ -78,10 +82,27 @@ def findings(path):
     for f in data:
         if (isinstance(f, dict) and f.get("severity") in SEVERITIES and f.get("owner") in OWNERS
                 and isinstance(f.get("finding"), str) and f["finding"].strip()):
-            kept.append(_route({k: f.get(k) for k in ("severity", "section", "finding", "fix", "owner")}))
+            entry = _route({k: f.get(k) for k in ("severity", "section", "finding", "fix", "owner")})
+            also = []
+            for o in f.get("alsoAffects") if isinstance(f.get("alsoAffects"), list) else []:
+                if o in AGENTS and o != entry["owner"] and o not in also:
+                    also.append(o)
+            if also:
+                entry["alsoAffects"] = also
+            kept.append(entry)
         else:
             skipped += 1
     return kept, skipped
+
+
+def route(critic):
+    """{owner: [findings]}: each Blocker and High finding for an agent goes to its owner and to every other owner in
+    its `alsoAffects`, whose sections state the same behaviour. A `person` finding goes to no agent."""
+    routes = {}
+    for f in for_agents(critic):
+        for owner in [f["owner"]] + [o for o in _list(f.get("alsoAffects")) if o in AGENTS and o != f["owner"]]:
+            routes.setdefault(owner, []).append(f)
+    return routes
 
 
 def _route(finding):
@@ -125,7 +146,8 @@ def render_review(dest, doc):
                                                         "pass" if p["grade"]["pass"] else "fail", *counts]) + " |")
     lines += ["", f"## Findings that remain after pass {last.get('n', 0)}", ""]
     remaining = sorted((f for f in last["critic"] if f.get("owner") != "person"), key=lambda f: SEVERITIES.index(f["severity"]))
-    lines += [f"- **{f['severity']}, {_cell(f.get('section')) or 'section not named'}** (owner: {f['owner']}): "
+    lines += [f"- **{f['severity']}, {_cell(f.get('section')) or 'section not named'}** (owner: {f['owner']}"
+              f"{'; also: ' + ', '.join(f['alsoAffects']) if f.get('alsoAffects') else ''}): "
               f"{_cell(f['finding'])} Fix: {_cell(f.get('fix')) or 'not given'}" for f in remaining] or ["None."]
     decide = sorted((f for f in last["critic"] if f.get("owner") == "person"), key=lambda f: SEVERITIES.index(f["severity"]))
     if decide:
@@ -203,7 +225,7 @@ def accept(dest, kind, ident, reason):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="command", required=True)
-    for name in ("reset", "questions", "uncovered"):
+    for name in ("reset", "questions", "uncovered", "route"):
         sub.add_parser(name).add_argument("out")
     ap_append = sub.add_parser("append")
     ap_append.add_argument("out")
@@ -233,6 +255,10 @@ def main(argv=None):
         print(f"Wrote {args.out}: OPEN_QUESTIONS.md ({len(rows)} questions)")
     elif args.command == "uncovered":
         print(json.dumps(uncovered(args.out), indent=2, ensure_ascii=False))
+    elif args.command == "route":
+        passes = _list(_dict(out.load(args.out, "review.json", {})).get("passes"))
+        last = passes[-1] if passes and isinstance(passes[-1], dict) else {}
+        print(json.dumps(route(_list(last.get("critic"))), indent=2, ensure_ascii=False))
     else:
         accept(args.out, args.kind, args.id, args.reason)
         print(f"Recorded in {args.out}/overrides.json: drop {args.kind} {args.id}")

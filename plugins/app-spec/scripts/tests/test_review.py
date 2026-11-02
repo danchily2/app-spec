@@ -80,6 +80,29 @@ class TestReview(unittest.TestCase):
         self.assertIn("is DOC-1 in scope?", person)
         self.assertNotIn("SCR-010", md.split("## For a person to decide")[0])
 
+    def test_a_finding_reaches_every_owner_that_states_the_behaviour(self):
+        # payslips v3: critic-1 sent the silent year-end failure to the writer only; EP-007 (contracts) still described
+        # the alert, and critic-2 raised it again as High
+        critic = self.critic("c.json", [
+            {"severity": "High", "section": "Screens", "finding": "the year-end failure is silent, no alert",
+             "fix": "say it fails silently", "owner": "writer", "alsoAffects": ["contracts", "rules", "writer", "boss"]},
+            {"severity": "Medium", "section": "Summary", "finding": "long", "fix": "x", "owner": "writer",
+             "alsoAffects": ["contracts"]},
+            {"severity": "High", "section": "Summary", "finding": "is year-end in scope?", "fix": "decide",
+             "owner": "person", "alsoAffects": ["writer"]}])
+        code, _, err = run_cli(["review.py", "append", self.out, "--critic", critic])
+        self.assertEqual(code, 0, err)
+        found = out.load(self.out, "review.json")["passes"][0]["critic"]
+        self.assertEqual(found[0]["alsoAffects"], ["contracts", "rules"])  # known agents only, never the owner
+        code, stdout, err = run_cli(["review.py", "route", self.out])
+        self.assertEqual(code, 0, err)
+        routes = json.loads(stdout)
+        names = {owner: [f["finding"] for f in items] for owner, items in routes.items()}
+        self.assertEqual(names, {"writer": ["the year-end failure is silent, no alert"],
+                                 "contracts": ["the year-end failure is silent, no alert"],
+                                 "rules": ["the year-end failure is silent, no alert"]})
+        self.assertIn("(owner: writer; also: contracts, rules)", read_text(self.out, "REVIEW.md"))
+
     def test_reset_removes_both_files(self):
         run_cli(["review.py", "append", self.out, "--critic", self.critic("c.json", [])])
         self.assertTrue(os.path.isfile(os.path.join(self.out, "REVIEW.md")))

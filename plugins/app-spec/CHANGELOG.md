@@ -7,6 +7,13 @@ changes.
 
 Fixes found in the v3 payslips rerun (0.3.0 code).
 
+- **A review finding reaches every owner that states the behaviour.** Critic-1 sent the silent year-end failure to
+  the writer, who fixed the screen and the criterion; EP-007 (contracts) still described the alert, and critic-2
+  raised it again as High. A critic finding can now name `alsoAffects`, the other agent owners whose sections state
+  the same behaviour, and the critic is told to look for them. `review.py append` keeps only known agent owners
+  there, `REVIEW.md` shows them, and the new `review.py route OUT` lists the Blocker and High findings of the last
+  pass per owner, so step 7.5 sends each finding to all of them.
+
 - **A citation relative to a folder inside the app resolves to its full path.** A rules extractor cited
   `Features/Main/MainPayslipFeature.swift:251-254`, relative to the module, not the app root; the range check
   reported it, but nothing fixed it, and the core check could send the rule out of scope. `render.py catalogs` now

@@ -75,13 +75,22 @@ The structural appendices are not prose. **Appendix A** (fields) comes from the 
 wrong field row belongs to `analyst`. **Appendix F** (coverage and the reasons items are left out) comes from the
 ledger and `overrides.json`: a missing reason belongs to `person`. Never give either to `writer`.
 
+A behaviour is often stated in more than one place: a screen's states and the acceptance criteria (`writer`), an
+endpoint's error reactions (`contracts`), a rule card (`rules`), a use case (`mapper`). When the finding is about a
+behaviour, search the whole spec for every other place that states it, and list the owners of those places in
+`alsoAffects`. Each of them gets the finding, so a fix in one section does not leave the old claim in another. In
+the payslips run the writer fixed a silent failure in the screens and criteria, and EP-007 still described an alert.
+
 ## What to return
 
 A JSON list, and nothing outside it:
 
 ```json
-[{"severity": "Blocker|High|Medium|Nit", "section": "Screens", "finding": "What is wrong, with the `path:line` that shows it", "fix": "What to change", "owner": "analyst|mapper|rules|contracts|writer|person"}]
+[{"severity": "Blocker|High|Medium|Nit", "section": "Screens", "finding": "What is wrong, with the `path:line` that shows it", "fix": "What to change", "owner": "analyst|mapper|rules|contracts|writer|person", "alsoAffects": ["contracts"]}]
 ```
+
+`alsoAffects` is optional: the other agent owners whose sections state the same behaviour, never `person` and never
+the `owner` again.
 
 `section` is the spec heading without `## ` (for example `Screens`, `Appendix C. Behaviour to keep, implementation to
 drop`). Put the use-case, screen, rule or endpoint id in `finding`. Order the list by severity. An empty list means
