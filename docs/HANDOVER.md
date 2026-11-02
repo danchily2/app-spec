@@ -235,3 +235,10 @@ Add one entry per round: date, items, commits, release tag, run folder, scorecar
   findings; pass 2 never ran, so the Blocker and 2 of the 3 High are spec content the loop had already routed. The
   findings use `alsoAffects` as intended. New plugin defects are items 19-24 (Round 3b). Exit criteria not met. Group
   C items done so far: P16 (`4680efb`), P27 (`c5b0b98`) on `fix/round3-agent-schemas`.
+- **Release 0.5.0 (2026-11-02):** Rounds 2, 3 (P16, P27) and 3b (items 19-24) fast-forwarded into `main`,
+  `release: app-spec 0.5.0` = `7acf3a7`, tag `v0.5.0`, pushed to `origin`. Tests: 380 Python, 35 Node. Installed
+  plugin updated to 0.5.0 with `claude plugin marketplace update app-spec` + `claude plugin update app-spec@app-spec`.
+  v5 run started headless into `~/Documents/GitHub/vmm3/specs/payslips-v5`. Still open in group C: P23 (rule use-case
+  id and `conflictsWith`), P9 (which roles write what). Then groups D (sharding) and E (Devin runtime).
+  Cost note: v4 used $55.84 before the account's 5-hour limit stopped it; a full run with two passes costs more.
+
