@@ -21,7 +21,8 @@ Fixes found in the second payslips run (Devin, v0.2.0).
   `path:line` in the use cases, screens, flows, rules and endpoints (contract field sources included) and add a
   `citation` warning to `render-warnings.json` for a range past the end of its file or a file that is not there.
   Contract field tables in the spec get a `Source` column, so the grader's `citations-resolve` now checks field
-  sources too. The agents that cite are told a range ends on or before the file's last line.
+  sources too. The agents that cite are told a range ends on or before the file's last line. A bare file name
+  (`MainPayslipView.swift:38`) is checked against the one file of that name, and skipped when none or several match.
 
 - **Behaviour that differs by OS version is stated per branch.** The analyst, rule extractor, writer and critic
   prompts say to read every `if #available`, `#if os`, `Build.VERSION.SDK_INT` or `Platform.OS` branch and state the

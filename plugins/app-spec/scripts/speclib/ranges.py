@@ -22,6 +22,17 @@ class Ranges:
         self.root_list = paths.roots(cfg)
         self._lengths = {}
 
+    def _by_name(self):
+        """{file name: [relative paths]} under every root, built once, for citations that give a bare file name."""
+        if getattr(self, "_names", None) is None:
+            self._names = {}
+            for real, _ in self.root_list:
+                for base, dirs, files in os.walk(real):
+                    dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ("node_modules", "Pods", "build", "DerivedData")]
+                    for f in files:
+                        self._names.setdefault(f, []).append(os.path.relpath(os.path.join(base, f), real))
+        return self._names
+
     def length(self, rel):
         """The number of lines of `rel` (relative, absolute or behind a root name), or `None` when no root holds it."""
         rel = paths.relative_path(rel, self.root_list)
@@ -43,7 +54,13 @@ class Ranges:
         return None
 
     def problem(self, path, first, last):
-        """Why `path:first-last` does not resolve, or `None`."""
+        """Why `path:first-last` does not resolve, or `None`. A bare file name (no folder) is checked against the one
+        file of that name; when no file or several files have it, the citation is skipped, not reported."""
+        if "/" not in path:
+            matches = self._by_name().get(path) or []
+            if len(matches) != 1:
+                return None
+            path = matches[0]
         length = self.length(path)
         if length is None:
             return "file not found"

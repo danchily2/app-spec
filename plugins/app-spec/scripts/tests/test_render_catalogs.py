@@ -366,6 +366,13 @@ class TestCatalogs(unittest.TestCase):
         records = [r for r in out.load(self.out, "render-warnings.json") if r["kind"] == "citation"]
         self.assertEqual([r["item"] for r in records], [f"{item}:10-70"])
 
+    def test_a_bare_file_name_is_checked_only_when_one_file_has_it(self):
+        self.edit("rules_result.json", lambda r: r["rules"][0].update(
+            source="Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift:3",
+            plainEnglish="See PayslipItem.swift:3-70 and Nowhere.swift:1."))
+        warnings = [w for w in self.warnings() if " cites " in w]
+        self.assertEqual(warnings, ["rule RULE-001 cites PayslipItem.swift:3-70: the file has 14 lines"])
+
     def test_a_citation_within_its_file_is_no_warning(self):
         self.assertEqual([w for w in self.warnings() if " cites " in w and "lines" in w], [])
 
