@@ -40,6 +40,32 @@ class TestSpeclib(unittest.TestCase):
         self.assertEqual(inv["tcaReducers"][0]["kind"], "tca-reducer")
         self.assertEqual(inv["counts"]["tcaReducers"], 1)
 
+    def test_ios_url_built_by_concatenation_in_a_service_is_an_endpoint(self):
+        # P11/P21: PayslipService.swift:155-156 builds allpayslips from two literals joined with +
+        import os
+        root = self.tmp + "/svc-app"
+        os.makedirs(root + "/Service")
+        with open(root + "/Service/PayslipService.swift", "w") as f:
+            f.write('final class PayslipService {\n'
+                    '    public func payslipUrl(odpUserId: Int, offset: Int) -> String {\n'
+                    '        let payslipUrl = "\\(APIConstants.MEAPIBaseUrl.baseUrl)\\(APIConstants.URL.employeeApiV1)" +\n'
+                    '                         "/employees/\\(odpUserId)/allpayslips?From=\\(date)&Offset=\\(offset)"\n'
+                    '        return payslipUrl\n'
+                    '    }\n'
+                    '    let title = "Payslips" + "/" + "list"\n'
+                    '    func getPayslips(url: String) async throws -> PayslipsResult {\n'
+                    '        try await api.request(PlainURLRequest<P>(url: url, httpMethod: .GET))\n'
+                    '    }\n'
+                    '}\n')
+        inv = ios.extract(root)
+        found = [e for e in inv["endpoints"] if e["path"].endswith("/allpayslips")]
+        self.assertEqual(len(found), 1, inv["endpoints"])
+        self.assertEqual(found[0]["file"], "Service/PayslipService.swift:3")
+        self.assertEqual(found[0]["type"], "PayslipService.payslipUrl")
+        self.assertEqual(found[0]["client"], "url-builder")
+        self.assertEqual(found[0]["method"], "GET")  # the one method the service sends built URLs with
+        self.assertEqual(len(inv["endpoints"]), 1, "a non-URL name is not an endpoint")
+
     def test_normalize_endpoint_drops_a_note_after_the_path(self):
         from speclib.common import normalize_endpoint
         self.assertEqual(normalize_endpoint("/employee/api/v1/Payslip/Export (single company)"),

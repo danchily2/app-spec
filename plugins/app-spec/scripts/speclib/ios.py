@@ -226,6 +226,12 @@ _COORD = re.compile(r"\b(class|struct|protocol|enum|actor)\s+((?:[A-Za-z_][A-Za-
 _PATH_PROP = re.compile(r"\b(?:var|let)\s+(resourceName|path|endpoint|urlPath|route|relativePath|apiPath)\s*:\s*String\s*\{")
 _PATH_LET = re.compile(r"\blet\s+(resourceName|path|endpoint|urlPath|relativePath|apiPath)\s*(?::\s*String\s*)?=\s*(" + _SWIFT_STRING + r")")
 _URL_CALL = re.compile(r"\b(?:URL\s*\(\s*string\s*:|appendingPathComponent\s*\(|AF\.request\s*\(|\.request\s*\()\s*(" + _SWIFT_STRING + r")")
+# a URL a service builds: `let payslipUrl = "\(base)\(v1)" + "/employees/\(id)/allpayslips?..."` (one literal or several
+# joined with +), assigned to a name that ends in Url, URL, Path or Endpoint
+_URL_BUILD = re.compile(r"\blet\s+([a-z][A-Za-z0-9_]*(?:Url|URL|Path|Endpoint))\s*(?::\s*String\s*)?=\s*("
+                        + _SWIFT_STRING + r"(?:\s*\+\s*" + _SWIFT_STRING + r")*)")
+_FUNC = re.compile(r"\bfunc\s+([A-Za-z_][A-Za-z0-9_]*)")
+_METHOD_ARG = re.compile(r"\b(?:httpMethod|method)\s*:\s*\.(get|post|put|delete|patch|head)\b", re.I)
 _METHOD_PROP = re.compile(r"\b(?:var|let)\s+(?:method|httpMethod|requestMethod)\s*(?::\s*[A-Za-z_.]+\s*)?(=|\{)")
 _METHOD_WORD = re.compile(r"\b(GET|POST|PUT|DELETE|PATCH|HEAD)\b|\.(get|post|put|delete|patch|head)\b|\"(GET|POST|PUT|DELETE|PATCH|HEAD)\"", re.I)
 _INTERP = re.compile(r"\\\(([^()]*(?:\([^()]*\)[^()]*)*)\)")
@@ -382,6 +388,12 @@ def extract(root):
             found_here.append((m.start(2), _literal(m.group(2))))
         for m in _URL_CALL.finditer(text):
             found_here.append((m.start(1), _literal(m.group(1))))
+        built = {}  # index of a URL a service builds -> the function that builds it
+        for m in _URL_BUILD.finditer(text):
+            joined = "".join(_literal(s) for s in re.findall(_SWIFT_STRING, m.group(2)))
+            found_here.append((m.start(2), joined))
+            funcs = list(_FUNC.finditer(text, 0, m.start()))
+            built[m.start(2)] = funcs[-1].group(1) if funcs else m.group(1)
         for index, raw in found_here:
             resolved = _resolve(raw, consts)
             if not looks_like_path(resolved):
@@ -406,6 +418,15 @@ def extract(root):
                     method = next((method_defaults[c] for c in conforms if c in method_defaults), None)
                 if any(c.endswith("Request") for c in conforms):
                     client = "api-client-request"
+            if index in built:
+                # the builder names the URL; the request goes out elsewhere in the same type, with the one method the
+                # type passes as `httpMethod: .GET` (none or several: unknown)
+                client = "url-builder"
+                type_name = f"{owner[3]}.{built[index]}" if owner else built[index]
+                if method is None:
+                    scope_text = text[owner[0]:owner[1]] if owner else text
+                    methods = {w.upper() for w in _METHOD_ARG.findall(scope_text)}
+                    method = methods.pop() if len(methods) == 1 else None
             endpoints.append({"method": method, "path": path, "raw": raw[:200], "client": client, "type": type_name,
                               "file": f"{rel}:{line_of(text, index)}"})
         if re.search(r":\s*[^{]*\bAPIClientRequest\b", text):

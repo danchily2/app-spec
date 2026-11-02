@@ -12,6 +12,13 @@ Inventory fixes from the Devin run-2 register, group B.
   (`/payslips/exportfromalltenants`). `endpoints.json` now also has `display`, the same path in the spelling of the
   app's literal (`/payslips/exportFromAllTenants`); the spec shows it. Matching still uses the lowercase `path`.
 
+- **A URL a service builds is an endpoint (P11/P21).** `PayslipService.swift:155-156` builds `allpayslips` as
+  `let payslipUrl = "\(base)\(v1)" + "/employees/\(id)/allpayslips?..."`; the iOS scan read neither the `+` nor the
+  name, so the inventory missed it and the spec said `Client: UNKNOWN`. A `let` whose name ends in `Url`, `URL`,
+  `Path` or `Endpoint` and whose value is one literal or several joined with `+` is now scanned. The entry has client
+  `url-builder`, type `<Type>.<function>`, and the method the type passes as `httpMethod: .GET` when it passes
+  exactly one.
+
 ## 0.4.0 - 2026-11-02
 
 Fixes found in the v3 payslips rerun (0.3.0 code).
