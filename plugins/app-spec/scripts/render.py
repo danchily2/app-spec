@@ -36,6 +36,15 @@ from speclib.ids import Registry, element_slug, norm  # noqa: E402
 UC_LISTS = ("personas", "permissions", "screens", "files", "endpoints", "events", "strings", "storage", "platform")
 _LOCATION = re.compile(r":\d[\d,\-– ]*$")
 _PARAM = re.compile(r"\{[^}]*\}|(?<=/):[A-Za-z_]\w*|(?<=/)\$[A-Za-z_]\w*")
+# `GET {report.export.href} (absolute URL supplied by the report)`: the app follows a link the server sends
+_LINK = re.compile(r"^\{\s*([^{}]+?)\s*\}")
+_PAGING = re.compile(r"\b(?:next|previous|prev)\b", re.I)
+
+
+def link_expression(raw):
+    """The expression of a `{expression}` citation, such as `report.export.href`, or None."""
+    m = _LINK.match(str(raw or "").strip())
+    return " ".join(m.group(1).split()) if m else None
 
 
 def _path(location):
@@ -146,13 +155,42 @@ class _Catalogs:
                             "backend": None, "label": "INFERRED"}
         return entries
 
+    def _link_endpoint(self, method, expression, cite, endpoints, owner):
+        """The id of the endpoint the app reaches by following the server link `expression`. Its path is null until
+        contracts.py or the contract reader finds the backend code that builds the link."""
+        eid = self.registry.assign("EP", f"{method} link:{expression.lower()}")
+        if eid not in endpoints:
+            endpoints[eid] = {"id": eid, "method": method, "path": None, "followsLink": expression,
+                              "raw": cite.partition(" ")[2].strip() or None, "useCases": [], "client": None,
+                              "clients": [], "request": {"fields": []}, "response": {"fields": []}, "errors": [],
+                              "auth": None, "backend": None, "label": "UNKNOWN", "inInventory": False,
+                              "reason": f"the app follows the link {expression} that the server sends; the backend "
+                                        f"code that builds the link names the path (cited by the use case {owner})"}
+        return eid
+
+    def _paging(self, found, expression, endpoints):
+        """Attach a next/previous link to the collection endpoints the use case already calls. True when attached."""
+        gets = [eid for eid in found if endpoints[eid]["method"] == "GET" and endpoints[eid].get("path")]
+        lists = [eid for eid in gets if not endpoints[eid]["path"].rstrip("/").endswith("{}")] or gets
+        for eid in lists:
+            endpoints[eid]["paging"] = f"pages through the server's links ({expression})"
+        return bool(lists)
+
     def _resolve_endpoints(self, cites, endpoints, owner):
         """EP ids of the endpoints that the citations `METHOD /path` name. A citation no inventory endpoint matches is
         kept as its own entry with label `UNKNOWN`, `inInventory: false` and no client, so the spec shows it with an
-        open question and the ledger counts it; a citation without a method or path is reported and left out."""
-        found = []
+        open question and the ledger counts it; a citation without a method or path is reported and left out.
+
+        A `METHOD {expression}` citation is a link the server sends. A next or previous page link becomes a `paging`
+        note of the use case's collection endpoints; any other link becomes an endpoint with `path: null` and
+        `followsLink`."""
+        found, links = [], []
         for cite in cites:
             method, _, raw = str(cite).strip().partition(" ")
+            expression = link_expression(raw)
+            if expression and method.isalpha():
+                links.append((method.upper(), expression, str(cite).strip()))
+                continue
             method, path = method.upper(), _endpoint_path(raw.strip())
             hit = [eid for eid, e in endpoints.items()
                    if e["method"] == method and (e["path"] == path or endpoints_match(path, e["path"]))]
@@ -173,6 +211,10 @@ class _Catalogs:
                                              f"kept as {eid} with label UNKNOWN")
                 hit = [eid]
             found += hit
+        for method, expression, cite in links:
+            if _PAGING.search(expression) and method == "GET" and self._paging(_unique(found), expression, endpoints):
+                continue
+            found.append(self._link_endpoint(method, expression, cite, endpoints, owner))
         return _unique(found)
 
     # ------------------------------------------------------------ use cases

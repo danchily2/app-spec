@@ -326,10 +326,65 @@ def _class_auth(classes, cls, seen=()):
     return _class_auth(classes, base[0], seen + (cls["base"],))
 
 
+_INDEX = {}
+
+
+def _aspnet_index(repo_root):
+    """(files, constants) of a repository's C# code, read once per run."""
+    key = os.path.realpath(repo_root)
+    if key not in _INDEX:
+        files = list(_files(repo_root, {".cs"}))
+        _INDEX.clear()
+        _INDEX[key] = (files, Constants(files))
+    return _INDEX[key]
+
+
+# `Export = new RestLink(_uriBuilder.CompleteUriForResource(RouteHelper.YearEndReport.ExportReportAsPdf, ...`: a
+# response property that carries a link the server builds from a route constant
+_LINK_PROP = re.compile(r"\b([A-Za-z_]\w*)\s*=(?![=>])\s*")
+_DOTTED = re.compile(r"\b[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+\b")
+_LINK_CALL = re.compile(r"Link|Uri|Url|Href", re.I)
+_LINK_WORDS = {"href", "url", "uri", "link", "links", "_links", "self", "rel", "value", "absolute", "absoluteurl"}
+
+
+def _aspnet_links(repo_root):
+    """{property name in lower case: [(route template, file, line)]} for every response property whose value is a link
+    built from a route constant."""
+    files, constants = _aspnet_index(repo_root)
+    links = {}
+    for rel, text in files:
+        scopes = _cs_class_paths(text)
+        for m in _LINK_PROP.finditer(text):
+            window = text[m.end():m.end() + 400]
+            stop = re.search(r";|\b[A-Za-z_]\w*\s*=(?![=>])", window)
+            window = window[:stop.start()] if stop else window
+            scope = _path_at(scopes, m.start()) or ()
+            for ref in _DOTTED.finditer(window):
+                key = constants.lookup(ref.group(0), scope)
+                value = constants.value(key) if key else None
+                if value and "/" in value and _LINK_CALL.search(window[:ref.start()]):
+                    links.setdefault(m.group(1).lower(), []).append((value, rel, line_of(text, m.start())))
+                    break
+    return links
+
+
+def link_target(expression, links):
+    """(template, file, line) of the link an expression such as `report.export.href` follows, or None when no
+    property or several different routes match."""
+    names = [w for w in re.split(r"[^\w]+", str(expression or "").lower()) if w and w not in _LINK_WORDS]
+    for name in reversed(names):
+        found = links.get(name) or []
+        paths = {normalize_endpoint(t) for t, _, _ in found}
+        if len(paths) == 1:
+            return sorted(found, key=lambda x: (x[1], x[2]))[0]
+        if found:
+            return None
+    return None
+
+
 def _aspnet_routes(repo_root):
     routes = []
-    files = list(_files(repo_root, {".cs"}))
-    constants = Constants(files)
+    files, constants = _aspnet_index(repo_root)
     classes = _aspnet_classes(files)
     for cls in (c for group in classes.values() for c in group):
         text, rel, open_i, scope = cls["text"], cls["file"], cls["open"], cls["scope"]
@@ -492,8 +547,16 @@ def enrich(out_dir, repo_root, framework="auto"):
     have_cases = bool(cases)
     name = repo_name(out_dir, repo_root)
     matched = 0
+    links = _aspnet_links(repo_root) if framework == "aspnet" and any(
+        e.get("followsLink") and not e.get("path") for e in data.get("endpoints", [])) else {}
     for e in data.get("endpoints", []):
-        if not e.get("backend"):
+        if e.get("followsLink") and not e.get("path"):
+            target = link_target(e["followsLink"], links)
+            if target:  # the backend code that builds the link names the path
+                e["path"] = normalize_endpoint(target[0])
+                e["linkSource"] = f"{target[1]}:{target[2]}"
+                e["reason"] = f"the app follows the link {e['followsLink']}; {name} builds it at {e['linkSource']}"
+        if not e.get("backend") and e.get("path"):
             route, ambiguous = _best(e, routes)
             if route:
                 e["backend"] = {"repo": name, "file": route["file"], "line": route["line"], "auth": route["auth"]}

@@ -186,7 +186,9 @@ When contract repositories were given, locate each endpoint's backend route firs
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/contracts.py" OUT
 ```
 
-It sets `backend` and the label from the routes it finds. Then read the fields: split the endpoints of
+It sets `backend` and the label from the routes it finds. An endpoint the app reaches through a server link
+(`followsLink`, path null) gets the path of the backend code that builds the link when `contracts.py` finds it; give
+the readers the rest. Then read the fields: split the endpoints of
 `OUT/endpoints.json` into batches of up to 10, and give each batch to one `app-spec:contract-reader` (at most six in
 parallel) with each endpoint's id, method, path, clients, the backend file and line when set, the app root and the
 contract roots. Each returns its envelope `{endpoints, disagreements, injectionFlags}`. Save batch `k` as

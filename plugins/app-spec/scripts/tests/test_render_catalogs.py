@@ -255,6 +255,26 @@ class TestCatalogs(unittest.TestCase):
     def warnings(self):
         return render.catalogs(self.out)["warnings"]
 
+    def test_a_server_link_is_an_endpoint_and_a_paging_link_a_note(self):
+        def change(r):
+            r["useCases"][0]["endpoints"] += ["GET {payslip.export.href} (absolute URL supplied by the payslip)",
+                                              "GET {_links rel=next|previous href}"]
+        self.edit("understand_result.json", change)
+        result = render.catalogs(self.out)
+        self.assertEqual([w for w in result["warnings"] if "endpoint" in w or "not an endpoint" in w], [])
+        eps = out.load(self.out, "endpoints.json")["endpoints"]
+        link = next(e for e in eps if e.get("followsLink"))
+        self.assertEqual((link["path"], link["followsLink"], link["label"]), (None, "payslip.export.href", "UNKNOWN"))
+        self.assertIn("follows the link payslip.export.href", link["reason"])
+        listed = next(e for e in eps if e["path"] == "/employee/api/v1/employees/{}/payslips")
+        self.assertEqual(listed["paging"], "pages through the server's links (_links rel=next|previous href)")
+        self.assertEqual(len([e for e in eps if e.get("followsLink")]), 1, "the paging link is no endpoint")
+        uc = next(u for u in out.load(self.out, "use-cases.json")["useCases"] if u["name"] == "View payslip list")
+        self.assertIn(link["id"], uc["endpoints"])
+        text = render.spec(self.out)
+        self.assertIn(f"### {link['id']} — GET link payslip.export.href (UNKNOWN (open question OQ-", text)
+        self.assertIn("- **Paging:** pages through the server's links", text)
+
     def test_inventory_endpoint_clients_are_collected_and_a_second_client_verifies(self):
         def add(inv):
             first = inv["endpoints"][1]

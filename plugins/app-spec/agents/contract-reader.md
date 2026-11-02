@@ -15,6 +15,9 @@ backend route file and line that the scripts located. For each endpoint:
 
 1. Open the client call and follow it to the **request type** and the **response model** (DTO, Codable, data class,
    interface, GraphQL type, serializer). Follow constants, base URLs and path builders until the path is concrete.
+   An endpoint with `followsLink` and no path is reached through a link the server sends: find the backend code that
+   builds that link (the response property and the route constant or template it uses), cite it, and say the route
+   in `reason`.
 2. Record the **request fields**: name, type, whether it is required, and where it goes (path, query, header, body).
 3. Record the **response fields**: name, type and **nullability**. A field is nullable when the type allows null or the
    decoder gives it a default. Say which.

@@ -213,6 +213,26 @@ class TestEnrich(unittest.TestCase):
         self.assertEqual(run["unresolvedRoutes"], [{"method": "DELETE", "file": "Controllers/PayslipController.cs",
                                                     "line": 27, "constant": "RouteHelper.Payslip.Missing"}])
 
+    def test_a_followed_link_takes_the_path_of_the_code_that_builds_it(self):
+        base = self.payslips()
+        out.save(self.out, "endpoints.json", {"version": 1, "endpoints": [
+            dict(base, path=None, followsLink="payslip.export.href", backend=None, label="UNKNOWN", inInventory=False)]})
+        contracts.enrich(self.out, CONSTANTS)
+        e = self.eps()[0]
+        self.assertEqual(e["path"], "/api/v1/employees/{}/payslips/export")
+        self.assertEqual(e["linkSource"], "Mappers/PayslipMapper.cs:8")
+        self.assertEqual((e["backend"]["file"], e["backend"]["line"]), ("Controllers/PayslipController.cs", 17))
+
+    def test_a_link_no_code_builds_keeps_a_null_path(self):
+        base = self.payslips()
+        out.save(self.out, "endpoints.json", {"version": 1, "endpoints": [
+            dict(base, path=None, followsLink="report.share.href", backend=None, label="UNKNOWN", inInventory=False)]})
+        contracts.enrich(self.out, CONSTANTS)
+        e = self.eps()[0]
+        self.assertIsNone(e["path"])
+        self.assertIsNone(e["backend"])
+        self.assertEqual(e["label"], "UNKNOWN")
+
     def test_cli(self):
         code, _, err = run_cli(["contracts.py", self.out, "--repo", ASPNET, "--framework", "aspnet"])
         self.assertEqual(code, 0, err)

@@ -321,7 +321,7 @@ def open_question_entries(c):
         gaps = _endpoint_gaps(e)
         if gaps:
             files = ", ".join(f"`{x.get('file')}`" for x in _clients(e) if x.get("file"))
-            structural.append({"question": f"What are {', '.join(gaps)} of {e['method']} {e['path']} ({e['id']})?",
+            structural.append({"question": f"What are {', '.join(gaps)} of {e['method']} {endpoint_path(e)} ({e['id']})?",
                                "searched": files or "the module's network clients", "owner": owner, "ref": e["id"]})
     for r in c.rules:
         missing = _rule_gaps(r)
@@ -364,14 +364,24 @@ def _oq(c, ref):
     return f"UNKNOWN (open question {found})" if found else _unknown("no open question recorded")
 
 
+def endpoint_path(e):
+    """The path of endpoint `e`, or `link <expression>` for a server link whose path no backend code named yet."""
+    return e.get("path") or (f"link {e['followsLink']}" if e.get("followsLink") else "path unknown")
+
+
 def endpoints(c):
     lines = []
     for e in c.endpoints:
         backend = e.get("backend")
         label = e.get("label") or "UNKNOWN"
-        lines += [f"### {e['id']} — {e['method']} {e['path']} ({_oq(c, e['id']) if label == 'UNKNOWN' else label})", "",
-                  f"- **Capabilities:** {c.show(e.get('useCases') or [])}",
-                  f"- **Auth:** {_text(e.get('auth')) or _oq(c, e['id'])}"]
+        lines += [f"### {e['id']} — {e['method']} {endpoint_path(e)} ({_oq(c, e['id']) if label == 'UNKNOWN' else label})", "",
+                  f"- **Capabilities:** {c.show(e.get('useCases') or [])}"]
+        if e.get("followsLink"):
+            lines.append(f"- **Follows link:** {_text(e['followsLink'])}, sent by the server"
+                         + (f"; built at `{e['linkSource']}`" if e.get("linkSource") else ""))
+        if e.get("paging"):
+            lines.append(f"- **Paging:** {_text(e['paging'])}")
+        lines.append(f"- **Auth:** {_text(e.get('auth')) or _oq(c, e['id'])}")
         if isinstance(backend, dict) and backend.get("auth"):
             lines[-1] += f"; backend: {_text(backend['auth'])}"
         for label, key in (("Request fields", "request"), ("Response fields", "response")):

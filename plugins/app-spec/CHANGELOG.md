@@ -32,6 +32,11 @@ Fixes found in a run on a native iOS payslips module.
   that endpoint go, and `merge_contracts.py` rebuilds each endpoint's list from `contracts_result.json` instead of
   appending to it, so an edited disagreement no longer sits next to its old version. The ambiguous-route note of
   `contracts.py` stays.
+- **Endpoints reached through a server link are kept.** A use case that cites `GET {report.export.href}` gets an
+  endpoint with `path: null`, `followsLink` and label `UNKNOWN`, and an open question, instead of a dropped citation.
+  `contracts.py` finds the ASP.NET response property that builds the link from a route constant and sets the path,
+  so the year-end report PDF of the payslips run now resolves to `api/v1/employees/report/{reportId}/export/pdf`.
+  A next or previous page link becomes a `paging` note on the use case's collection endpoints.
 
 ## 0.1.0 - 2026-10-30
 
