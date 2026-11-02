@@ -276,4 +276,8 @@ Add one entry per round: date, items, commits, release tag, run folder, scorecar
   (`review.py accept`). Released with Round 4 as 0.6.0 (`af14f14`, tag `v0.6.0`), pushed, installed plugin updated.
   Tests: 389 Python, 36 Node. v6 is scheduled to start at 23:55 (after the 5-hour usage window resets at 23:50) into
   `~/Documents/GitHub/vmm3/specs/payslips-v6`.
+- **Paused (2026-11-02, 21:41) at Dan's request.** The scheduled v6 start was cancelled before it ran; nothing is
+  running. Resume: start v6 with 0.6.0 (installed) into `~/Documents/GitHub/vmm3/specs/payslips-v6` with the runner
+  script (headless, `--headless`, `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0`; a copy of the command is in this file's
+  step 5 plus those two settings), then assess it (step 6). Open for Dan: the 19 start-page string keys (item 28).
 
