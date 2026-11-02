@@ -5,6 +5,8 @@ changes.
 
 ## Unreleased
 
+## 0.3.0 - 2026-11-02
+
 Fixes found in the second payslips run (Devin, v0.2.0).
 
 - **A use case without a rule can state the real reason.** Next to `No client-side rule; the server decides.`, the
