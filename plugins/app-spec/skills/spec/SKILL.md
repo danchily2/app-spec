@@ -239,10 +239,12 @@ For pass `n` from 1:
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/review.py" append OUT --critic OUT/critic-<n>.json
    ```
 
-4. **Stop** when the ledger passes, the grade passes and no Blocker or High finding remains, or when `n` is the
-   number of passes.
+4. **Stop** when the ledger passes, the grade passes and no Blocker or High finding for an agent remains (every
+   owner but `person`), or when `n` is the number of passes.
 5. Otherwise send each Blocker and High finding to its owner, **for that gap only**. Medium and Nit findings stay in
-   `REVIEW.md`. Save each corrected part under `OUT/patches/`:
+   `REVIEW.md`. A `person` finding (an Appendix F reason, a scope or naming decision) is never sent to an agent:
+   `REVIEW.md` lists it under "For a person to decide", and the Finish names it. Save each corrected part under
+   `OUT/patches/`:
    - `analyst`: give the stack analyst the finding and the files it cites, with the `FRAGMENT_SCHEMA` prompt; then
      give the use-case mapper the finding, those fragments and the entries of `understand_result.json` the finding
      names. It returns the corrected entries in `USECASES_SCHEMA`, plus `"remove": [names]` for entries it folds away.

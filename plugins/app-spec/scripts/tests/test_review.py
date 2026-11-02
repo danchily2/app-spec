@@ -59,6 +59,27 @@ class TestReview(unittest.TestCase):
         self.assertNotIn("SCR-001 has no error state", md.split("## Findings that remain")[1])
         self.assertIn("- Ledger, screens: 50 percent of 100 percent", md)
 
+    def test_appendix_f_goes_to_a_person_and_appendix_a_to_the_analyst(self):
+        critic = self.critic("c.json", [
+            {"severity": "High", "section": "Appendix F. Coverage", "finding": "SCR-010 is uncovered with no reason",
+             "fix": "give a reason", "owner": "writer"},
+            {"severity": "High", "section": "Appendix A. Fields and identifiers", "finding": "SCR-002 rows are empty",
+             "fix": "fill the rows", "owner": "writer"},
+            {"severity": "High", "section": "Screens", "finding": "SCR-001 has no error state", "fix": "add it",
+             "owner": "writer"},
+            {"severity": "Medium", "section": "Summary", "finding": "is DOC-1 in scope?", "fix": "decide",
+             "owner": "person"}])
+        code, _, err = run_cli(["review.py", "append", self.out, "--critic", critic])
+        self.assertEqual(code, 0, err)
+        found = out.load(self.out, "review.json")["passes"][0]["critic"]
+        self.assertEqual([f["owner"] for f in found], ["person", "analyst", "writer", "person"])
+        self.assertEqual([f["owner"] for f in review.for_agents(found)], ["analyst", "writer"])
+        md = read_text(self.out, "REVIEW.md")
+        person = md.split("## For a person to decide")[1].split("## Checks that fail now")[0]
+        self.assertIn("SCR-010 is uncovered with no reason", person)
+        self.assertIn("is DOC-1 in scope?", person)
+        self.assertNotIn("SCR-010", md.split("## For a person to decide")[0])
+
     def test_reset_removes_both_files(self):
         run_cli(["review.py", "append", self.out, "--critic", self.critic("c.json", [])])
         self.assertTrue(os.path.isfile(os.path.join(self.out, "REVIEW.md")))

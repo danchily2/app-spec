@@ -64,14 +64,21 @@ Each finding names the part of the pipeline that owns the gap, so the fix goes t
 - `rules`: a rule is missing, has no values, has the wrong priority, or its citation does not hold it.
 - `contracts`: an endpoint's request, response, errors or auth are missing or wrong.
 - `writer`: the catalogs hold the fact and the prose leaves it out, states it without values, cites the wrong lines,
-  or states structure as a requirement.
+  or states structure as a requirement. The writer owns only the prose slots: summary, screen purposes and states,
+  acceptance criteria, behaviour to keep, data, dependencies and open questions.
+- `person`: a decision or a reason only a person can give: why an uncovered inventory item is left out (a reason in
+  `overrides.json`), whether an item is in the module, a rename or a merge. No agent is sent these.
+
+The structural appendices are not prose. **Appendix A** (fields) comes from the `screens.json` elements: a missing or
+wrong field row belongs to `analyst`. **Appendix F** (coverage and the reasons items are left out) comes from the
+ledger and `overrides.json`: a missing reason belongs to `person`. Never give either to `writer`.
 
 ## What to return
 
 A JSON list, and nothing outside it:
 
 ```json
-[{"severity": "Blocker|High|Medium|Nit", "section": "Screens", "finding": "What is wrong, with the `path:line` that shows it", "fix": "What to change", "owner": "analyst|mapper|rules|contracts|writer"}]
+[{"severity": "Blocker|High|Medium|Nit", "section": "Screens", "finding": "What is wrong, with the `path:line` that shows it", "fix": "What to change", "owner": "analyst|mapper|rules|contracts|writer|person"}]
 ```
 
 `section` is the spec heading without `## ` (for example `Screens`, `Appendix C. Behaviour to keep, implementation to

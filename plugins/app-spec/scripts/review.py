@@ -12,7 +12,8 @@
 `append` adds one pass to review.json, `{"n", "ledger": {"pass"}, "grade": {"pass"}, "critic": [findings]}`, with the
 verdicts of the current ledger.json and grade.json and the critic's findings from FILE (a JSON list of
 `{"severity", "section", "finding", "fix", "owner"}`; an entry without a known severity or owner is reported and left
-out). It then writes REVIEW.md from review.json: the scorecard of every pass, the findings that remain after the last
+out). The appendices that are not prose are routed by section: an Appendix F finding (a coverage reason) goes to
+`person`, and an Appendix A finding (a field row) sent to `writer` goes to `analyst`. It then writes REVIEW.md from review.json: the scorecard of every pass, the findings that remain after the last
 pass, and the failing ledger classes and grade checks.
 
 `questions` writes OPEN_QUESTIONS.md with the entries, ids and order of the spec's section 8: the open questions of
@@ -37,7 +38,8 @@ from speclib import out, spec_md  # noqa: E402
 from speclib.common import die, load_json  # noqa: E402
 
 SEVERITIES = ("Blocker", "High", "Medium", "Nit")
-OWNERS = ("analyst", "mapper", "rules", "contracts", "writer")
+OWNERS = ("analyst", "mapper", "rules", "contracts", "writer", "person")
+AGENTS = OWNERS[:-1]  # the owners the spec skill sends a finding to; a `person` finding waits for a person
 KIND = {"screens": "screen", "fields": "field", "endpoints": "endpoint", "strings": "string", "events": "event",
         "storage": "storage", "permissions": "permission", "platform": "platform"}
 KINDS = ("field", "screen", "useCase", "endpoint", "string", "event", "storage", "permission", "platform")
@@ -76,10 +78,25 @@ def findings(path):
     for f in data:
         if (isinstance(f, dict) and f.get("severity") in SEVERITIES and f.get("owner") in OWNERS
                 and isinstance(f.get("finding"), str) and f["finding"].strip()):
-            kept.append({k: f.get(k) for k in ("severity", "section", "finding", "fix", "owner")})
+            kept.append(_route({k: f.get(k) for k in ("severity", "section", "finding", "fix", "owner")}))
         else:
             skipped += 1
     return kept, skipped
+
+
+def _route(finding):
+    """The finding with the owner that can fix its section: no agent writes Appendix F, the writer never Appendix A."""
+    section = str(finding.get("section") or "")
+    if section.startswith("Appendix F"):
+        finding["owner"] = "person"
+    elif section.startswith("Appendix A") and finding["owner"] == "writer":
+        finding["owner"] = "analyst"
+    return finding
+
+
+def for_agents(critic):
+    """The Blocker and High findings the spec skill sends back to an agent: every owner but `person`."""
+    return [f for f in critic if f.get("severity") in ("Blocker", "High") and f.get("owner") in AGENTS]
 
 
 def append(dest, critic):
@@ -107,9 +124,16 @@ def render_review(dest, doc):
         lines.append("| " + " | ".join(str(v) for v in [p["n"], "pass" if p["ledger"]["pass"] else "fail",
                                                         "pass" if p["grade"]["pass"] else "fail", *counts]) + " |")
     lines += ["", f"## Findings that remain after pass {last.get('n', 0)}", ""]
-    remaining = sorted(last["critic"], key=lambda f: SEVERITIES.index(f["severity"]))
+    remaining = sorted((f for f in last["critic"] if f.get("owner") != "person"), key=lambda f: SEVERITIES.index(f["severity"]))
     lines += [f"- **{f['severity']}, {_cell(f.get('section')) or 'section not named'}** (owner: {f['owner']}): "
               f"{_cell(f['finding'])} Fix: {_cell(f.get('fix')) or 'not given'}" for f in remaining] or ["None."]
+    decide = sorted((f for f in last["critic"] if f.get("owner") == "person"), key=lambda f: SEVERITIES.index(f["severity"]))
+    if decide:
+        lines += ["", "## For a person to decide", "",
+                  "No agent can settle these. Record a reason with `review.py accept OUT --kind KIND --id ID --reason "
+                  "TEXT`, or change `overrides.json`.", ""]
+        lines += [f"- **{f['severity']}, {_cell(f.get('section')) or 'section not named'}:** {_cell(f['finding'])} "
+                  f"Fix: {_cell(f.get('fix')) or 'not given'}" for f in decide]
     ledger, grade = _dict(out.load(dest, "ledger.json", {})), _dict(out.load(dest, "grade.json", {}))
     failing = [f"- Ledger, {name}: {c.get('percent')} percent of {_dict(ledger.get('thresholds')).get(name)} percent"
                for name, c in _dict(ledger.get("classes")).items() if isinstance(c, dict) and c.get("pass") is False]

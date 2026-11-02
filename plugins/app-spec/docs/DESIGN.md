@@ -454,7 +454,7 @@ location a mapper or analyst invented, such as `Modules/Invented/Ghost.swift:999
 | `critic[].section` | The spec section the finding is about |
 | `critic[].finding` | What is wrong, with a citation |
 | `critic[].fix` | What to change |
-| `critic[].owner` | The part that owns the gap: `analyst`, `mapper`, `rules`, `contracts` or `writer`. The `spec` skill sends a Blocker or High finding back to it, for that gap only |
+| `critic[].owner` | The part that owns the gap: `analyst`, `mapper`, `rules`, `contracts`, `writer` or `person`. The `spec` skill sends a Blocker or High finding back to an agent owner, for that gap only. A `person` finding (a reason in `overrides.json`, a scope or naming decision) goes to `REVIEW.md` under "For a person to decide" and to no agent. `review.py` routes by section: Appendix F to `person`, and Appendix A, which comes from `screens.json` elements, from `writer` to `analyst` |
 
 ### prose.json
 

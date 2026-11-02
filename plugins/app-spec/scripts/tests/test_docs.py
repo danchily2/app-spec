@@ -20,6 +20,15 @@ class TestDocs(unittest.TestCase):
             self.assertNotIn("capability_index.json", text, rel)
             self.assertIn("`capabilities.json`", text, rel)
 
+    def test_structural_appendices_are_never_the_writers(self):
+        critic = (PLUGIN / "agents" / "spec-critic.md").read_text(encoding="utf-8")
+        self.assertIn("**Appendix A** (fields)", critic)
+        self.assertIn("belongs to `analyst`", critic)
+        self.assertIn("a missing reason belongs to `person`", critic)
+        self.assertIn("writer|person", critic)
+        skill = (PLUGIN / "skills" / "spec" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("A `person` finding (an Appendix F reason, a scope or naming decision) is never sent to an agent", skill)
+
 
 if __name__ == "__main__":
     unittest.main()

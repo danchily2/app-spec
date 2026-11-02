@@ -44,6 +44,10 @@ Fixes found in a run on a native iOS payslips module.
   nested `Path` and `Destination` count as covered when a kept screen sits in the same file or folder. On the
   payslips run, the Info.plist permissions and the keychain storage no longer fail the ledger, and screens fail only
   on core items.
+- **Critic findings go to an owner that can fix them.** A new owner `person` takes a reason for `overrides.json` or a
+  decision. The critic maps Appendix A (fields) to `analyst` and Appendix F (coverage reasons) to `person`, and
+  `review.py` enforces that by section. `REVIEW.md` lists person findings under "For a person to decide", and the
+  skill never sends them to an agent nor keeps a pass running for them.
 
 ## 0.1.0 - 2026-10-30
 
