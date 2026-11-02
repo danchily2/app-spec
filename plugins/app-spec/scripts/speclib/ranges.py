@@ -12,7 +12,7 @@ import re
 from . import paths
 
 # a citation-shaped token: a path with a file extension, then :line or :line-line
-_CITE = re.compile(r"(?:^|(?<=[\s`'\"(\[{,=;]))(~?/?[\w@+.\-]+(?:/[\w@+.\-]+)*\.[A-Za-z][\w]*):(\d+)(?:-(\d+))?(?![\w-])")
+CITE = re.compile(r"(?:^|(?<=[\s`'\"(\[{,=;]))(~?/?[\w@+.\-]+(?:/[\w@+.\-]+)*\.[A-Za-z][\w]*):(\d+)(?:-(\d+))?(?![\w-])")
 
 
 class Ranges:
@@ -69,7 +69,7 @@ class Ranges:
         """`[(citation, reason)]` for every citation in the strings of a JSON value that does not resolve, once each."""
         found, seen = [], set()
         for text in _strings(value):
-            for m in _CITE.finditer(text):
+            for m in CITE.finditer(text):
                 cite = m.group(0)
                 if cite in seen:
                     continue

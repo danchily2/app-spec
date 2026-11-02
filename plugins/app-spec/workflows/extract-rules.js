@@ -109,6 +109,8 @@ const VERDICT = {
 const agentFor = stack =>
   stack === 'ios-native' ? 'app-spec:ios-analyst' : stack === 'android-native' ? 'app-spec:android-analyst' : 'app-spec:rn-analyst'
 const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+// a name without parenthetical notes and capability ids, to match an out-of-scope entry to a kept rule
+const coreName = s => norm(String(s || '').replace(/\([^()]*\)/g, ' ').replace(/\bCAP-\d+\b/gi, ' '))
 const file = src => String(src || '').split(':')[0]
 const lower = c => (c === 'High' ? 'Medium' : c)
 
@@ -240,7 +242,8 @@ log(`${rules.length} rules kept (${rules.filter(r => r.priority === 'P0').length
 
 return {
   rules,
-  outOfScope,
+  // a touch shard may list a rule out of scope "for the core shard", which then keeps it: it is not out of scope
+  outOfScope: outOfScope.filter(o => !rules.some(r => coreName(r.name) === coreName(o.name))),
   rejected,
   unverified,
   injectionFlags: [...new Set(injectionFlags)],

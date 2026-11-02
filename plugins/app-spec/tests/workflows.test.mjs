@@ -340,6 +340,32 @@ test('understand: touch shards are context, and outOfScope from analysts and map
   assert.ok(map.includes('"kind":"touch"') && map.includes('goes to outOfScope'))
 })
 
+test('understand: an out-of-scope name with a parenthetical note does not hide a kept use case', async () => {
+  // payslips v3: "Learn why I have no payslips (CAP-231)" stayed out of scope next to the kept "Learn why I have no payslips"
+  const respond = label => {
+    if (label === 'extract:touch-01') return { fragments: [], outOfScope: [{ name: 'View payslips (CAP-029)', reason: 'leave it to the core shard' }] }
+    if (label === 'extract:core-01') return { fragments: [{ name: 'View payslips', description: 'd', evidence: 'A.swift:1' }] }
+    if (label === 'map') return { useCases: [{ name: 'View payslips', description: 'd', files: ['A.swift:1'], evidence: 'VERIFIED' }], screens: [], flows: [] }
+    if (label.startsWith('verify:')) return { real: true, badEvidence: [], reason: 'ok' }
+    return undefined
+  }
+  const { result: r } = await run(wf('understand-module.js'), args, respond)
+  assert.deepEqual(r.outOfScope, [])
+})
+
+test('rules: an out-of-scope rule with the name of a kept rule leaves the list', async () => {
+  const rule = { name: 'Net pay is shown', category: 'visibility', priority: 'P1', confidence: 'High', plainEnglish: 'p',
+    given: 'g', when: 'w', then: 't', source: 'A.swift:3', useCase: '' }
+  const respond = label => label === 'extract:touch-01'
+    ? { rules: [], outOfScope: [{ name: 'Net pay is shown (CAP-029)', source: 'Card.swift:3', reason: 'core shard' },
+      { name: 'Week starts Monday', source: 'Cal.swift:3', reason: 'calendar' }] }
+    : label === 'extract:core-01' ? { rules: [rule] }
+    : label.startsWith('verify:') ? { real: true, badEvidence: false, reason: 'ok' } : undefined
+  const { result: r } = await run(wf('extract-rules.js'), args, respond)
+  assert.deepEqual(r.rules.map(x => x.name), ['Net pay is shown'])
+  assert.deepEqual(r.outOfScope.map(x => x.name), ['Week starts Monday'])
+})
+
 test('rules: a touch shard is told its rules are out of scope, and outOfScope is returned', async () => {
   const respond = label => label === 'extract:touch-01'
     ? { rules: [], outOfScope: [{ name: 'Week starts Monday', source: 'Cal.swift:3', reason: 'calendar' }] }

@@ -53,6 +53,36 @@ def _path(location):
     return _LOCATION.sub("", str(location or ""))
 
 
+_CAP_ID = re.compile(r"\bCAP-\d+\b", re.I)
+_PARENS = re.compile(r"\([^()]*\)")
+
+
+def _core_name(name):
+    """`norm(name)` without parenthetical notes and capability ids: "Learn why I have no payslips (CAP-231)" and
+    "Learn why I have no payslips" are one name."""
+    return norm(_CAP_ID.sub(" ", _PARENS.sub(" ", str(name or ""))))
+
+
+def _ranged(texts):
+    """[(path, first, last)] of every citation with a line range in the strings `texts`."""
+    found = []
+    for text in texts:
+        for m in ranges.CITE.finditer(str(text or "")):
+            first = int(m.group(2))
+            found.append((m.group(1), first, int(m.group(3) or first)))
+    return found
+
+
+def _overlaps(a, b):
+    """Whether the cited ranges `a` and `b` share a line of one file. A whole-file citation never overlaps: a shared
+    file such as a tab coordinator holds many use cases."""
+    return _same_file(a[0], b[0]) and a[1] <= b[2] and b[1] <= a[2]
+
+
+def _cite(r):
+    return f"{r[0]}:{r[1]}" if r[1] == r[2] else f"{r[0]}:{r[1]}-{r[2]}"
+
+
 def _same_file(a, b):
     """Whether the first paths of the citations `a` and `b` name the same file, one perhaps by a shorter path."""
     a, b = (re.split(r"[:\s(]", s.strip(), maxsplit=1)[0] for s in (a, b))
@@ -107,6 +137,7 @@ class _Catalogs:
         self.core = {str(f) for f in module.get("core") or []} if isinstance(module, dict) else set()
         self.out_cases = []  # {id, name, reason}: use cases with no evidence in a core file
         self.out_rules = []
+        self.kept_cases = []  # (name, cited ranges) of the use cases that stay, set by _use_cases
         self.registry = Registry(os.path.join(dest, "ids.json"))
         self._complete_paths()
         self.warnings = []  # the sentences, printed to stderr
@@ -281,8 +312,20 @@ class _Catalogs:
     def _use_cases(self, screen_ids, endpoints):
         cases = {}
         current = {norm(r["name"]) for r in self.understood.get("useCases", []) if isinstance(r, dict) and r.get("name")}
+        # the use cases that stay, by name and cited ranges: an out-of-scope entry they cover is not out of scope
+        self.kept_cases = [(raw["name"], _ranged(_strings(raw.get("files"))))
+                           for raw in self.understood.get("useCases", [])
+                           if isinstance(raw, dict) and raw.get("name")
+                           and self._in_core(sorted({_path(f) for f in _strings(raw.get("files"))}))]
+        kept_names = {_core_name(n) for n, _ in self.kept_cases}
+        kept_ranges = [r for _, rs in self.kept_cases for r in rs]
         for raw in self.understood.get("outOfScope") or []:
             if isinstance(raw, dict) and raw.get("name"):
+                if _core_name(raw["name"]) in kept_names:
+                    continue
+                cited = _ranged([raw["name"], raw.get("reason")] + _strings(raw.get("files")))
+                if cited and all(any(_overlaps(c, k) for k in kept_ranges) for c in cited):
+                    continue
                 self._out_of_scope("useCase", "UC", norm(raw["name"]), raw["name"],
                                    raw.get("reason") or "the mapper found it only in touch files")
         for raw in self.understood.get("useCases", []):
@@ -463,8 +506,23 @@ class _Catalogs:
     def _rules(self, uc_by_name, retired):
         rules = {}
         outside = {norm(e["name"]) for e in self.out_cases}
+        kept_names = {_core_name(r["name"]) for r in self.rules_in if isinstance(r, dict) and r.get("name")}
+        kept_ranges = [c for r in self.rules_in if isinstance(r, dict) for c in _ranged([r.get("source")])]
         for raw in self.rules_out:
             if isinstance(raw, dict) and raw.get("name"):
+                if _core_name(raw["name"]) in kept_names:
+                    continue  # the same rule, kept from a core file
+                cited = _ranged([raw.get("source")])
+                if cited and all(any(_overlaps(c, k) for k in kept_ranges) for c in cited):
+                    continue
+                case = next((n for n, rs in self.kept_cases if cited
+                             and all(any(_overlaps(c, k) for k in rs) for c in cited)), None)
+                if case:
+                    # a rule of a kept use case that the extractor called a neighbour's: it has no given/when/then
+                    # to keep, so it leaves both lists and the warning says so
+                    self._warn("scope", raw["name"], f"out-of-scope rule {raw['name']} cites code of the kept use case "
+                               f"{case} ({', '.join(_cite(c) for c in cited)}); it is not in the catalogs")
+                    continue
                 self._out_of_scope("rule", "RULE", self._rule_key(raw["name"], raw.get("source")), raw["name"],
                                    raw.get("reason") or "the extractor found it only in touch files")
         present = {self._rule_key(r["name"], r.get("source")) for r in self.rules_in + self.rules_out

@@ -216,6 +216,8 @@ function foldOutOfScope(items) {
 const agentFor = stack =>
   stack === 'ios-native' ? 'app-spec:ios-analyst' : stack === 'android-native' ? 'app-spec:android-analyst' : 'app-spec:rn-analyst'
 const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+// a name without parenthetical notes and capability ids: "Learn why I have no payslips (CAP-231)" is the kept use case
+const coreName = s => norm(String(s || '').replace(/\([^()]*\)/g, ' ').replace(/\bCAP-\d+\b/gi, ' '))
 const empty = (extra = {}) => ({
   useCases: [], screens: [], flows: [], outOfScope: [], rejected: [], unverified: [], injectionFlags: [], rerunShards: [],
   stats: { shards: shards.length, fragments: 0, useCases: 0, screens: 0, flows: 0, rejected: 0 }, ...extra,
@@ -395,7 +397,7 @@ return {
   useCases,
   screens,
   flows,
-  outOfScope: foldOutOfScope([...outOfScope, ...(mapped.outOfScope || [])].filter(o => !useCases.some(u => norm(u.name) === norm(o.name)))),
+  outOfScope: foldOutOfScope([...outOfScope, ...(mapped.outOfScope || [])].filter(o => !useCases.some(u => coreName(u.name) === coreName(o.name)))),
   rejected,
   unverified,
   injectionFlags: [...new Set(injectionFlags)],

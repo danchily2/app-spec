@@ -67,6 +67,30 @@ class TestOutOfScope(unittest.TestCase):
         self.assertEqual([r["name"] for r in out.load(self.out, "rules.json")["rules"]], ["Payslips are newest first"])
         self.assertEqual([r["name"] for r in out.load(self.out, "out-of-scope.json")["rules"]], ["Net pay is always shown"])
 
+    def test_an_out_of_scope_entry_that_a_kept_entry_covers_leaves_the_list(self):
+        # payslips v3: touch-shard analysts listed "Learn why I have no payslips (CAP-231)" and year-end report rules
+        # (ReportsService.swift:41-46) out of scope, "leave it to the core shard"; the core shard kept them
+        view = "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipListView.swift"
+        item = "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift"
+        cal = "Modules/CalendarFeature/Sources/CalendarFeature/CalendarView.swift"
+        self.edit("understand_result.json", lambda u: u.update(outOfScope=[
+            {"name": "View payslip list (CAP-029)", "reason": "leave it to the core shard"},
+            {"name": "Payslip list rows", "reason": f"the rows are drawn in {view}:8-8"},
+            {"name": "View the calendar", "reason": f"{cal}:1-3, opened from {view}"},
+            {"name": "Fetch payslips", "reason": "EmployeeServices/Payslips/Sources/Payslips/GetPayslips.swift"}]))
+        self.edit("rules_result.json", lambda r: r.update(outOfScope=[
+            {"name": "Payslips are newest first (CAP-029)", "source": "Employee/StartPage/PayslipCard.swift:3", "reason": "x"},
+            {"name": "Rows sort by date", "source": f"{item}:11-12", "reason": "x"},
+            {"name": "The list loads on open", "source": f"{view}:8", "reason": "x"},
+            {"name": "Weeks start on Monday", "source": f"{cal}:1-2", "reason": "x"}]))
+        render.catalogs(self.out)
+        gone = out.load(self.out, "out-of-scope.json")
+        self.assertEqual([e["name"] for e in gone["useCases"]], ["View the calendar", "Fetch payslips"])
+        self.assertEqual([e["name"] for e in gone["rules"]], ["Weeks start on Monday"])
+        scope = [r["why"] for r in out.load(self.out, "render-warnings.json") if r["kind"] == "scope"]
+        self.assertIn("out-of-scope rule The list loads on open cites code of the kept use case View payslip list "
+                      f"({view}:8); it is not in the catalogs", scope)
+
     def test_with_a_capability_scope_a_touch_rule_of_a_kept_use_case_stays(self):
         card = "Employee/StartPage/PayslipCard.swift"
         self.edit("app-spec.json", lambda c: c.update(scope=["CAP-001"]))

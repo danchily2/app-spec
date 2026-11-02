@@ -20,6 +20,15 @@ Fixes found in the v3 payslips rerun (0.3.0 code).
   same name whose first source file is the same file, cited by the same, a shorter or a longer path, when no rule of
   the run still holds that id. A rule whose source moved to another file still gets a new id.
 
+- **The out-of-scope list drops what a kept use case or rule covers.** Touch-shard analysts listed year-end reports,
+  the FAQ link and analytics out of scope, "leave it to the core shard"; the core shard kept them, but the list kept
+  them too, because "Learn why I have no payslips (CAP-231)" is not exactly "Learn why I have no payslips". Both
+  workflows now compare names without parenthetical notes and capability ids. `render.py catalogs` also drops an
+  out-of-scope use case or rule whose cited line ranges all lie inside the ranges of kept entries (the year-end
+  rules at `ReportsService.swift:41-46` inside the kept use case's `ReportsService.swift:41-60`). A whole-file
+  citation never counts, so a shared file such as a tab coordinator does not hide a neighbour. An out-of-scope rule
+  inside a kept use case's code has no given/when/then to keep; it gets a `scope` warning in `render-warnings.json`.
+
 ## 0.3.0 - 2026-11-02
 
 Fixes found in the second payslips run (Devin, v0.2.0).
