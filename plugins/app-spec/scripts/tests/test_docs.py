@@ -22,7 +22,7 @@ class TestDocs(unittest.TestCase):
 
     def test_the_skill_says_how_an_agent_answer_reaches_save_json(self):
         # payslips v4: the run searched the subagent transcript folder for a contract batch and was denied
-        skill = (PLUGIN / "skills" / "spec" / "SKILL.md").read_text(encoding="utf-8")
+        skill = " ".join((PLUGIN / "skills" / "spec" / "SKILL.md").read_text(encoding="utf-8").split())  # line breaks
         self.assertIn("OUT/answers/", skill)
         self.assertIn("Never search session or transcript folders", skill)
         self.assertNotIn("transcript (`.jsonl`)", skill)
