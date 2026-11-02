@@ -2,7 +2,7 @@
 """Resolve the module to specify, find its touch points and split it into shards.
 
     python3 module.py <app> --module <name|path> [--module ...] --out DIR [--app-name NAME] [--contracts REPO ...]
-                      [--max-lines N] [--confirmed] [--locale CODE]
+                      [--max-lines N] [--confirmed] [--locale CODE] [--touch-keyword WORD]
                       [--capabilities FILE --scope CAP-001,CAP-002]
 
 A --module value is a folder name (matched against package roots: Swift packages, Gradle modules, React Native screen
@@ -405,6 +405,8 @@ def main(argv=None):
     ap.add_argument("--max-lines", type=int, default=DEFAULT_MAX_LINES)
     ap.add_argument("--confirmed", action="store_true", help="a person confirmed the proposed scope")
     ap.add_argument("--locale", help="source-language code of the strings (default en; a re-run keeps the stored one)")
+    ap.add_argument("--touch-keyword", metavar="WORD",
+                    help="keep only touch points whose text contains WORD (case-insensitive); recorded in module.json")
     args = ap.parse_args(argv)
     if args.max_lines < 1:
         die("--max-lines must be at least 1")
@@ -442,6 +444,11 @@ def main(argv=None):
         die(f"no source files under {', '.join(core_folders)}")
     keys = string_keys_for(core_files, load_catalog(root, stack), root)
     touch = touchpoints.find(root, stack, core_files, keys)
+    touch_filter = None
+    if args.touch_keyword:
+        kept = touchpoints.find(root, stack, core_files, keys, keyword=args.touch_keyword)
+        touch_filter = {"keyword": args.touch_keyword, "dropped": len(touch) - len(kept)}
+        touch = kept
     shards = make_shards(root, core_files, "core", args.max_lines)
     shards += make_shards(root, [t["file"] for t in touch], "touch", args.max_lines)
 
@@ -451,15 +458,20 @@ def main(argv=None):
              else _config(args, root, stack, contracts))
     entries = _write_shards(dest, shards)
     total = sum(s["loc"] for s in shards)
-    out.save(dest, "module.json", {"version": 1, "core": core_files, "touchPoints": touch, "stringKeys": keys,
-                                   "shards": entries, "loc": total})
+    record = {"version": 1, "core": core_files, "touchPoints": touch, "stringKeys": keys, "shards": entries,
+              "loc": total}
+    if touch_filter:
+        record["touchFilter"] = touch_filter
+    out.save(dest, "module.json", record)
 
     print(f"Module {', '.join(args.module or scope)} in {os.path.basename(root)} ({stack})")
     print("Core folders:")
     for folder in core_folders:
         info = _folder_summary(root, stack, folder)
         print(f"  {folder}  ({info['files']} files, {info['loc']} lines)")
-    print(f"Touch points: {len(touch)}")
+    print(f"Touch points: {len(touch)}"
+          + (f" (only those that contain '{touch_filter['keyword']}'; {touch_filter['dropped']} dropped)"
+             if touch_filter else ""))
     for t in touch:
         print(f"  {t['file']}  {t['reason']}")
     print(f"String keys: {len(keys)}")

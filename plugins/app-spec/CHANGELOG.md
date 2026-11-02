@@ -3,6 +3,16 @@
 A release gets a new number in `.claude-plugin/plugin.json`. Claude Code only offers an update when that number
 changes.
 
+## Unreleased
+
+Fixes found in a run on a native iOS payslips module.
+
+- **Touch points stay near the module.** A type nested in a core type (`ViewModel`, `Delegate`, `Destination` in a
+  TCA feature) matches only in its qualified form, more common nested names count as generic, a core name that
+  another file also declares is ambiguous and does not match, and an event family counts only when the core declares
+  it. On the payslips module, touch points fell from 486 to 18. `module.py --touch-keyword WORD` keeps only touch
+  points that contain the word and records the filter in `module.json`.
+
 ## 0.1.0 - 2026-10-30
 
 First release. Turns one module of one mobile app (native iOS, React Native or native Android) into a reviewed spec.

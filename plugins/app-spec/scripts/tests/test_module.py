@@ -226,6 +226,51 @@ class TestModule(unittest.TestCase):
             ("App/Track.swift", "fires event family OrderEvent"),
         ])
 
+    def test_nested_generic_types_do_not_make_another_feature_a_touch_point(self):
+        app = os.path.join(self.tmp, "tca")
+        write(app, "Modules/PayslipsFeature/Sources/PayslipsFeature/MainPayslipFeature.swift",
+              "@Reducer\nstruct MainPayslipFeature {\n  struct ViewModel { let title: String }\n"
+              "  enum Delegate { case done }\n  enum Destination { case pdf }\n"
+              "  func track() { EmployeeAnalytics.log(.payslipOpened) }\n}\n")
+        write(app, "Modules/ExpensesFeature/Sources/ExpensesFeature/ExpensesFeature.swift",
+              "@Reducer\nstruct ExpensesFeature {\n  struct ViewModel { let total: Int }\n"
+              "  enum Delegate { case saved }\n  func track() { EmployeeAnalytics.log(.expenseSaved) }\n}\n")
+        write(app, "Employee/Analytics/EmployeeAnalytics.swift", "enum EmployeeAnalytics { case payslipOpened }\n")
+        write(app, "Employee/Root/RootFeature.swift",
+              "let dest: MainPayslipFeature.Destination = .pdf\nlet other = Other.MainPayslipFeature.Delegate.x\n")
+        core = ["Modules/PayslipsFeature/Sources/PayslipsFeature/MainPayslipFeature.swift"]
+        tps = touchpoints.find(app, "ios-native", core, [])
+        self.assertEqual(tps, [{"file": "Employee/Root/RootFeature.swift",
+                                "reason": "uses type MainPayslipFeature.Destination"}])
+
+    def test_a_name_declared_outside_the_core_too_is_not_matched(self):
+        app = os.path.join(self.tmp, "dup")
+        write(app, "Modules/Payslips/Sources/Payslips/Loadable.swift", "enum Loadable {}\nstruct PayslipRow {}\n")
+        write(app, "Modules/Shared/Sources/Shared/Loadable.swift", "public enum Loadable {}\n")
+        write(app, "Modules/Calendar/Sources/Calendar/Grid.swift", "var days: Loadable = .idle\n")
+        write(app, "App/Card.swift", "let row = PayslipRow()\nvar l: Loadable\n")
+        tps = touchpoints.find(app, "ios-native", ["Modules/Payslips/Sources/Payslips/Loadable.swift"], [])
+        self.assertEqual(tps, [{"file": "App/Card.swift", "reason": "uses type PayslipRow"}])
+
+    def test_generic_top_level_names_are_not_matched(self):
+        found = touchpoints.declared("ios-native", "struct Coordinator {}\nstruct Mapper {}\nstruct PayslipMapper {}\n")
+        self.assertEqual(found["types"], {"PayslipMapper"})
+
+    def test_cli_touch_keyword_filters_and_is_recorded(self):
+        app = os.path.join(self.tmp, "kw")
+        write(app, "Package.swift", "// swift-tools-version:5.9\n")
+        write(app, "Modules/Orders/Sources/Orders/Orders.swift", "struct OrderRow {}\n")
+        write(app, "App/OrderCard.swift", "let r = OrderRow() // order card\n")
+        write(app, "App/Basket.swift", "let r = OrderRow()\n")
+        dest = os.path.join(self.tmp, "out")
+        code, stdout, _ = run_cli(["module.py", app, "--module", "Modules/Orders", "--out", dest,
+                                   "--touch-keyword", "card"])
+        self.assertEqual(code, 0)
+        data = json.loads(Path(dest, "module.json").read_text())
+        self.assertEqual([t["file"] for t in data["touchPoints"]], ["App/OrderCard.swift"])
+        self.assertEqual(data["touchFilter"], {"keyword": "card", "dropped": 1})
+        self.assertIn("Touch points: 1 (only those that contain 'card'; 1 dropped)", stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

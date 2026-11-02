@@ -35,7 +35,8 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/module.py" <app> --module <m> [--module .
 ```
 
 It prints the core folders with their files and lines, the touch points with their reasons, the string keys and the
-shards. Exit code 2 means the name matched no folder or several unrelated ones: show the message and ask for folders.
+shards. When the touch points still reach far beyond the module, `--touch-keyword WORD` keeps only those whose text
+contains the word, and `module.json` records the filter. Exit code 2 means the name matched no folder or several unrelated ones: show the message and ask for folders.
 
 Show the proposal, then ask with AskUserQuestion, "Is this the module?", with the options `Yes`, `Edit the folders`
 and `Cancel`:

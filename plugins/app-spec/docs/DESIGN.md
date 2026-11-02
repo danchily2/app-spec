@@ -17,7 +17,7 @@ inventory and a coverage ledger, and a critic reviews the draft before a person 
 | --- | --- |
 | Module | One feature of the app that a person names: a name, or a set of folders. The unit of one run |
 | Core | The files of the module itself: its folders, found from the name or given by the person |
-| Touch point | A file outside the core that the module needs or that needs the module, with the reason it was pulled in (shared types, string keys, analytics events, navigation entries, start-page components, assistant tools) |
+| Touch point | A file outside the core that the module needs or that needs the module, with the reason it was pulled in (shared types, string keys, analytics events, navigation entries, start-page components, assistant tools). Only a top-level type of the core matches by its bare name; a nested one matches only qualified (`Feature.Destination`). A name that a file outside the core declares too is ambiguous and never matches, and an event family counts only when the core declares it |
 | Use case | One thing a person can do in the module, named with a verb in business words. `UC-NNN`. With a capability index it can carry a `CAP-NNN` alias |
 | Screen | One screen or screen state the user sees, with its actions, states and fields. `SCR-NNN` |
 | Flow | A path through the module in 3 to 8 numbered steps, each naming a screen and its use cases. `FLOW-NNN`. Flows become the end-to-end tests |
@@ -136,6 +136,7 @@ A re-run of `spec` regenerates every file except three. `overrides.json` is neve
 | `core` | Files of the module itself |
 | `touchPoints[].file` | A file outside the core that the module needs or that needs the module |
 | `touchPoints[].reason` | Why it was pulled in |
+| `touchFilter` | Present only with `module.py --touch-keyword`: `{"keyword", "dropped"}`, the word every kept touch point contains and how many were left out |
 | `stringKeys` | String keys the core's screens use |
 | `shards[].id` | Shard id, also the file name under `shards/` |
 | `shards[].kind` | `core` for module files, `touch` for touch points |
