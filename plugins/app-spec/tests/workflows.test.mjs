@@ -349,3 +349,12 @@ test('rules: a touch shard is told its rules are out of scope, and outOfScope is
   assert.ok(calls.find(c => c.opts.label === 'extract:touch-01').prompt.includes('This shard is of kind touch'))
   assert.ok(!calls.find(c => c.opts.label === 'extract:core-01').prompt.includes('This shard is of kind touch'))
 })
+
+test('analysts and rule extractors are told to read every platform branch', async () => {
+  const { calls } = await run(wf('understand-module.js'), args)
+  const analysts = calls.filter(c => c.opts.label.startsWith('extract:'))
+  assert.ok(analysts.length && analysts.every(c => c.prompt.includes('PLATFORM BRANCHES') && c.prompt.includes('#available')))
+  const { calls: rcalls } = await run(wf('extract-rules.js'), rargs, oneRule({}))
+  const extractors = rcalls.filter(c => c.opts.phase === 'Extract')
+  assert.ok(extractors.length && extractors.every(c => c.prompt.includes('PLATFORM BRANCHES')))
+})

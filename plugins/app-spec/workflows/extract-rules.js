@@ -126,6 +126,11 @@ ${catalog}${s.kind === 'touch' ? `
 This shard is of kind touch: its files are OUTSIDE the module, context and not scope. A rule found here belongs to a
 neighbour module: list it in outOfScope with its source and the reason, never in rules. Only a rule whose code is in a
 core file of the module goes in rules.` : ''}
+PLATFORM BRANCHES: when a behaviour sits inside a platform or version branch (if #available, @available,
+#if os(...), Build.VERSION.SDK_INT, Platform.OS, a check such as isLiquidGlass or a helper that picks a branch by OS
+version), read every branch. State the behaviour per branch ("on iOS 26 and later the picker always shows; before
+iOS 26 it shows only with at least one report") with a citation for each, never one rule for all versions. A state
+of the store (showSegmentPicker) is not what the user sees until you have checked each branch that renders it.
 ${UNTRUSTED}`,
       { agentType: 'app-spec:business-rules-extractor', label: `extract:${s.id}`, phase: 'Extract', schema: RULES_SCHEMA },
     ),

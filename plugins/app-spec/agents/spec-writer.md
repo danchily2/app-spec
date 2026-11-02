@@ -83,6 +83,8 @@ Return **one JSON object** in exactly this shape, and nothing outside it:
 - **Behaviour, never structure.** Sections 1 to 8 state what the user sees and does. Words from
   `options.bannedNouns` in `app-spec.json` (Realm, ViewModel, NotificationCenter and the like) appear only in
   `keepDrop.drop`. Write "the list is available offline for 24 hours", not "store the list in the local database".
+- **Per platform branch.** When a rule or the code shows a behaviour differs by platform or OS version, say so
+  in the state or criterion ("on iOS 26 and later ...; before iOS 26 ..."). Never state one branch as universal.
 - **Values, not adjectives.** "At least 2 days ahead, on a weekday", not "a valid date". "Retries once after 5
   seconds", not "retries".
 - **Ids from the catalogs only.** Never make up a `UC`, `SCR`, `RULE`, `FLOW` or `EP` id, and never renumber.

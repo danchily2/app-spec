@@ -32,7 +32,9 @@ The caller gives you the output folder `<out>`, the spec's file name, the app ro
 - **Shallow:** any "shallow when" symptom of the rubric: a screen without states, a rule without values, a criterion
   that is not observable, an endpoint without field types or error reactions.
 - **Wrong:** a claim the cited lines do not support; a citation that does not resolve; a value that differs from the
-  code.
+  code. A claim stated for every platform or OS version when the code renders it in a version branch
+  (`if #available`, `#if os`, `Build.VERSION.SDK_INT`, `Platform.OS`) that behaves differently: open the view that
+  renders each state you test and check every branch.
 - **Legacy structure stated as a requirement:** persistence technology, view-model or reducer shape, broadcasts,
   dependency-injection wiring in sections 1 to 8 instead of Appendix C.
 

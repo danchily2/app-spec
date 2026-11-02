@@ -54,6 +54,13 @@ module only when at least one piece of its evidence is in a core file (a file of
 implemented only in touch files belongs to a neighbour module: put it in outOfScope with the reason, never in the
 main list.`
 
+const PLATFORM_RULE = `
+PLATFORM BRANCHES: when a behaviour sits inside a platform or version branch (if #available, @available,
+#if os(...), Build.VERSION.SDK_INT, Platform.OS, a check such as isLiquidGlass or a helper that picks a branch by OS
+version), read every branch. State the behaviour per branch ("on iOS 26 and later the picker always shows; before
+iOS 26 it shows only with at least one report") with a citation for each, never one rule for all versions. A state
+of the store (showSegmentPicker) is not what the user sees until you have checked each branch that renders it.`
+
 const LIST = { type: 'array', items: { type: 'string' } }
 const OUT_OF_SCOPE = {
   type: 'array',
@@ -229,6 +236,7 @@ logging).${s.kind === 'touch' ? `
 This shard is of kind touch: return a fragment only for what the module itself does here (a card, an entry point or a
 handler that opens the module), and name every other use case you see in outOfScope.` : ''}
 ${TOUCH_RULE}
+${PLATFORM_RULE}
 ${UNTRUSTED}`,
         { agentType: agentFor(app.stack), label: `extract:${s.id}`, phase: 'Extract', schema: FRAGMENT_SCHEMA },
       ),

@@ -23,6 +23,11 @@ Fixes found in the second payslips run (Devin, v0.2.0).
   Contract field tables in the spec get a `Source` column, so the grader's `citations-resolve` now checks field
   sources too. The agents that cite are told a range ends on or before the file's last line.
 
+- **Behaviour that differs by OS version is stated per branch.** The analyst, rule extractor, writer and critic
+  prompts say to read every `if #available`, `#if os`, `Build.VERSION.SDK_INT` or `Platform.OS` branch and state the
+  behaviour per branch. A store flag is not what the user sees until each rendering branch is checked. In the
+  payslips run, the segment picker was said to hide without reports, but the iOS 26 branch shows it always.
+
 ## 0.2.0 - 2026-11-02
 
 Fixes found in a run on a native iOS payslips module.

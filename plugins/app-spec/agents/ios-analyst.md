@@ -26,6 +26,10 @@ widgets. You read an app so that another team can rebuild it without losing anyt
   entitlements (push, associated domains, app groups, keychain groups), app extension targets and their
   `NSExtensionPointIdentifier`, `PrivacyInfo.xcprivacy`, the minimum iOS version. These are what existing users
   lose silently when a new app forgets them.
+- **Read every platform branch.** When a behaviour sits inside `if #available`, `@available`, `#if os(...)`,
+  `Build.VERSION.SDK_INT`, `Platform.OS` or a helper that picks a branch by OS version, read each branch and state the
+  behaviour per branch with its own citation. A store flag is not what the user sees until each rendering branch is
+  checked: the iOS 26 branch may show a control that the older branch hides.
 - **Cite everything.** Every claim gets `path:line` relative to the app root. A range ends on or before the last line of the file (check with `wc -l`); a range past the end is a warning in
   `render-warnings.json` and a grade failure. If you cannot point at a line, say "not
   found" instead of guessing. Say "appears to" when you infer from names.

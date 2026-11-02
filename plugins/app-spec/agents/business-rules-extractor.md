@@ -37,6 +37,8 @@ of the technology, skip it.
 1. Find the rule in executable code. Record one `path:line-line` range relative to the app root. The range ends on or
    before the last line of the file (check with `wc -l`).
 2. State it in one sentence a product owner recognizes.
+   When the code branches by platform or OS version (`if #available`, `#if os`, `Build.VERSION.SDK_INT`,
+   `Platform.OS`), read every branch and state the rule per branch, or write one card per branch.
 3. Encode Given/When/Then with **concrete values** ("Given a mileage claim of 42 km at 3.50 NOK/km, when the total is
    shown, then it reads 147.00 kr"). Use no placeholders.
 4. List the parameters with their current values (limits, rates, magic numbers). These often become configuration.
