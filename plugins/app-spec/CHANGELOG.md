@@ -14,6 +14,12 @@ Fixes found in the v3 payslips rerun (0.3.0 code).
   real file, to that file's path from the app root (`paths.complete`). A path that fits no file, or several, stays as
   cited and is still reported.
 
+- **A rule keeps its id when its source path is corrected.** `ids.json` keys a rule by its name and source. In the v3
+  run a patch corrected the paths in the source of "Export with no payslips shows a dedicated message", RULE-073
+  became RULE-117, and the spec and critic-2 still named RULE-073. A new key now takes the id of an old key with the
+  same name whose first source file is the same file, cited by the same, a shorter or a longer path, when no rule of
+  the run still holds that id. A rule whose source moved to another file still gets a new id.
+
 ## 0.3.0 - 2026-11-02
 
 Fixes found in the second payslips run (Devin, v0.2.0).

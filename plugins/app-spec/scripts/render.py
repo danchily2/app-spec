@@ -53,6 +53,12 @@ def _path(location):
     return _LOCATION.sub("", str(location or ""))
 
 
+def _same_file(a, b):
+    """Whether the first paths of the citations `a` and `b` name the same file, one perhaps by a shorter path."""
+    a, b = (re.split(r"[:\s(]", s.strip(), maxsplit=1)[0] for s in (a, b))
+    return bool(a and b) and (a == b or a.endswith("/" + b) or b.endswith("/" + a))
+
+
 def _slug(text):
     return norm(text).replace(" ", "-")
 
@@ -141,6 +147,20 @@ class _Catalogs:
 
     def _rule_key(self, name, source):
         return f"{norm(name)}|{_path(source)}"
+
+    def _rule_id(self, key, present):
+        """The RULE id of `key`. A new key takes the id of an old key with the same name whose source is the same file
+        cited by a shorter or longer path (`Sources/X/Item.swift` corrected to `Modules/X/Sources/X/Item.swift`), when
+        no rule of this run holds that old key, so correcting a source path does not renumber the rule."""
+        mapping = self.registry.data["RULE"]
+        if key not in mapping:
+            name, _, new = key.partition("|")
+            old = {mapping[k] for k in mapping if k not in present and k.partition("|")[0] == name
+                   and _same_file(k.partition("|")[2], new)}
+            old -= {mapping[k] for k in present if k in mapping}  # an id a rule of this run still holds is taken
+            if len(old) == 1:  # several old keys can name one id: each correction adds a key
+                self.registry.adopt("RULE", key, old.pop())
+        return self.registry.assign("RULE", key)
 
     def _screen_ids(self):
         """Screen name to SCR ids (a name can repeat in two files), and the screen entries by id."""
@@ -447,6 +467,8 @@ class _Catalogs:
             if isinstance(raw, dict) and raw.get("name"):
                 self._out_of_scope("rule", "RULE", self._rule_key(raw["name"], raw.get("source")), raw["name"],
                                    raw.get("reason") or "the extractor found it only in touch files")
+        present = {self._rule_key(r["name"], r.get("source")) for r in self.rules_in + self.rules_out
+                   if isinstance(r, dict) and r.get("name")}
         for raw in self.rules_in:
             if not isinstance(raw, dict) or not raw.get("name"):
                 continue
@@ -461,7 +483,7 @@ class _Catalogs:
             if raw.get("useCase") and norm(raw["useCase"]) in outside:
                 self._out_of_scope("rule", "RULE", key, raw["name"], f"its use case {raw['useCase']} is out of scope")
                 continue
-            rid = self.registry.assign("RULE", key)
+            rid = self._rule_id(key, present)
             if rid in rules:
                 self._warn("rule", raw["name"], f"rule {raw['name']} appears twice in {_path(raw.get('source'))}; the first is kept")
                 continue

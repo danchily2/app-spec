@@ -201,6 +201,39 @@ class TestCatalogs(unittest.TestCase):
         self.assertIsNone(rules[1]["useCase"])
         self.assertEqual(out.load(self.out, "ids.json")["RULE"]["payslips are newest first|Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift"], "RULE-001")
 
+    def test_a_rule_keeps_its_id_when_its_source_path_is_corrected(self):
+        # payslips v3: a patch corrected a module-relative source to the full path and RULE-073 became RULE-117,
+        # while the spec still named RULE-073
+        render.catalogs(self.out)
+        ids = out.load(self.out, "ids.json")
+        full = "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift"
+        del ids["RULE"][f"payslips are newest first|{full}"]
+        ids["RULE"]["payslips are newest first|Sources/PayslipsFeature/PayslipItem.swift"] = "RULE-073"
+        ids["max"]["RULE"] = 73
+        out.save(self.out, "ids.json", ids)
+        render.catalogs(self.out)
+        rules = {r["name"]: r["id"] for r in out.load(self.out, "rules.json")["rules"]}
+        self.assertEqual(rules["Payslips are newest first"], "RULE-073")
+        # the v3 shape: the first file is the same, only the paths in the note after it were corrected
+        ids = out.load(self.out, "ids.json")
+        del ids["RULE"][f"payslips are newest first|{full}"]
+        ids["RULE"][f"payslips are newest first|{full}:10-14 (+ Features/Main/Old.swift:1-2)"] = "RULE-073"
+        out.save(self.out, "ids.json", ids)
+        render.catalogs(self.out)
+        rules = {r["name"]: r["id"] for r in out.load(self.out, "rules.json")["rules"]}
+        self.assertEqual(rules["Payslips are newest first"], "RULE-073")
+        # a rule of the same name whose source moved to another file is another rule
+        ids = out.load(self.out, "ids.json")
+        self.edit_rules(lambda r: r["rules"][0].update(source="Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipListView.swift:3"))
+        render.catalogs(self.out)
+        rules = {r["name"]: r["id"] for r in out.load(self.out, "rules.json")["rules"]}
+        self.assertEqual(rules["Payslips are newest first"], "RULE-074")
+
+    def edit_rules(self, change):
+        data = out.load(self.out, "rules_result.json")
+        change(data)
+        out.save(self.out, "rules_result.json", data)
+
     def test_endpoint_label_unknown_when_unresolved(self):
         render.catalogs(self.out)
         eps = out.load(self.out, "endpoints.json")["endpoints"]
