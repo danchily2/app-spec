@@ -23,6 +23,23 @@ class TestSpeclib(unittest.TestCase):
         pairs = {(e["method"], e["path"]) for e in inv["endpoints"]}
         self.assertIn(("GET", "/employee/api/v1/employees/{}/payslips"), pairs)
 
+    def test_ios_reducer_without_a_store_is_not_a_screen(self):
+        root = self.tmp + "/tca-app"
+        import os
+        os.makedirs(root + "/Feature")
+        with open(root + "/Feature/Main.swift", "w") as f:
+            f.write("@Reducer\nstruct MainFeature {}\n@Reducer\nstruct AnalyticsFeature {}\n"
+                    "@Reducer\nstruct DetailFeature {}\n"
+                    "struct MainView: View {\n  let store: StoreOf<MainFeature>\n  var body: some View { Text(\"x\") }\n}\n"
+                    "struct DetailView: View {\n  let store: Store<DetailFeature.State, DetailFeature.Action>\n"
+                    "  var body: some View { Text(\"y\") }\n}\n")
+        inv = ios.extract(root)
+        screens = {s["name"] for s in inv["screens"] if s["kind"] == "tca-feature"}
+        self.assertEqual(screens, {"MainFeature", "DetailFeature"})
+        self.assertEqual([r["name"] for r in inv["tcaReducers"]], ["AnalyticsFeature"])
+        self.assertEqual(inv["tcaReducers"][0]["kind"], "tca-reducer")
+        self.assertEqual(inv["counts"]["tcaReducers"], 1)
+
     def test_out_roundtrip(self):
         path = out.save(self.tmp, "x.json", {"a": 1})
         self.assertEqual(out.load(self.tmp, "x.json"), {"a": 1})

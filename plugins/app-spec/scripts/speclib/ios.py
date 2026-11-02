@@ -203,6 +203,25 @@ _UIKIT = re.compile(r"\bclass\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:<[^>]*>)?\s*:\s*([
 _OBJC_UIKIT = re.compile(r"@interface\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([A-Za-z_][A-Za-z0-9_]*ViewController)\b")
 _SWIFTUI = re.compile(r"\bstruct\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:<[^>{]*>)?\s*:\s*(?:[A-Za-z_][A-Za-z0-9_.]*\s*,\s*)*View\b")
 _REDUCER = re.compile(r"@Reducer\b(?:\s*\([^)]*\))?\s*(?:(?:public|internal|package|private|fileprivate|final)\s+)*(?:struct|enum)\s+([A-Za-z_][A-Za-z0-9_]*)")
+
+
+def _split_viewless_reducers(screens, texts):
+    """`(screens, reducers)`: a TCA feature stays a screen only when some non-test Swift file holds a store of it
+    (`StoreOf<Name>` or `Store<Name.State, ...>`). A reducer only scoped into a parent, such as an analytics or a
+    rating reducer, has no view of its own and is listed apart."""
+    features = {s["name"] for s in screens if s.get("kind") == "tca-feature"}
+    if not features:
+        return screens, []
+    body = "\n".join(t for rel, t in texts.items() if rel.endswith(".swift") and not is_test_path(rel))
+    held = set(re.findall(r"\bStoreOf<\s*([A-Za-z_][A-Za-z0-9_]*)\s*>", body))
+    held |= set(re.findall(r"\bStore<\s*([A-Za-z_][A-Za-z0-9_]*)\.State\b", body))
+    kept, reducers = [], []
+    for s in screens:
+        if s.get("kind") == "tca-feature" and s["name"] not in held:
+            reducers.append(dict(s, kind="tca-reducer"))
+        else:
+            kept.append(s)
+    return kept, reducers
 _COORD = re.compile(r"\b(class|struct|protocol|enum|actor)\s+((?:[A-Za-z_][A-Za-z0-9_]*)?Coordinator[A-Za-z0-9_]*)")
 _PATH_PROP = re.compile(r"\b(?:var|let)\s+(resourceName|path|endpoint|urlPath|route|relativePath|apiPath)\s*:\s*String\s*\{")
 _PATH_LET = re.compile(r"\blet\s+(resourceName|path|endpoint|urlPath|relativePath|apiPath)\s*(?::\s*String\s*)?=\s*(" + _SWIFT_STRING + r")")
@@ -448,6 +467,7 @@ def extract(root):
     maestro = _maestro_flows(root)
     plat = platform(root)
     plat["notificationCategories"] = notify.scan(root)
+    screens, tca_reducers = _split_viewless_reducers(screens, texts)
     uniq_endpoints = sorted({(e["method"] or "?", e["path"]) for e in endpoints})
     uniq_events = sorted({e["name"] for e in events})
     counts = {
@@ -455,6 +475,7 @@ def extract(root):
         "screens": len(screens),
         "uikitControllers": sum(1 for s in screens if s["kind"] == "uikit-controller"),
         "tcaFeatures": sum(1 for s in screens if s["kind"] == "tca-feature"),
+        "tcaReducers": len(tca_reducers),
         "swiftuiViews": len(swiftui_views),
         "coordinators": len(coordinators),
         "requestTypes": request_types,
@@ -472,9 +493,10 @@ def extract(root):
     }
     rules = {
         "sourceFiles": "non-test .swift, .m and .h files, generated and vendored directories excluded",
-        "screens": "UIKit view controllers (a class whose superclass ends in ViewController, or ObjC @interface of one) plus TCA features (@Reducer types), outside test paths",
+        "screens": "UIKit view controllers (a class whose superclass ends in ViewController, or ObjC @interface of one) plus TCA features (@Reducer types that a view holds a store of), outside test paths",
         "uikitControllers": "classes whose superclass name ends in ViewController, TableViewController, CollectionViewController, HostingController or PageViewController",
-        "tcaFeatures": "struct or enum declarations annotated @Reducer",
+        "tcaFeatures": "struct or enum declarations annotated @Reducer that some non-test Swift file holds a store of (StoreOf<Name> or Store<Name.State, ...>)",
+        "tcaReducers": "@Reducer types no Swift file holds a store of (analytics, rating and other child reducers): not screens",
         "swiftuiViews": "structs conforming to View (every View, not only screens)",
         "coordinators": "type declarations (class, struct, protocol, enum, actor) whose name contains 'Coordinator', outside test paths",
         "requestTypes": "struct/class/enum declarations conforming to a protocol ending in 'Request', in files that mention APIClientRequest",
@@ -496,7 +518,7 @@ def extract(root):
     ]
     return {
         "stack": "ios-native", "counts": counts, "rules": rules,
-        "screens": screens, "swiftuiViews": swiftui_views, "coordinators": coordinators,
+        "screens": screens, "tcaReducers": tca_reducers, "swiftuiViews": swiftui_views, "coordinators": coordinators,
         "routes": [], "endpoints": endpoints, "webLinks": web_links, "events": events, "storage": storage,
         "platform": plat, "dependencies": deps, "localPackages": local_packages,
         "tests": {"frameworks": sorted(frameworks), "unitTestFiles": test_files - ui_test_files,

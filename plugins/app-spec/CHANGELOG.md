@@ -12,6 +12,11 @@ Fixes found in the second payslips run (Devin, v0.2.0).
   assistant sheet". A placeholder or a reason under 12 characters still fails. The writer is told never to claim the
   server decides when the code does not show it.
 
+- **A TCA reducer with no view is not a screen.** The iOS inventory keeps a `@Reducer` type among screens only when
+  some Swift file holds a store of it (`StoreOf<Name>` or `Store<Name.State, ...>`). A reducer that is only scoped
+  into a parent, such as `AnalyticsFeature` or `AppRatingFeature`, goes to `tcaReducers` and is not held to the
+  screen threshold of the ledger.
+
 ## 0.2.0 - 2026-11-02
 
 Fixes found in a run on a native iOS payslips module.

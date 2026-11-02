@@ -22,7 +22,7 @@ from speclib.common import die  # noqa: E402
 
 EXTRACTORS = {"ios-native": ios, "android-native": android, "react-native": rn}
 # lists of entries that name the file they come from: the only parts of the extractor result a file scope can cut
-SCOPED_LISTS = ("screens", "swiftuiViews", "coordinators", "routes", "unresolvedRoutes", "navigators", "endpoints",
+SCOPED_LISTS = ("screens", "tcaReducers", "swiftuiViews", "coordinators", "routes", "unresolvedRoutes", "navigators", "endpoints",
                 "webLinks", "events", "storage")
 SCOPE_RULE = "kept when its file is in the module's core or touch points"
 COUNT_RULES = {  # counts this script defines itself, and the fallback for a count the extractor gives no rule
@@ -58,7 +58,7 @@ def _scoped_strings(catalog, keys):
 
 def _counts(inv, files):
     counts = {"sourceFiles": len(files), "stringKeys": len(inv["strings"].get("keys", {}))}
-    for key in ("screens", "swiftuiViews", "coordinators", "webLinks"):
+    for key in ("screens", "tcaReducers", "swiftuiViews", "coordinators", "webLinks"):
         if key in inv:
             counts[key] = len(inv[key])
     counts["routes"] = _distinct(inv["routes"], "name")
@@ -109,6 +109,7 @@ def _render(inv, scope):
     lines += ["", "The platform section is app-wide: entitlements, URL schemes and permissions are not tied to one file.", ""]
     for title, key, columns in (("Screens", "screens", ("name", "kind", "file")),
                                 ("SwiftUI views", "swiftuiViews", ("name", "file")),
+                                ("TCA reducers without a view (not screens)", "tcaReducers", ("name", "file")),
                                 ("Routes", "routes", ("name", "component", "file")),
                                 ("Endpoints", "endpoints", ("method", "path", "raw", "file")),
                                 ("Events", "events", ("name", "family", "file")),
