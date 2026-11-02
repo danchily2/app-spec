@@ -386,6 +386,21 @@ class TestCatalogs(unittest.TestCase):
         warnings = [w for w in self.warnings() if " cites " in w]
         self.assertEqual(warnings, ["rule RULE-001 cites PayslipItem.swift:3-70: the file has 14 lines"])
 
+    def test_a_module_relative_citation_resolves_to_its_full_path(self):
+        # an extractor cited the path relative to the module, not the app root (payslips v3:
+        # Features/Main/MainPayslipFeature.swift:251-254); it names the end of exactly one real file
+        full = "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift"
+        self.edit("rules_result.json", lambda r: r["rules"][0].update(source="PayslipsFeature/PayslipItem.swift:10-14"))
+        self.edit("understand_result.json", lambda u: u["useCases"][1].update(
+            files=["PayslipsFeature/PayslipDetailView.swift:3", "Nowhere/Missing.swift:1"]))
+        warnings = self.warnings()
+        rule = next(r for r in out.load(self.out, "rules.json")["rules"] if r["name"] == "Payslips are newest first")
+        self.assertEqual(rule["source"], f"{full}:10-14")
+        case = next(u for u in out.load(self.out, "use-cases.json")["useCases"] if u["name"] == "View a payslip's details")
+        self.assertIn("Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipDetailView.swift:3", case["files"])
+        self.assertIn("Nowhere/Missing.swift:1", case["files"])  # no file ends so: left as cited, and reported
+        self.assertFalse(any("PayslipsFeature/PayslipItem.swift:10-14: file not found" in w for w in warnings))
+
     def test_a_citation_within_its_file_is_no_warning(self):
         self.assertEqual([w for w in self.warnings() if " cites " in w and "lines" in w], [])
 

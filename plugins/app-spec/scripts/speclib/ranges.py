@@ -25,12 +25,7 @@ class Ranges:
     def _by_name(self):
         """{file name: [relative paths]} under every root, built once, for citations that give a bare file name."""
         if getattr(self, "_names", None) is None:
-            self._names = {}
-            for real, _ in self.root_list:
-                for base, dirs, files in os.walk(real):
-                    dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ("node_modules", "Pods", "build", "DerivedData")]
-                    for f in files:
-                        self._names.setdefault(f, []).append(os.path.relpath(os.path.join(base, f), real))
+            self._names = paths.file_index(self.root_list)
         return self._names
 
     def length(self, rel):

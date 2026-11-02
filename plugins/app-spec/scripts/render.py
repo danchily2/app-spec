@@ -29,7 +29,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from speclib import out, ranges, spec_md  # noqa: E402
+from speclib import out, paths, ranges, spec_md  # noqa: E402
 from speclib.common import die, endpoints_match, load_json, normalize_endpoint  # noqa: E402
 from speclib.ids import Registry, element_slug, norm  # noqa: E402
 
@@ -102,8 +102,25 @@ class _Catalogs:
         self.out_cases = []  # {id, name, reason}: use cases with no evidence in a core file
         self.out_rules = []
         self.registry = Registry(os.path.join(dest, "ids.json"))
+        self._complete_paths()
         self.warnings = []  # the sentences, printed to stderr
         self.records = []   # the same as {kind, item, why}, written to render-warnings.json
+
+    def _complete_paths(self):
+        """Rewrite a use case's files, a screen's file and a rule's source that an agent cited relative to a folder
+        inside the app (`PayslipsFeature/PayslipItem.swift:10`) to the full path of the one file that ends so. Without
+        it the core check sends the entry out of scope and the range check reports the file as not found."""
+        root_list = paths.roots(self.cfg)
+        index = paths.file_index(root_list)
+        for case in self.understood.get("useCases") or []:
+            if isinstance(case, dict) and isinstance(case.get("files"), list):
+                case["files"] = paths.complete(case["files"], root_list, index)
+        for screen in self.understood.get("screens") or []:
+            if isinstance(screen, dict) and screen.get("file"):
+                screen["file"] = paths.complete(screen["file"], root_list, index)
+        for rule in list(self.rules_in) + list(self.rules_out):
+            if isinstance(rule, dict) and rule.get("source"):
+                rule["source"] = paths.complete(rule["source"], root_list, index)
 
     def _check_ranges(self, groups):
         """Warn about every citation in the catalog entries that runs past the end of its file or names no file."""

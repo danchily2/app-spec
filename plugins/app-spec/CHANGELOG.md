@@ -5,6 +5,15 @@ changes.
 
 ## Unreleased
 
+Fixes found in the v3 payslips rerun (0.3.0 code).
+
+- **A citation relative to a folder inside the app resolves to its full path.** A rules extractor cited
+  `Features/Main/MainPayslipFeature.swift:251-254`, relative to the module, not the app root; the range check
+  reported it, but nothing fixed it, and the core check could send the rule out of scope. `render.py catalogs` now
+  rewrites a use case's files, a screen's file and a rule's source that name no file, but name the end of exactly one
+  real file, to that file's path from the app root (`paths.complete`). A path that fits no file, or several, stays as
+  cited and is still reported.
+
 ## 0.3.0 - 2026-11-02
 
 Fixes found in the second payslips run (Devin, v0.2.0).

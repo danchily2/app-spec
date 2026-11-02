@@ -3,6 +3,8 @@
 Agents cite `path:line` in three shapes: relative to the app root or a contract root (the only shape the grader
 resolves), absolute (`/Users/me/code/me-api/Controllers/X.cs:12`), or behind the root folder's name
 (`me-api/Controllers/X.cs:12`). `relativize` rewrites the last two into the first, in every string of a JSON value.
+A fourth shape is relative to a folder inside the root (`PayslipsFeature/PayslipItem.swift:10`); `complete` rewrites it
+to the one real file whose path ends with it.
 """
 
 import os
@@ -57,6 +59,40 @@ def relative_path(token, root_list):
             if rest and _exists(real, rest) and not _exists(real, token):
                 return rest
     return token
+
+
+_SKIP_DIRS = {"node_modules", "Pods", "build", "DerivedData"}
+
+
+def file_index(root_list):
+    """{file name: [paths relative to their root]} of every file under the roots, hidden and build folders left out."""
+    names = {}
+    for real, _ in root_list:
+        for base, dirs, files in os.walk(real):
+            dirs[:] = [d for d in dirs if not d.startswith(".") and d not in _SKIP_DIRS]
+            for f in files:
+                names.setdefault(f, []).append(os.path.relpath(os.path.join(base, f), real))
+    return names
+
+
+def complete(value, root_list, index):
+    """`value` (a string or a list of strings) with every path that names no file under a root, but names the end of
+    exactly one file in `index` (from `file_index`), rewritten to that file's full relative path. Other paths stay."""
+    if isinstance(value, list):
+        return [complete(v, root_list, index) for v in value]
+    if not isinstance(value, str):
+        return value
+
+    def fix(m):
+        cited = m.group(1)
+        if cited.startswith(("/", "~")) or "." not in cited.rsplit("/", 1)[-1]:
+            return cited
+        if any(_exists(real, cited) for real, _ in root_list):
+            return cited
+        matches = {p for p in index.get(cited.rsplit("/", 1)[-1], []) if p.endswith("/" + cited)}
+        return matches.pop() if len(matches) == 1 else cited
+
+    return _TOKEN.sub(fix, value)
 
 
 def relativize(value, root_list):
