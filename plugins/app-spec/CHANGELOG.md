@@ -5,6 +5,8 @@ changes.
 
 ## Unreleased
 
+## 0.4.0 - 2026-11-02
+
 Fixes found in the v3 payslips rerun (0.3.0 code).
 
 - **A review finding reaches every owner that states the behaviour.** Critic-1 sent the silent year-end failure to
