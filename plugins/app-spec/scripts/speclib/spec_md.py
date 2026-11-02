@@ -8,7 +8,7 @@ import json
 import os
 import re
 
-from . import out
+from . import out, paths
 from .common import die
 from .ids import element_slug
 from .template import APPENDICES, CITE_RE, EVIDENCE_LABELS, HEADINGS, header
@@ -77,7 +77,8 @@ class Context:
         self.module = out.load(dest, "module.json", {}) or {}
         self.ledger = out.load(dest, "ledger.json")
         prose = out.load(dest, "prose.json")
-        self.prose = prose if isinstance(prose, dict) else {}
+        # the writer may cite absolute or root-name paths: the spec shows them relative to their root
+        self.prose = paths.relativize(prose, paths.roots(self.cfg)) if isinstance(prose, dict) else {}
         self.has_prose = bool(self.prose)
         all_cases = self._catalog("use-cases.json", "useCases")
         self.all_cases = all_cases

@@ -24,6 +24,10 @@ Fixes found in a run on a native iOS payslips module.
   moves a use case whose files are all outside the core, a rule whose source is outside it, and a rule of such a use
   case to `out-of-scope.json`. The spec names them on one Dependencies line, and the skill asks a person to confirm
   the list after step 3.
+- **Citation paths are made root-relative.** `merge_contracts.py` rewrites every string of a reader envelope, and
+  `render.py spec` every string of `prose.json`, so an absolute path under the app or a contract root, or one that
+  starts with the root's folder name (`me-api/...`), becomes relative to that root and resolves in the grader. The
+  contract reader is told to cite that way.
 
 ## 0.1.0 - 2026-10-30
 

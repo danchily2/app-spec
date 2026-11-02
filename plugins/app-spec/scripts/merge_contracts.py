@@ -9,7 +9,8 @@ Each ENVELOPE is a JSON file in the contract reader's envelope shape:
      "disagreements": [{"endpoint", "field", "client", "backend", "note"}],
      "injectionFlags": ["file:line: ..."]}
 
-The envelopes are folded into `<out>/contracts_result.json` (an entry with the same id replaces the earlier one,
+Every string of an envelope is first rewritten so its citations are relative to the app root or a contract root: an
+absolute root and a leading `<root folder name>/` are stripped. The envelopes are then folded into `<out>/contracts_result.json` (an entry with the same id replaces the earlier one,
 disagreements and flags are added once), and then contracts_result.json is applied to endpoints.json. Without an
 ENVELOPE the saved contracts_result.json is applied again: run it after every `render.py catalogs` and `contracts.py`,
 because `render.py catalogs` writes endpoints.json from scratch.
@@ -35,7 +36,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from speclib import out  # noqa: E402
+from speclib import out, paths  # noqa: E402
 from speclib.common import die, load_json  # noqa: E402
 
 RESULT = "contracts_result.json"
@@ -44,10 +45,11 @@ FIELDS = ("request", "response", "errors", "auth")
 DISAGREEMENT_KEYS = ("field", "client", "backend", "note")
 
 
-def _envelope(path):
+def _envelope(path, root_list=()):
     data = load_json(path, None)
     if not isinstance(data, dict) or not isinstance(data.get("endpoints", []), list):
         die(f"{path} is not a contract reader envelope (a JSON object with an endpoints list)")
+    data = paths.relativize(data, list(root_list))
     return {
         "endpoints": [e for e in data.get("endpoints") or [] if isinstance(e, dict) and e.get("id")],
         "disagreements": [d for d in data.get("disagreements") or [] if isinstance(d, dict) and d.get("endpoint")],
@@ -133,11 +135,11 @@ def main(argv=None):
         print(__doc__.split("\n\n")[1].strip(), file=sys.stderr)
         return 2
     dest, envelopes = args[0], args[1:]
-    out.load_config(dest)
+    root_list = paths.roots(out.load_config(dest))
     saved = out.load(dest, RESULT, {}) or {}
     saved = saved if isinstance(saved, dict) else {}
     for path in envelopes:
-        saved = fold(saved, _envelope(path))
+        saved = fold(saved, _envelope(path, root_list))
     if envelopes:
         out.save(dest, RESULT, saved)
     if not saved.get("endpoints"):

@@ -143,3 +143,68 @@ class TestMerge(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCitationPaths(unittest.TestCase):
+    """Readers cite root-relative, `<root folder name>/...` and absolute paths; all three merge root-relative."""
+
+    def setUp(self):
+        import test_grade
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.grade_mod = test_grade
+        self.dest = test_grade.make_good(self.tmp)
+        self.contract = os.path.join(self.tmp, "me-api")
+        os.makedirs(os.path.join(self.contract, "Controllers"))
+        with open(os.path.join(self.contract, "Controllers", "PayslipController.cs"), "w") as fh:
+            fh.write("".join(f"line {i}\n" for i in range(1, 21)))
+        cfg = out.load_config(self.dest)
+        cfg["contracts"] = [{"path": self.contract, "name": "me-api", "commit": None}]
+        out.save(self.dest, "app-spec.json", cfg)
+        self.app = cfg["app"]["path"]
+        self.app_name = os.path.basename(self.app)
+
+    def test_three_path_shapes_merge_relative_and_resolve(self):
+        lst = self.grade_mod.LIST
+        ep = out.load(self.dest, "endpoints.json")["endpoints"][0]["id"]
+        env = os.path.join(self.tmp, "batch.json")
+        with open(env, "w") as fh:
+            json.dump({"endpoints": [{"id": ep, "label": "INFERRED",
+                                      "citations": [f"{lst}:8", f"{self.app_name}/{lst}:8", f"{self.app}/{lst}:8",
+                                                    "me-api/Controllers/PayslipController.cs:12",
+                                                    f"{self.contract}/Controllers/PayslipController.cs:3-4"]}],
+                       "disagreements": [
+                           {"endpoint": ep, "field": "id", "client": f"{self.app_name}/{lst}:8",
+                            "backend": "me-api/Controllers/PayslipController.cs:12", "note": "a"},
+                           {"endpoint": ep, "field": "date", "client": f"{self.app}/{lst}:8",
+                            "backend": f"{self.contract}/Controllers/PayslipController.cs:3", "note": "b"}]}, fh)
+        code, _, err = run_cli(["merge_contracts.py", self.dest, env])
+        self.assertEqual(code, 0, err)
+        saved = out.load(self.dest, merge_contracts.RESULT)
+        self.assertEqual(saved["endpoints"][0]["citations"],
+                         [f"{lst}:8"] * 3 + ["Controllers/PayslipController.cs:12", "Controllers/PayslipController.cs:3-4"])
+        self.assertEqual({(d["client"], d["backend"]) for d in saved["disagreements"]},
+                         {(f"{lst}:8", "Controllers/PayslipController.cs:12"),
+                          (f"{lst}:8", "Controllers/PayslipController.cs:3")})
+        import grade
+        import render
+        render.spec(self.dest)
+        self.assertTrue(self.grade_mod.check(grade.run(self.dest), "citations-resolve")["pass"])
+
+    def test_prose_paths_are_shown_relative(self):
+        import render
+        prose = out.load(self.dest, "prose.json")
+        lst = self.grade_mod.LIST
+        prose["summary"] = f"An employee reads their payslips. Source: `{self.app}/{lst}:8` and `{self.app_name}/{lst}:9`"
+        out.save(self.dest, "prose.json", prose)
+        text = render.spec(self.dest)
+        self.assertIn(f"Source: `{lst}:8` and `{lst}:9`", text)
+
+    def test_a_real_folder_named_like_the_root_is_kept(self):
+        from speclib import paths
+        os.makedirs(os.path.join(self.contract, "me-api"))
+        with open(os.path.join(self.contract, "me-api", "X.cs"), "w") as fh:
+            fh.write("x\n")
+        roots = paths.roots(out.load_config(self.dest))
+        self.assertEqual(paths.relativize("see me-api/X.cs:1", roots), "see me-api/X.cs:1")
+        self.assertEqual(paths.relativize("`~/nowhere/a/b.cs:1`", roots), "`~/nowhere/a/b.cs:1`")
