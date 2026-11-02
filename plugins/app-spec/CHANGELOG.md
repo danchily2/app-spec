@@ -5,6 +5,12 @@ changes.
 
 ## Unreleased
 
+- **A screen takes the fields of the sub-views it uses.** `PayslipRowView` and `PayslipDetailFooterView` (in the file
+  of SCR-008) and `YearEndReportView` (its own file, used by SCR-011) belonged to no screen, so their 8 fields were
+  uncovered and the ledger's fields class failed at 84.9 percent. A screen now also takes the `fields.json` elements
+  of each view its file uses (`Name(`, `Name {`, `Name.init`) that is not a mapped screen itself. On the v4 folder
+  the fields class reaches 100 percent.
+
 - **The skill says which role writes (P9).** Every agent prompt says read-only, while the path without the Workflow
   tool (and Devin, where one agent plays every role) needs that agent to save results. The skill now states that the
   agents only return JSON, that only the session writes, under `OUT`, and that for one agent in every role

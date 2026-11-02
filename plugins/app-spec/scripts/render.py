@@ -479,7 +479,28 @@ class _Catalogs:
         same = [s for s in self.fields if _path(s.get("file")) == file]
         named = [s for s in same if norm(s.get("screen")) == norm(screen.get("name"))]
         pick = named or (same if len(same) == 1 else [])
+        # the sub-views the screen's file uses (`PayslipRowView(...)`, `PayslipRow.init`, `YearEndReportView {`), in the
+        # same file or another one, when they are not mapped screens themselves: their elements are on this screen
+        mapped = {norm(s.get("name")) for s in self.understood.get("screens", []) if isinstance(s, dict)}
+        text = self._source_text(file)
+        for view in self.fields:
+            name = str(view.get("screen") or "")
+            if view in pick or not name or norm(name) in mapped or not text:
+                continue
+            if re.search(r"\b" + re.escape(name) + r"\s*(?:\(|\{|\.init\b)", text):
+                pick = pick + [view]
         return [dict(e) for s in pick for e in s.get("elements", [])]
+
+    def _source_text(self, rel):
+        """The text of the app file `rel`, read once, or '' when it cannot be read."""
+        cache = self.__dict__.setdefault("_texts", {})
+        if rel not in cache:
+            try:
+                with open(os.path.join(out.app_root(self.cfg), rel), encoding="utf-8", errors="replace") as fh:
+                    cache[rel] = fh.read()
+            except (OSError, TypeError, KeyError):
+                cache[rel] = ""
+        return cache[rel]
 
     def _elements(self, screen, sid):
         elements = self._fields_for(screen)

@@ -471,6 +471,25 @@ class TestCatalogs(unittest.TestCase):
         self.assertIn("Nowhere/Missing.swift:1", case["files"])  # no file ends so: left as cited, and reported
         self.assertFalse(any("PayslipsFeature/PayslipItem.swift:10-14: file not found" in w for w in warnings))
 
+    def test_a_screen_takes_the_fields_of_the_sub_views_its_file_uses(self):
+        # payslips v4: PayslipRowView and PayslipDetailFooterView (same file as SCR-008) and YearEndReportView (its own
+        # file, used by SCR-011) belonged to no screen, and the ledger's fields class failed at 84.9 percent
+        row_file = "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipRow.swift"
+        unused_file = "Modules/PayslipsFeature/Sources/PayslipsFeature/Unused.swift"
+
+        def fields(f):
+            f["screens"].append({"screen": "PayslipRow", "file": f"{row_file}:3", "scope": "core", "elements": [
+                {"kind": "text", "textKey": None, "text": "Net amount", "identifier": None, "file": row_file, "line": 5}]})
+            f["screens"].append({"screen": "UnusedView", "file": f"{unused_file}:3", "scope": "core", "elements": [
+                {"kind": "text", "textKey": None, "text": "Nobody", "identifier": None, "file": unused_file, "line": 4}]})
+        self.edit("fields.json", fields)  # PayslipListView.swift uses `PayslipRow.init`, nothing uses UnusedView
+        render.catalogs(self.out)
+        screens = {s["name"]: s for s in out.load(self.out, "screens.json")["screens"]}
+        texts = [e.get("text") for e in screens["PayslipListView"]["elements"]]
+        self.assertIn("Net amount", texts)
+        self.assertNotIn("Nobody", [e.get("text") for s in screens.values() for e in s["elements"]])
+        self.assertNotIn("Net amount", [e.get("text") for e in screens["PayslipDetailView"]["elements"]])
+
     def test_a_rule_names_its_use_case_by_id_and_its_conflicts(self):
         # P23: useCase was free text, so a name copied slightly wrong lost the link; no field held a conflict
         render.catalogs(self.out)
