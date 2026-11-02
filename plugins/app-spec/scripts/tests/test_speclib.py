@@ -40,6 +40,12 @@ class TestSpeclib(unittest.TestCase):
         self.assertEqual(inv["tcaReducers"][0]["kind"], "tca-reducer")
         self.assertEqual(inv["counts"]["tcaReducers"], 1)
 
+    def test_normalize_endpoint_drops_a_note_after_the_path(self):
+        from speclib.common import normalize_endpoint
+        self.assertEqual(normalize_endpoint("/employee/api/v1/Payslip/Export (single company)"),
+                         normalize_endpoint("/employee/api/v1/payslip/export"))
+        self.assertEqual(normalize_endpoint("/a/{id}/b (push path only; list passes the loaded item)"), "/a/{}/b")
+
     def test_out_roundtrip(self):
         path = out.save(self.tmp, "x.json", {"a": 1})
         self.assertEqual(out.load(self.tmp, "x.json"), {"a": 1})

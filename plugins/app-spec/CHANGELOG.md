@@ -35,6 +35,9 @@ Fixes found in the second payslips run (Devin, v0.2.0).
   card or a shortcut. `--module` together with `--scope` now adds the folders to the capability files instead of
   being ignored. In the second payslips run the Salary card and its shortcut were dropped as a neighbour module.
 
+- **A note after an endpoint path no longer makes a second endpoint.** `GET /x/{id} (push path only)` and
+  `GET /Payslip/Export (single company)` normalize to the same endpoint as the plain path.
+
 ## 0.2.0 - 2026-11-02
 
 Fixes found in a run on a native iOS payslips module.

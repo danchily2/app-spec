@@ -315,12 +315,13 @@ def normalize_endpoint(raw):
     """Normalize a URL or path to a comparable form.
 
     Scheme and host are dropped, parameters of any syntax (${x}, \\(x), {x}, :x, %@, <x>) become {}, the query and
-    fragment are dropped, duplicate slashes collapse, trailing slashes go, and the result is lowercase. Returns None
+    fragment are dropped, a note after the first space is dropped, duplicate slashes collapse, trailing slashes go, and the result is lowercase. Returns None
     for something that is not path-shaped.
     """
     if raw is None:
         return None
     s = str(raw).strip().strip("\"'`")
+    s = s.split()[0] if s.split() else s  # a path has no spaces: drop a note such as " (push path only)"
     s = _HOST.sub("", s)
     s = _replace_templates(s)
     s = _PARAM.sub("{}", s)
