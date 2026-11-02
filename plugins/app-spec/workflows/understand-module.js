@@ -3,7 +3,7 @@ export const meta = {
   description:
     'Use cases, screens and flows of one module of one mobile app: one stack analyst per shard extracts use-case fragments with screen states and fields, one mapper merges every fragment into use cases, screens and flows, one referee per use case re-checks the citations',
   whenToUse:
-    'Invoked by the app-spec skill when the Workflow tool is available. Requires args {out, app: {name, path, stack}, shards: [{id, kind, name, loc, file}], capabilityIndex?} - build the shards with scripts/module.py first: each shard names a small JSON file under <out>/shards/ (its files and inventory hints) that its analyst reads, so the call carries no file lists. Returns the understand_result.json shape {useCases, screens, flows, outOfScope, rejected, unverified, corrected, injectionFlags, rerunShards, stats}; the calling session saves it as <out>/understand_result.json and renders it with scripts/render.py. Resumable after a stop: re-invoke with identical args plus resumeFromRunId.',
+    'Invoked by the app-spec skill when the Workflow tool is available. Requires args {out, app: {name, path, stack}, shards: [{id, kind, name, loc, file}], capabilityIndex?} - build the shards with scripts/module.py first: each shard names a small JSON file under <out>/shards/ (its files and inventory hints) that its analyst reads, so the call carries no file lists. Returns the understand_result.json shape {useCases, screens, flows, outOfScope, rejected, unverified, corrected, injectionFlags, agentConfig, rerunShards, stats}; the calling session saves it as <out>/understand_result.json and renders it with scripts/render.py. Resumable after a stop: re-invoke with identical args plus resumeFromRunId.',
   phases: [
     { title: 'Extract', detail: 'one stack analyst per shard: use-case fragments with screens, states and fields' },
     { title: 'Map', detail: 'one mapper merges every fragment into use cases, screens and flows' },
@@ -236,11 +236,18 @@ function foldOutOfScope(items) {
 }
 const agentFor = stack =>
   stack === 'ios-native' ? 'app-spec:ios-analyst' : stack === 'android-native' ? 'app-spec:android-analyst' : 'app-spec:rn-analyst'
+// The analysed repo's own agent configuration (CLAUDE.md, AGENTS.md, .claude/, .cursor/ ...) speaks to AI tools by
+// design: it is reported as agentConfig ("agent config, not followed"), not as planted text in injectionFlags.
+const AGENT_CONFIG = /(^|[\/\s`'"])(?:CLAUDE\.md|AGENTS\.md|GEMINI\.md|\.cursorrules|\.windsurfrules|copilot-instructions\.md)(?::|\s|$)|(^|[\/\s`'"])\.(?:claude|cursor|windsurf)\//
+const splitFlags = flags => {
+  const all = [...new Set((flags || []).map(String))]
+  return { injectionFlags: all.filter(f => !AGENT_CONFIG.test(f)), agentConfig: all.filter(f => AGENT_CONFIG.test(f)) }
+}
 const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 // a name without parenthetical notes and capability ids: "Learn why I have no payslips (CAP-231)" is the kept use case
 const coreName = s => norm(String(s || '').replace(/\([^()]*\)/g, ' ').replace(/\bCAP-\d+\b/gi, ' '))
 const empty = (extra = {}) => ({
-  useCases: [], screens: [], flows: [], outOfScope: [], rejected: [], unverified: [], injectionFlags: [], rerunShards: [],
+  useCases: [], screens: [], flows: [], outOfScope: [], rejected: [], unverified: [], injectionFlags: [], agentConfig: [], rerunShards: [],
   stats: { shards: shards.length, fragments: 0, useCases: 0, screens: 0, flows: 0, rejected: 0 }, ...extra,
 })
 
@@ -287,7 +294,7 @@ extracted.forEach((r, i) => {
   for (const x of r.outOfScope || []) outOfScope.push({ ...x, shard: s.id })
 })
 log(`${fragments.length} fragment(s) from ${shards.length - rerunShards.length} shard(s)`)
-if (!fragments.length) return empty({ outOfScope: foldOutOfScope(outOfScope), injectionFlags: [...new Set(injectionFlags)], rerunShards })
+if (!fragments.length) return empty({ outOfScope: foldOutOfScope(outOfScope), ...splitFlags(injectionFlags), rerunShards })
 
 // ---- Map: one mapper over every fragment -------------------------------------------------------------------------
 phase('Map')
@@ -321,7 +328,7 @@ if (!mapped) {
   return empty({
     unverified,
     outOfScope: foldOutOfScope(outOfScope),
-    injectionFlags: [...new Set(injectionFlags)],
+    ...splitFlags(injectionFlags),
     rerunShards,
     stats: { shards: shards.length, fragments: fragments.length, useCases: 0, screens: 0, flows: 0, rejected: 0 },
   })
@@ -427,7 +434,7 @@ return {
   unverified,
   // {name, field, from, to, citation}: what the referees corrected in kept use cases
   corrected,
-  injectionFlags: [...new Set(injectionFlags)],
+  ...splitFlags(injectionFlags),
   rerunShards,
   stats: {
     shards: shards.length,

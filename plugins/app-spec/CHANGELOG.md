@@ -7,6 +7,10 @@ changes.
 
 Agent and schema fixes from the Devin run-2 register, group C.
 
+- **The analysed repo's own agent configuration is not an injection (P27).** `CLAUDE.md`, `AGENTS.md` and `.claude/`
+  files of the source app were reported as planted text. Both workflows now return them in `agentConfig` ("agent
+  config, not followed") and keep `injectionFlags` for the rest.
+
 - **The mapper names the injection field the schema has (P16).** `use-case-mapper.md` told the agent to report
   instruction-shaped text in "the flags field", and the workflow prompt said "injectionSuspects (or flags)"; the
   schema has only `injectionSuspects`, so a strict schema run could lose the flags. Both now say `injectionSuspects`.

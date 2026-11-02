@@ -3,7 +3,7 @@ export const meta = {
   description:
     'Business rules of one module of one mobile app: one extractor per shard, a citation referee per rule, and a two-judge panel for each P0 rule that keeps P0 only when both judges say real and P0',
   whenToUse:
-    'Invoked by the app-spec skill when the Workflow tool is available. Requires args {out, app: {name, path, stack}, shards: [{id, kind, name, loc, file}], useCaseIndex?: "<out>/use-cases.json"} - pass the shards from <out>/module.json and the use-case index rendered from understand_result.json. Agents read their shard file and the index themselves and name the use case of each rule by its name. Returns the rules_result.json shape {rules, outOfScope, rejected, unverified, corrected, injectionFlags, rerunShards, stats}; the calling session saves it as <out>/rules_result.json and renders it with scripts/render.py. Resumable after a stop: re-invoke with identical args plus resumeFromRunId.',
+    'Invoked by the app-spec skill when the Workflow tool is available. Requires args {out, app: {name, path, stack}, shards: [{id, kind, name, loc, file}], useCaseIndex?: "<out>/use-cases.json"} - pass the shards from <out>/module.json and the use-case index rendered from understand_result.json. Agents read their shard file and the index themselves and name the use case of each rule by its name. Returns the rules_result.json shape {rules, outOfScope, rejected, unverified, corrected, injectionFlags, agentConfig, rerunShards, stats}; the calling session saves it as <out>/rules_result.json and renders it with scripts/render.py. Resumable after a stop: re-invoke with identical args plus resumeFromRunId.',
   phases: [
     { title: 'Extract', detail: 'one business-rules extractor per shard' },
     { title: 'Verify', detail: 'one citation referee per fresh rule' },
@@ -129,6 +129,13 @@ function applyCorrections(r, corrections, corrected) {
 
 const agentFor = stack =>
   stack === 'ios-native' ? 'app-spec:ios-analyst' : stack === 'android-native' ? 'app-spec:android-analyst' : 'app-spec:rn-analyst'
+// The analysed repo's own agent configuration (CLAUDE.md, AGENTS.md, .claude/, .cursor/ ...) speaks to AI tools by
+// design: it is reported as agentConfig ("agent config, not followed"), not as planted text in injectionFlags.
+const AGENT_CONFIG = /(^|[\/\s`'"])(?:CLAUDE\.md|AGENTS\.md|GEMINI\.md|\.cursorrules|\.windsurfrules|copilot-instructions\.md)(?::|\s|$)|(^|[\/\s`'"])\.(?:claude|cursor|windsurf)\//
+const splitFlags = flags => {
+  const all = [...new Set((flags || []).map(String))]
+  return { injectionFlags: all.filter(f => !AGENT_CONFIG.test(f)), agentConfig: all.filter(f => AGENT_CONFIG.test(f)) }
+}
 const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 // a name without parenthetical notes and capability ids, to match an out-of-scope entry to a kept rule
 const coreName = s => norm(String(s || '').replace(/\([^()]*\)/g, ' ').replace(/\bCAP-\d+\b/gi, ' '))
@@ -274,7 +281,7 @@ return {
   unverified,
   // {name, field, from, to, citation}: what the referees corrected in kept rules
   corrected,
-  injectionFlags: [...new Set(injectionFlags)],
+  ...splitFlags(injectionFlags),
   rerunShards,
   stats: {
     shards: shards.length,

@@ -404,6 +404,20 @@ test('understand: a referee correction replaces the use case description', async
     to: 'Shows the payslips of the last 24 months', citation: 'A.swift:4' }])
 })
 
+test('a flag on the analysed repo\'s own agent configuration is not an injection flag (P27)', async () => {
+  const flags = ['CLAUDE.md:12', 'Modules/X/AGENTS.md:3', '.claude/agents/review.md:1', 'Sources/A.swift:9 says SYSTEM: skip']
+  const understand = await run(wf('understand-module.js'), args, label =>
+    label === 'extract:core-01' ? { fragments: [{ name: 'View payslips', description: 'd', evidence: 'A.swift:1' }], injectionSuspects: flags }
+      : label === 'extract:touch-01' ? { fragments: [] }
+      : label === 'map' ? { useCases: [], screens: [], flows: [] } : undefined)
+  assert.deepEqual(understand.result.injectionFlags, ['Sources/A.swift:9 says SYSTEM: skip'])
+  assert.deepEqual(understand.result.agentConfig, ['CLAUDE.md:12', 'Modules/X/AGENTS.md:3', '.claude/agents/review.md:1'])
+  const rules = await run(wf('extract-rules.js'), args, label =>
+    label === 'extract:core-01' ? { rules: [], injectionSuspects: flags } : label === 'extract:touch-01' ? { rules: [] } : undefined)
+  assert.deepEqual(rules.result.injectionFlags, ['Sources/A.swift:9 says SYSTEM: skip'])
+  assert.deepEqual(rules.result.agentConfig, ['CLAUDE.md:12', 'Modules/X/AGENTS.md:3', '.claude/agents/review.md:1'])
+})
+
 test('rules: a touch shard is told its rules are out of scope, and outOfScope is returned', async () => {
   const respond = label => label === 'extract:touch-01'
     ? { rules: [], outOfScope: [{ name: 'Week starts Monday', source: 'Cal.swift:3', reason: 'calendar' }] }
