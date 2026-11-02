@@ -246,4 +246,12 @@ Add one entry per round: date, items, commits, release tag, run folder, scorecar
   defect; the runner now sets the variable to 0. Folder kept as `payslips-v5-aborted`. Its 0.5.0 inventory confirms
   Round 2: 11 endpoints (allpayslips, allreports, report detail found), 6 events, 46 string keys (v4: 5, 0, 7).
   v5 restarted into `payslips-v5`.
+- **Round 4 (2026-11-02, while v5 runs):** branch `fix/round4-rules-schema` (pushed), not released. Group C rest:
+  P23 (`6960c31`, rule use case by id + `conflictsWith`), P9 (`7dbcb04`, "Who writes"). v4 leftovers: sub-view fields
+  on their screen (`2249b04`; v4 data: fields 84.9 -> 100 percent, citation warnings 3 -> 0). v5 manual step:
+  `save_json.py` reads a tool-result file the harness stores for a large answer (`9665a53`, test fixed in
+  `661b126`: a grep in the command chain hid one failing test at commit time). Group D: shards keep to one top folder
+  (`387e118`). Group E: N1 plugin version in `app-spec.json` (`c8f0b5b`). Tests: 386 Python, 36 Node.
+  Left in group E: N2/P3/P24 (single-judge label without the Workflow tool), P20/P22 (runner: needs Dan's Devin
+  files), N3 (Devin allow-list doc).
 
