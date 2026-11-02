@@ -5,6 +5,8 @@ changes.
 
 ## Unreleased
 
+## 0.5.0 - 2026-11-02
+
 Fixes found in the v4 payslips run (0.4.0, headless).
 
 - **Partial paths resolve in every field, not only the source.** RULE-108 cited

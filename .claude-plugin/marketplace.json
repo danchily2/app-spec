@@ -11,7 +11,7 @@
       "name": "app-spec",
       "source": "./plugins/app-spec",
       "description": "Turn one module of an existing mobile app (native iOS, React Native, native Android) into a reviewed spec with a coverage ledger, ready to plan and build in a new app.",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "category": "development",
       "tags": ["mobile", "ios", "android", "react-native", "spec", "migration"]
     }
