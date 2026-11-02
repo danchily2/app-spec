@@ -107,6 +107,7 @@ scarlet-team-c calendar spec as the bar) to check that the fixes did not overfit
 | 2 (Devin) | v0.2.0 | 21 | 11 (0) | 9/9 / 1 | ~30 (1) | fail | fail, screens 26/28 | 2 / 0 | N3 approvals |
 | v3 | branch `2ab0bd1`→`a1c1138` | 31 | 11 (0) | 9/9 / 5 | 85 (0) | pass | fail, fields 51/58, strings 0/1 | 0 / 2 | 5 plugin fixes made mid-run, 1 rule path patched by hand |
 | v4 | 0.4.0, headless, **partial** (usage limit hit after pass 1, $55.84) | 31 | 11 (0); 32 out of scope | 9 / 5 (4 INFERRED, not in inventory) | 87 (2); 84 referee corrections | fail (1 citation past end of file) | fail, fields 84.9%, strings 0/1 | 1 / 3 after pass 1 (pass 2 never ran) | 0 by hand; 1 denied workaround (transcript grep to save a contract batch) |
+| v5 | 0.5.0, headless, 2 passes, $72.66 | 37 | 10 (0); all 6 in-scope caps | 11 / 6 (4 reached through a service stay INFERRED, no reason) | 162 (2): duplicates from the rules re-run | fail: bare file names + `ViewModel` | fail, strings 58.7% (19 start-page keys) | 2 / 3 after pass 2 (4 of 5 are rule findings pass 1 already raised) | 1 kind, 3 times: large answers stored as files (fixed in Round 4) |
 
 ## Backlog, ranked
 
@@ -168,6 +169,18 @@ Fix in this order unless a later run shows a higher-impact defect. Ids P-n and N
 23. **No clear way to save an agent's answer.** The run grepped subagent transcripts for the contract batch (denied).
     State in the skill how the answer reaches `save_json.py` (write it with the Write tool, then save).
 24. **84 of 87 rules corrected by referees.** Check whether the referees rewrite text that was right.
+
+### Round 5: defects the v5 run found
+
+25. **A `rules` finding cannot be fixed.** Step 7.5 re-runs the extraction on the shard; the new cards get new
+    source keys, so `patch_result.py` adds them beside the old ones (87 -> 162 rules, pairs such as RULE-031/125),
+    and the wrong old cards stay. Give the rules owner the finding and the named cards and take back corrected cards
+    with the same name and source, plus `remove`.
+26. **Endpoints reached through a service stay INFERRED.** A use case cites `ReportsService.swift` (the endpoint's
+    `usedBy`), not the request file, so the label is never VERIFIED and the endpoint has no reason.
+27. **The grader does not resolve a bare file name** that exactly one file has, while the catalog check does.
+28. **Strings of the start page** (in core because of the Salary card) fail the strings class: a person reason, or
+    count only keys a kept screen or use case uses.
 
 ### Round 3: agent and schema consistency (group C)
 
@@ -254,4 +267,7 @@ Add one entry per round: date, items, commits, release tag, run folder, scorecar
   (`387e118`). Group E: N1 plugin version in `app-spec.json` (`c8f0b5b`). Tests: 386 Python, 36 Node.
   Left in group E: N2/P3/P24 (single-judge label without the Workflow tool), P20/P22 (runner: needs Dan's Devin
   files), N3 (Devin allow-list doc).
+- **v5 assessment (2026-11-02):** full run, both passes, $72.66; render warnings 0 (v4: 40), fields 92.5% (100% with
+  Round 4), all in-scope capabilities covered. Exit criteria not met: items 25-28 (Round 5). Manual step: large answers
+  stored as files, 3 times (fixed in Round 4, `9665a53`).
 
