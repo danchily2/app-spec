@@ -121,6 +121,14 @@ class TestModule(unittest.TestCase):
         mod = out.load(self.tmp, "module.json")
         self.assertEqual(mod["core"], ["Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipListView.swift"])
 
+    def test_cli_module_with_scope_adds_the_folders_to_the_capability_files(self):
+        rc, _, err = run_cli(["module.py", IOS, "--capabilities", INDEX, "--scope", "CAP-001",
+                              "--module", "EmployeeServices/Payslips", "--out", self.tmp])
+        self.assertEqual(rc, 0, err)
+        core = json.load(open(os.path.join(self.tmp, "module.json")))["core"]
+        self.assertIn("Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipListView.swift", core)
+        self.assertIn("EmployeeServices/Payslips/Sources/Payslips/GetPayslips.swift", core)
+
     def test_cli_scope_with_no_ids_exits_2(self):
         rc, _, err = run_cli(["module.py", IOS, "--capabilities", INDEX, "--scope", ",", "--out", self.tmp])
         self.assertEqual(rc, 2)

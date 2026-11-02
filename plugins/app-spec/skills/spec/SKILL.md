@@ -10,7 +10,7 @@ Write the spec of one module of one app. The arguments are `$ARGUMENTS`:
 | Argument | Meaning |
 | --- | --- |
 | `<app>` | The app's folder. Read-only: nothing is ever written under it |
-| `--module` | A folder name, folder or glob inside the app. Repeat for several. Not needed with `--scope` |
+| `--module` | A folder name, folder, source file or glob inside the app. Repeat for several. Not needed with `--scope`; with it, the folders join the capability files |
 | `--out DIR` | The output folder. Default `./specs/<first module name in lower case>`. Must be outside the app and every contract repository, and hold no contract repository |
 | `--name FILE` | The spec's file name inside `--out`. Default `SPEC.md` |
 | `--contracts REPO ...` | Backend repositories read as contract sources. Read-only |
@@ -109,6 +109,7 @@ it adds the use-case index):
 python3 -c 'import json,os,sys; o=os.path.realpath(sys.argv[1]); c=json.load(open(o+"/app-spec.json")); m=json.load(open(o+"/module.json"))
 a={"out":o,"app":{k:c["app"][k] for k in ("name","path","stack")},"shards":[dict({k:s[k] for k in ("id","kind","name","loc")},file=o+"/"+s["file"]) for s in m["shards"]]}
 if c.get("capabilityIndex") and sys.argv[2:]!=["rules"]: a["capabilityIndex"]=c["capabilityIndex"]
+if c.get("capabilityIndex") and c.get("scope"): a["scopeCapabilities"]=[{k:x.get(k) for k in ("id","name","description")} for x in json.load(open(c["capabilityIndex"])).get("capabilities",[]) if x.get("id") in c["scope"]]
 if sys.argv[2:]==["rules"]: a["useCaseIndex"]=o+"/use-cases.json"
 print(json.dumps(a))' OUT [rules]
 ```

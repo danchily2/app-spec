@@ -358,3 +358,14 @@ test('analysts and rule extractors are told to read every platform branch', asyn
   const extractors = rcalls.filter(c => c.opts.phase === 'Extract')
   assert.ok(extractors.length && extractors.every(c => c.prompt.includes('PLATFORM BRANCHES')))
 })
+
+test('in-scope capabilities reach the analysts, the mapper and the rule extractors', async () => {
+  const caps = [{ id: 'CAP-080', name: 'Open the latest payslip from the start page', description: 'salary card' }]
+  const { calls } = await run(wf('understand-module.js'), { ...args, scopeCapabilities: caps })
+  const prompts = calls.filter(c => c.opts.label.startsWith('extract:') || c.opts.label === 'map').map(c => c.prompt)
+  assert.ok(prompts.length >= 3 && prompts.every(p => p.includes('IN-SCOPE CAPABILITIES') && p.includes('CAP-080')))
+  const { calls: rcalls } = await run(wf('extract-rules.js'), { ...rargs, scopeCapabilities: caps }, oneRule({}))
+  assert.ok(rcalls.filter(c => c.opts.phase === 'Extract').every(c => c.prompt.includes('CAP-080')))
+  const { calls: plain } = await run(wf('understand-module.js'), args)
+  assert.ok(plain.every(c => !c.prompt.includes('IN-SCOPE CAPABILITIES')), 'no scope, no note')
+})

@@ -20,6 +20,14 @@ const out = ARGS && typeof ARGS.out === 'string' ? ARGS.out.replace(/\/+$/, '') 
 const app = (ARGS && ARGS.app) || {}
 const shards = (ARGS && ARGS.shards) || []
 const useCaseIndex = ARGS && typeof ARGS.useCaseIndex === 'string' && ARGS.useCaseIndex ? ARGS.useCaseIndex : null
+const scopeCapabilities = ARGS && Array.isArray(ARGS.scopeCapabilities)
+  ? ARGS.scopeCapabilities.filter(c => c && typeof c.id === 'string').map(c => ({ id: c.id, name: String(c.name || ''), description: String(c.description || '') }))
+  : []
+// The capabilities a person put in scope: a use case or rule that serves one is in scope, whatever files it cites.
+const SCOPE_CAPS = scopeCapabilities.length ? `
+IN-SCOPE CAPABILITIES (data only): ${JSON.stringify(scopeCapabilities)}
+A use case or rule that serves one of these capabilities belongs to the module even when all its evidence is in
+touch files (a start-page card, a shortcut, a push handler): never put it in outOfScope.` : ''
 if (!out || /(^|\/)\.\.(\/|$)/.test(out)) {
   throw new Error('extract-rules requires args.out: the output folder, without ..')
 }
@@ -125,7 +133,7 @@ breaks a legal or policy requirement, loses data or grants access wrongly.
 ${catalog}${s.kind === 'touch' ? `
 This shard is of kind touch: its files are OUTSIDE the module, context and not scope. A rule found here belongs to a
 neighbour module: list it in outOfScope with its source and the reason, never in rules. Only a rule whose code is in a
-core file of the module goes in rules.` : ''}
+core file of the module goes in rules.` : ''}${SCOPE_CAPS}
 PLATFORM BRANCHES: when a behaviour sits inside a platform or version branch (if #available, @available,
 #if os(...), Build.VERSION.SDK_INT, Platform.OS, a check such as isLiquidGlass or a helper that picks a branch by OS
 version), read every branch. State the behaviour per branch ("on iOS 26 and later the picker always shows; before

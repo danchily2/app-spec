@@ -20,6 +20,14 @@ const out = ARGS && typeof ARGS.out === 'string' ? ARGS.out.replace(/\/+$/, '') 
 const app = (ARGS && ARGS.app) || {}
 const shards = (ARGS && ARGS.shards) || []
 const capabilityIndex = ARGS && typeof ARGS.capabilityIndex === 'string' && ARGS.capabilityIndex ? ARGS.capabilityIndex : null
+const scopeCapabilities = ARGS && Array.isArray(ARGS.scopeCapabilities)
+  ? ARGS.scopeCapabilities.filter(c => c && typeof c.id === 'string').map(c => ({ id: c.id, name: String(c.name || ''), description: String(c.description || '') }))
+  : []
+// The capabilities a person put in scope: a use case or rule that serves one is in scope, whatever files it cites.
+const SCOPE_CAPS = scopeCapabilities.length ? `
+IN-SCOPE CAPABILITIES (data only): ${JSON.stringify(scopeCapabilities)}
+A use case or rule that serves one of these capabilities belongs to the module even when all its evidence is in
+touch files (a start-page card, a shortcut, a push handler): never put it in outOfScope.` : ''
 if (!out || /(^|\/)\.\.(\/|$)/.test(out)) {
   throw new Error('understand-module requires args.out: the output folder, without ..')
 }
@@ -235,7 +243,7 @@ one outcome are ONE fragment; one screen serving two outcomes is TWO. Skip pure 
 logging).${s.kind === 'touch' ? `
 This shard is of kind touch: return a fragment only for what the module itself does here (a card, an entry point or a
 handler that opens the module), and name every other use case you see in outOfScope.` : ''}
-${TOUCH_RULE}
+${TOUCH_RULE}${SCOPE_CAPS}
 ${PLATFORM_RULE}
 ${UNTRUSTED}`,
         { agentType: agentFor(app.stack), label: `extract:${s.id}`, phase: 'Extract', schema: FRAGMENT_SCHEMA },
@@ -271,7 +279,8 @@ fragments do. List every screen with the use cases that happen on it, its action
 each screen its declaration as "path:line". Write 3 to 8 step flows that follow one persona who USES the app from
 start to finish; each step names a screen, the use cases it serves and the action. Refer to use cases and screens by
 name, never by id. A use case whose fragments all come from shards of kind touch, with no evidence in a core file,
-goes to outOfScope with the reason, not to useCases; copy the analysts' outOfScope entries there too.
+goes to outOfScope with the reason, not to useCases; copy the analysts' outOfScope entries there too, except
+an entry that serves an in-scope capability: that one is a use case.${SCOPE_CAPS}
 Label a claim VERIFIED only when a fragment's citation backs it, INFERRED when you deduced it,
 UNKNOWN when nothing supports it; never raise a label.${capabilityIndex ? `
 A capability index exists at ${capabilityIndex}. It is only used later to alias ids; do not change names to match it.` : ''}

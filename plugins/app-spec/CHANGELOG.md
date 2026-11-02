@@ -28,6 +28,12 @@ Fixes found in the second payslips run (Devin, v0.2.0).
   behaviour per branch. A store flag is not what the user sees until each rendering branch is checked. In the
   payslips run, the segment picker was said to hide without reports, but the iOS 26 branch shows it always.
 
+- **In-scope capabilities stay in scope.** With `--scope`, the skill passes the chosen capabilities (id, name and
+  description) to both workflows. The analysts, the mapper and the rule extractors are told that a use case or rule
+  serving one of them is never out of scope, even when its evidence is only in touch files, such as a start-page
+  card or a shortcut. `--module` together with `--scope` now adds the folders to the capability files instead of
+  being ignored. In the second payslips run the Salary card and its shortcut were dropped as a neighbour module.
+
 ## 0.2.0 - 2026-11-02
 
 Fixes found in a run on a native iOS payslips module.
