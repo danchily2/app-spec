@@ -17,6 +17,11 @@ Fixes found in the v4 payslips run (0.4.0, headless).
   line when it starts inside the file and ends at most 3 lines past it, and records a `clamped` entry in
   `render-warnings.json`. A range further past the end is a wrong citation and is still reported as `citation`.
 
+- **A touch shard keeps the rules of the module's use cases.** The year-end rules in `ReportsService.swift` (a touch
+  file the module calls) went out of scope, and four `scope` warnings said they cite a kept use case's code. With a
+  use-case index, the touch-shard extractor is now told that a rule serving an indexed use case goes in `rules` with
+  that use case. With a capability scope, `render.py` already keeps such a rule; without one, it still leaves.
+
 Agent and schema fixes from the Devin run-2 register, group C.
 
 - **The analysed repo's own agent configuration is not an injection (P27).** `CLAUDE.md`, `AGENTS.md` and `.claude/`

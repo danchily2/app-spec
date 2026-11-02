@@ -161,9 +161,13 @@ formatting and rounding a user relies on, offline/retry/cache/session policies. 
 network plumbing. Given/When/Then with concrete values; one source range per rule; P0 when a wrong result moves money,
 breaks a legal or policy requirement, loses data or grants access wrongly.
 ${catalog}${s.kind === 'touch' ? `
-This shard is of kind touch: its files are OUTSIDE the module, context and not scope. A rule found here belongs to a
+This shard is of kind touch: its files are OUTSIDE the module, context and not scope. ${useCaseIndex
+  ? `A rule found here that serves a use case of the index (the module calls this code for it, such as a shared
+service the module's screen uses) goes in rules, with that use case's name in useCase. Any other rule belongs to a
+neighbour module: list it in outOfScope with its source and the reason.`
+  : `A rule found here belongs to a
 neighbour module: list it in outOfScope with its source and the reason, never in rules. Only a rule whose code is in a
-core file of the module goes in rules.` : ''}${SCOPE_CAPS}
+core file of the module goes in rules.`}` : ''}${SCOPE_CAPS}
 PLATFORM BRANCHES: when a behaviour sits inside a platform or version branch (if #available, @available,
 #if os(...), Build.VERSION.SDK_INT, Platform.OS, a check such as isLiquidGlass or a helper that picks a branch by OS
 version), read every branch. State the behaviour per branch ("on iOS 26 and later the picker always shows; before

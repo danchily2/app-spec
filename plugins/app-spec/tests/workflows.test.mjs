@@ -418,6 +418,17 @@ test('a flag on the analysed repo\'s own agent configuration is not an injection
   assert.deepEqual(rules.result.agentConfig, ['CLAUDE.md:12', 'Modules/X/AGENTS.md:3', '.claude/agents/review.md:1'])
 })
 
+test('rules: with a use-case index, a touch shard keeps the rules of indexed use cases', async () => {
+  // payslips v4: year-end rules in ReportsService.swift (a touch file) went out of scope although the module's
+  // use case "View my year-end reports" was in the index
+  const withIndex = await run(wf('extract-rules.js'), { ...args, useCaseIndex: 'o/use-cases.json' }, () => undefined)
+  const touch = withIndex.calls.find(c => c.opts.label === 'extract:touch-01').prompt
+  assert.ok(touch.includes('serves a use case of the index'), touch)
+  assert.ok(!touch.includes('never in rules'))
+  const without = await run(wf('extract-rules.js'), args, () => undefined)
+  assert.ok(without.calls.find(c => c.opts.label === 'extract:touch-01').prompt.includes('never in rules'))
+})
+
 test('rules: a touch shard is told its rules are out of scope, and outOfScope is returned', async () => {
   const respond = label => label === 'extract:touch-01'
     ? { rules: [], outOfScope: [{ name: 'Week starts Monday', source: 'Cal.swift:3', reason: 'calendar' }] }
