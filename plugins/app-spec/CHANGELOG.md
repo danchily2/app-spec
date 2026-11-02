@@ -22,6 +22,12 @@ Fixes found in the v4 payslips run (0.4.0, headless).
   use-case index, the touch-shard extractor is now told that a rule serving an indexed use case goes in `rules` with
   that use case. With a capability scope, `render.py` already keeps such a rule; without one, it still leaves.
 
+- **A navigation coordinator is not a screen.** The mapper listed `PayslipsListCoordinator`,
+  `ShowPayslipCoordinator`, `PresentPayslipCoordinator` and `ShowEndYearCoordinator` as SCR-015 to SCR-018, with
+  old-app plumbing as their states (critic-1, High). The mapper prompt now says a coordinator is never a screen, and
+  `render.py catalogs` leaves out a mapped screen that is an inventory coordinator and no inventory screen, with
+  one `screen` warning; the use cases and flows that named it drop the name without more warnings.
+
 Agent and schema fixes from the Devin run-2 register, group C.
 
 - **The analysed repo's own agent configuration is not an injection (P27).** `CLAUDE.md`, `AGENTS.md` and `.claude/`

@@ -19,7 +19,9 @@ citations. Open the cited code with Read or Grep when two fragments disagree or 
   fragments that describe the same outcome, even when the code calls it differently ("Leave request" and "Absence").
   Split a fragment that mixes two outcomes into one use case for each.
 - **Screens keep the analysts' names.** Name each screen exactly as the fragments do. Never rename or invent a screen.
-  A screen lists the use cases that happen on it and every action the user can take on it.
+  A screen lists the use cases that happen on it and every action the user can take on it. A navigation coordinator,
+  router or presenter that only shows other screens has no UI of its own and is never a screen: put what it decides
+  (which screen opens, from a push, after an account switch) in the use cases and flows.
 - **States are part of the screen.** For each screen list the states the code handles: loading, empty, error, success,
   offline, no permission and confirmation. Give each state what the user sees, and its evidence. Do not list a state
   that no code or fragment shows.

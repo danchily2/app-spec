@@ -471,6 +471,24 @@ class TestCatalogs(unittest.TestCase):
         self.assertIn("Nowhere/Missing.swift:1", case["files"])  # no file ends so: left as cited, and reported
         self.assertFalse(any("PayslipsFeature/PayslipItem.swift:10-14: file not found" in w for w in warnings))
 
+    def test_a_coordinator_is_not_a_screen(self):
+        # payslips v4 critic-1 (High): SCR-015 to SCR-018 were navigation coordinators the mapper listed as screens
+        coord = "Employee/Payslips/Coordinator/PayslipsCoordinator.swift:5"
+        inv = out.load(self.out, "inventory.json")
+        inv.setdefault("coordinators", []).append({"name": "PayslipsCoordinator", "kind": "class", "file": coord})
+        out.save(self.out, "inventory.json", inv)
+
+        def understood(u):
+            u["screens"].append({"name": "PayslipsCoordinator", "file": coord, "useCases": ["View payslip list"],
+                                 "actions": [], "states": [], "fields": []})
+            u["useCases"][0].setdefault("screens", []).append("PayslipsCoordinator")
+        self.edit("understand_result.json", understood)
+        warnings = self.warnings()
+        self.assertNotIn("PayslipsCoordinator", [s["name"] for s in out.load(self.out, "screens.json")["screens"]])
+        self.assertIn("screen PayslipsCoordinator is the navigation coordinator of "
+                      "Employee/Payslips/Coordinator/PayslipsCoordinator.swift, not a screen; it is left out", warnings)
+        self.assertFalse(any("names the screen PayslipsCoordinator" in w for w in warnings))
+
     def test_a_range_that_runs_past_the_end_of_its_file_is_clamped(self):
         # payslips v4: UC-033 cited PayslipsListCoordinator.swift:25-124 in a 123-line file, and the grade failed
         item = "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift"  # 14 lines

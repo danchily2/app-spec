@@ -152,6 +152,7 @@ class _Catalogs:
         self.out_cases = []  # {id, name, reason}: use cases with no evidence in a core file
         self.out_rules = []
         self.kept_cases = []  # (name, cited ranges) of the use cases that stay, set by _use_cases
+        self.not_screens = set()  # normalized names of mapped screens that are navigation coordinators
         self.registry = Registry(os.path.join(dest, "ids.json"))
         self.warnings = []  # the sentences, printed to stderr
         self.records = []   # the same as {kind, item, why}, written to render-warnings.json
@@ -216,8 +217,18 @@ class _Catalogs:
     def _screen_ids(self):
         """Screen name to SCR ids (a name can repeat in two files), and the screen entries by id."""
         by_name, entries = {}, {}
+        # a navigation coordinator the inventory found, and no inventory screen of that name: it presents screens but
+        # has no UI, so it is not a screen (its behaviour belongs to the use cases and flows)
+        real = {norm(s.get("name")) for s in self.inventory.get("screens", []) if isinstance(s, dict)}
+        coordinators = {norm(c.get("name")): _path(c.get("file")) for c in self.inventory.get("coordinators", [])
+                        if isinstance(c, dict) and c.get("name") and norm(c.get("name")) not in real}
         for screen in self.understood.get("screens", []):
             if not isinstance(screen, dict) or not screen.get("name"):
+                continue
+            if norm(screen["name"]) in coordinators:
+                self.not_screens.add(norm(screen["name"]))
+                self._warn("screen", screen["name"], f"screen {screen['name']} is the navigation coordinator of "
+                           f"{coordinators[norm(screen['name'])]}, not a screen; it is left out")
                 continue
             sid = self.registry.assign("SCR", self._screen_key(screen["name"], screen.get("file")))
             if sid in entries:
@@ -390,7 +401,7 @@ class _Catalogs:
             hit = by_name.get(norm(name))
             if hit:
                 ids.append(hit[0])
-            else:
+            elif norm(name) not in self.not_screens:  # a coordinator left out is reported once, where it left
                 self._warn("screen", name, f"{where} names the screen {name}, which understand_result.json does not have")
         return _unique(ids)
 
