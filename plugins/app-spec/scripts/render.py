@@ -153,9 +153,9 @@ class _Catalogs:
         self.out_rules = []
         self.kept_cases = []  # (name, cited ranges) of the use cases that stay, set by _use_cases
         self.registry = Registry(os.path.join(dest, "ids.json"))
-        self._complete_paths()
         self.warnings = []  # the sentences, printed to stderr
         self.records = []   # the same as {kind, item, why}, written to render-warnings.json
+        self._complete_paths()
 
     def _complete_paths(self):
         """Rewrite a use case's files, a screen's file and a rule's source that an agent cited relative to a folder
@@ -163,6 +163,7 @@ class _Catalogs:
         it the core check sends the entry out of scope and the range check reports the file as not found."""
         root_list = paths.roots(self.cfg)
         index = paths.file_index(root_list)
+        checker = ranges.Ranges(self.cfg)
         entries = [e for key in ("useCases", "screens", "flows") for e in self.understood.get(key) or []]
         for entry in entries + list(self.rules_in) + list(self.rules_out):
             if not isinstance(entry, dict):
@@ -171,7 +172,12 @@ class _Catalogs:
             # is part of the id key and never holds a path
             for key, value in list(entry.items()):
                 if key != "name":
-                    entry[key] = paths.complete(value, root_list, index)
+                    # an agent's range that starts in the file but ends a few lines past it ends on the last line
+                    changes = []
+                    entry[key] = checker.clamp(paths.complete(value, root_list, index), changes)
+                    for old, new in changes:
+                        self._warn("clamped", old, f"{entry.get('name')}: {old} ran past the end of its file and now "
+                                                   f"ends on its last line, {new}")
 
     def _check_ranges(self, groups):
         """Warn about every citation in the catalog entries that runs past the end of its file or names no file."""

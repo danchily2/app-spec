@@ -471,6 +471,19 @@ class TestCatalogs(unittest.TestCase):
         self.assertIn("Nowhere/Missing.swift:1", case["files"])  # no file ends so: left as cited, and reported
         self.assertFalse(any("PayslipsFeature/PayslipItem.swift:10-14: file not found" in w for w in warnings))
 
+    def test_a_range_that_runs_past_the_end_of_its_file_is_clamped(self):
+        # payslips v4: UC-033 cited PayslipsListCoordinator.swift:25-124 in a 123-line file, and the grade failed
+        item = "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift"  # 14 lines
+        self.edit("rules_result.json", lambda r: r["rules"][0].update(
+            source=f"{item}:10-16", plainEnglish=f"See {item}:20-30."))
+        warnings = self.warnings()
+        rule = next(r for r in out.load(self.out, "rules.json")["rules"] if r["name"] == "Payslips are newest first")
+        self.assertEqual(rule["source"], f"{item}:10-14")
+        self.assertIn(f"rule {rule['id']} cites {item}:20-30: the file has 14 lines", warnings)  # starts past the end
+        self.assertFalse(any(f"{item}:10-16" in w and "cites" in w for w in warnings))
+        clamped = [r for r in out.load(self.out, "render-warnings.json") if r["kind"] == "clamped"]
+        self.assertEqual([r["item"] for r in clamped], [f"{item}:10-16"])
+
     def test_a_partial_path_in_any_field_of_a_rule_resolves(self):
         # payslips v4: RULE-108 cited `nil (ViewModel/ViewModel.PayslipDocument.swift:17)` inside its parameters
         full = "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift"

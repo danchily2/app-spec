@@ -12,6 +12,11 @@ Fixes found in the v4 payslips run (0.4.0, headless).
   not found. `render.py catalogs` now completes paths in every field of use cases, screens, flows and rules (nested
   lists and objects too), except `name`, which is part of the id key.
 
+- **An off-by-one range at the end of a file is clamped.** UC-033 cited `PayslipsListCoordinator.swift:25-124` in a
+  123-line file, and the grader failed `citations-resolve`. `render.py catalogs` now ends a range on the file's last
+  line when it starts inside the file and ends at most 3 lines past it, and records a `clamped` entry in
+  `render-warnings.json`. A range further past the end is a wrong citation and is still reported as `citation`.
+
 Agent and schema fixes from the Devin run-2 register, group C.
 
 - **The analysed repo's own agent configuration is not an injection (P27).** `CLAUDE.md`, `AGENTS.md` and `.claude/`

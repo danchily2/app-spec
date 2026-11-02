@@ -65,6 +65,32 @@ class Ranges:
             return f"the file has {length} lines"
         return None
 
+    SLACK = 3  # an end at most this many lines past the last line is an off-by-one, not a wrong citation
+
+    def clamp(self, value, changes):
+        """`value` (a JSON value) with every `path:first-last` whose start lies in the file but whose end runs at most
+        SLACK lines past it rewritten to end on the file's last line. Each change is appended to `changes` as (old, new).
+        A range further past the end stays, so the range check reports it."""
+        if isinstance(value, list):
+            return [self.clamp(v, changes) for v in value]
+        if isinstance(value, dict):
+            return {k: self.clamp(v, changes) for k, v in value.items()}
+        if not isinstance(value, str):
+            return value
+
+        def fix(m):
+            path, first, last = m.group(1), int(m.group(2)), m.group(3)
+            if last is None or "/" not in path:
+                return m.group(0)
+            length = self.length(path)
+            if length is None or not (1 <= first <= length < int(last) <= length + self.SLACK):
+                return m.group(0)
+            new = f"{path}:{first}-{length}" if first < length else f"{path}:{first}"
+            changes.append((m.group(0), new))
+            return new
+
+        return CITE.sub(fix, value)
+
     def problems(self, value):
         """`[(citation, reason)]` for every citation in the strings of a JSON value that does not resolve, once each."""
         found, seen = [], set()
