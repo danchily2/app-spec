@@ -23,12 +23,14 @@ Below, `OUT` is the absolute output folder, `NAME` the spec's file name, and `P`
 `NAME_ARG` is `--name NAME` when `--name` was given, else nothing.
 
 **Saving JSON.** Agents answer with fenced JSON inside prose, and a workflow's task output wraps its result as
-`{"summary", "result"}`. Never write an ad-hoc extractor: save the answer, the task output file or the agent's
-transcript (`.jsonl`) with `save_json.py`, which takes the last JSON value that holds the key, unwraps `result`, checks
-that it parses and writes the file (exit code 2 when none matches; then ask the agent once more for valid JSON):
+`{"summary", "result"}`. Never write an ad-hoc extractor. A workflow's result is in its task output file: pass that
+file. An agent's answer reaches you as text: write it unchanged with the Write tool to `OUT/answers/<file>.txt`,
+then pass that file. Never search session or transcript folders for it. `save_json.py` takes the last JSON value
+that holds the key, unwraps `result`, checks that it parses and writes the file (exit code 2 when none matches; then
+ask the agent once more for valid JSON):
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/save_json.py" <task output, transcript or text file> OUT/<file>.json --key <key>
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/save_json.py" <task output file or OUT/answers/<file>.txt> OUT/<file>.json --key <key>
 ```
 
 **Read-only source.** Never create, edit or delete a file under `<app>` or under a contract repository. Every file
@@ -206,7 +208,7 @@ the readers the rest. Then read the fields: split the endpoints of
 `OUT/endpoints.json` into batches of up to 10, and give each batch to one `app-spec:contract-reader` (at most six in
 parallel) with each endpoint's id, method, path, clients, the backend file and line when set, the app root and the
 contract roots. Each returns its envelope `{endpoints, disagreements, injectionFlags}`. Save batch `k` as
-`OUT/contracts/batch-<k>.json` (`save_json.py <answer> OUT/contracts/batch-<k>.json --key endpoints`) and merge:
+`OUT/contracts/batch-<k>.json` (`save_json.py OUT/answers/batch-<k>.txt OUT/contracts/batch-<k>.json --key endpoints`) and merge:
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/merge_contracts.py" OUT OUT/contracts/batch-*.json
@@ -223,7 +225,7 @@ that endpoint's `disagreements`. A label `contracts.py` set to `VERIFIED` is nev
 ## 6: Write
 
 Give `app-spec:spec-writer` the output folder `OUT`, the app root, the contract roots and the plugin folder `P`. It
-returns one JSON object. Save it as `OUT/prose.json` (`save_json.py <answer> OUT/prose.json --key summary`, which
+returns one JSON object. Save it as `OUT/prose.json` (`save_json.py OUT/answers/prose.txt OUT/prose.json --key summary`, which
 also checks that it parses); if none parses, ask the writer once more for valid JSON.
 
 ## 7: Review, at most the configured number of passes
@@ -243,7 +245,7 @@ For pass `n` from 1:
 2. Give `app-spec:spec-critic` the folder `OUT`, the spec's name, the app root, the contract roots, the plugin folder
    and, with `--bar`, the bar file. Tell it that it must open at least one cited range per use case, and that it
    cannot see a fact the code does not show, so it never asks for one. Save its JSON list as `OUT/critic-<n>.json`
-   (`save_json.py <answer> OUT/critic-<n>.json --list`).
+   (`save_json.py OUT/answers/critic-<n>.txt OUT/critic-<n>.json --list`).
 3. Record the pass. This appends `{n, ledger: {pass}, grade: {pass}, critic: [findings]}` to `review.json` and
    rewrites `REVIEW.md`:
 

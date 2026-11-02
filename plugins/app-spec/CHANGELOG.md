@@ -28,6 +28,11 @@ Fixes found in the v4 payslips run (0.4.0, headless).
   `render.py catalogs` leaves out a mapped screen that is an inventory coordinator and no inventory screen, with
   one `screen` warning; the use cases and flows that named it drop the name without more warnings.
 
+- **The skill says how an agent's answer reaches `save_json.py`.** It allowed "the agent's transcript (`.jsonl`)", so
+  the v4 run searched the subagent folders under `~/.claude/projects` for a contract batch, and the command was
+  denied. The session now writes the answer unchanged with the Write tool to `OUT/answers/<file>.txt` and saves that
+  file; it never searches session or transcript folders.
+
 Agent and schema fixes from the Devin run-2 register, group C.
 
 - **The analysed repo's own agent configuration is not an injection (P27).** `CLAUDE.md`, `AGENTS.md` and `.claude/`

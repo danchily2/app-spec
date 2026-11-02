@@ -20,6 +20,13 @@ class TestDocs(unittest.TestCase):
             self.assertNotIn("capability_index.json", text, rel)
             self.assertIn("`capabilities.json`", text, rel)
 
+    def test_the_skill_says_how_an_agent_answer_reaches_save_json(self):
+        # payslips v4: the run searched the subagent transcript folder for a contract batch and was denied
+        skill = (PLUGIN / "skills" / "spec" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("OUT/answers/", skill)
+        self.assertIn("Never search session or transcript folders", skill)
+        self.assertNotIn("transcript (`.jsonl`)", skill)
+
     def test_agents_name_the_injection_field_the_schemas_have(self):
         # P16: the mapper prompt said "the flags field"; the schema field is injectionSuspects
         for path in sorted((PLUGIN / "agents").glob("*.md")) + sorted((PLUGIN / "workflows").glob("*.js")):
