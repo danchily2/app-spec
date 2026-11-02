@@ -194,3 +194,13 @@ Add one entry per round: date, items, commits, release tag, run folder, scorecar
 - **Round 1 (2026-11-02):** branch `fix/round1-review-routing`. Items: (1) a fix reaches every owner, (2) a rule
   keeps its id when its source path is corrected, (3) the out-of-scope fold matches by normalized name and files,
   (4) partial paths in agent citations resolve to full paths, (5) referees can correct, not only remove (P18).
+  Commits: `c97bd27` (4, `paths.complete`), `77278fb` (2, `render._rule_id`), `0268ac9` (3, `_core_name` in both
+  workflows + range-overlap fold in `render.py`, new `scope` warning kind), `7f2f8dd` (5, `corrections` in both
+  verdict schemas, new `corrected` result field), `34050c6` (1, critic `alsoAffects` + `review.py route`, step 7.5
+  uses it). Tests: 370 Python, 33 Node, all pass. Two Node stats tests gained `corrected: 1` because the harness
+  sample referee fills every schema field (a new key, not a weaker check). Released as **0.4.0** (`c3758ae`, tag
+  `v0.4.0`), not pushed.
+  Not done: step 5 (the payslips-v4 acceptance run) and steps 6-7. The installed plugin in
+  `~/.claude/plugins/installed_plugins.json` is still **0.1.0** (cache from 2026-10-31); update it to 0.4.0 before the
+  run, or the run tests old code. Next: in a new session, update the plugin, run step 5 into
+  `~/Documents/GitHub/vmm3/specs/payslips-v4`, fill the scorecard row, then pick Round 2.
