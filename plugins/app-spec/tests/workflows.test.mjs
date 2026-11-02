@@ -385,7 +385,10 @@ test('rules: a referee correction replaces the wrong field and is recorded (P18)
   assert.deepEqual(r.corrected, [{ name: 'Payslips load in pages', field: 'then', from: 'offset is the item count',
     to: 'offset is the page size, 20', citation: 'A.swift:5' }])
   assert.equal(r.stats.corrected, 1)
-  assert.ok(calls.find(c => c.opts.label.startsWith('verify:')).prompt.includes('corrections'))
+  const referee = calls.find(c => c.opts.label.startsWith('verify:')).prompt
+  assert.ok(referee.includes('corrections'))
+  // payslips v4: 84 corrections on 45 of 87 rules, some only adding old-app names such as pastUrl or hasPrevious()
+  assert.ok(referee.includes('Correct only what is wrong') && referee.includes('never add type, function, property or error names'))
 })
 
 test('understand: a referee correction replaces the use case description', async () => {

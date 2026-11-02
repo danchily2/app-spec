@@ -33,6 +33,11 @@ Fixes found in the v4 payslips run (0.4.0, headless).
   denied. The session now writes the answer unchanged with the Write tool to `OUT/answers/<file>.txt` and saves that
   file; it never searches session or transcript folders.
 
+- **Referees correct only what is wrong.** In v4 the rule referees made 84 corrections on 45 of 87 rules. Most added
+  real precision, but some only added old-app names to a right field (`pastUrl is nil and hasPrevious() is false`,
+  `PayslipError.noPayslips`), the plumbing critic-1 asked to remove. The referee prompt now says to correct only a
+  wrong value or condition and never to add type, function, property or error names of the old app.
+
 Agent and schema fixes from the Devin run-2 register, group C.
 
 - **The analysed repo's own agent configuration is not an injection (P27).** `CLAUDE.md`, `AGENTS.md` and `.claude/`
