@@ -10,7 +10,13 @@ entry that the spec keeps references it. An endpoint that a use case cites but t
 in endpoints.json) is an endpoint item too. An item that `overrides.json` drops with a reason is covered with that reason:
 it is left out of the spec, listed in Appendix F and listed here. An item with no reference and no reason is listed
 with `reason: null`. A class passes when covered items, with or without a reason, reach its threshold; the ledger passes
-when every class passes. A class with no items passes. Thresholds come from `options.thresholds` in app-spec.json over
+when every class passes. A class with no items passes.
+
+Only the module's own items are held to a threshold: an item whose file is a core file of module.json, a string key
+of the core, and any item a kept use case or screen references. An item found only in a touch file, or app-wide with
+no core file (a permission in Info.plist), that nothing references is informational: it is listed
+under `informational` and in LEDGER.md apart, and counts toward no threshold. A TCA reducer (`tca-feature`, with its
+nested `Path` and `Destination`) is covered when a kept screen sits in the same file or folder. Thresholds come from `options.thresholds` in app-spec.json over
 the defaults of DESIGN.md. Platform has no default threshold in DESIGN.md and takes 0: it is reported, never fails,
 until app-spec.json sets one.
 
@@ -67,6 +73,7 @@ class _Ledger:
         self.cases = [c for c in self.all_cases if (("useCase", str(c["id"])) not in self.dropped)]
         self.screens = [s for s in self.all_screens if ("screen", str(s["id"])) not in self.dropped]
         self.case_ids = {c["id"] for c in self.cases}
+        self.core = {str(f) for f in _list(self.module.get("core"))}
         self.items = {}  # kind to every item key counted: the ids `overrides.json` can drop an item by
 
     def _catalog(self, name, key):
@@ -85,12 +92,24 @@ class _Ledger:
                 return True, (reason.strip() if isinstance(reason, str) and reason.strip() else None)
         return False, None
 
+    def scope(self, entry_or_file):
+        """`core` when the item's file is a core file (or module.json lists no core), else `touch`."""
+        value = entry_or_file.get("file") if isinstance(entry_or_file, dict) else entry_or_file
+        if not self.core:
+            return "core"
+        return "core" if isinstance(value, str) and _path(value) in self.core else "touch"
+
     def count(self, kind, rows):
-        """One class. `rows` is `(item, drop keys, referenced, inherited)`: `inherited` is `(dropped, reason)` from the
-        screen that holds the item, or `None`. A drop of the item itself wins over the inherited one."""
-        uncovered, seen = [], set()
-        for item, keys, referenced, inherited in sorted(rows, key=lambda r: r[0]):
+        """One class. `rows` is `(item, drop keys, referenced, inherited, scope)`: `inherited` is `(dropped, reason)`
+        from the screen that holds the item, or `None`; `scope` is `core` or `touch`. A drop of the item itself wins over
+        the inherited one. A touch item nothing references is informational and counts toward no threshold."""
+        uncovered, seen, informational = [], set(), []
+        for item, keys, referenced, inherited, scope in sorted(rows, key=lambda r: r[0]):
             if item in seen:
+                continue
+            if scope != "core" and not referenced:
+                if item not in informational:
+                    informational.append(item)
                 continue
             seen.add(item)
             dropped, reason = self.drop(kind, [*keys, item])
@@ -103,7 +122,7 @@ class _Ledger:
         with_reason = sum(1 for u in uncovered if u["reason"])
         covered = total - len(uncovered) + with_reason
         return {"total": total, "covered": covered, "withReason": with_reason, "percent": _percent(covered, total),
-                "uncovered": uncovered}
+                "uncovered": uncovered, "informational": [i for i in informational if i not in seen]}
 
     # ------------------------------------------------------------ what the spec keeps
 
@@ -129,8 +148,17 @@ class _Ledger:
                 continue
             found = self._screen_for(name, file)
             item = f"{file} {name}"
-            rows.append((item, [found["id"]] if found else [], found is not None, None))
+            referenced = found is not None or (e.get("kind") == "tca-feature" and self._beside_a_kept_screen(file))
+            rows.append((item, [found["id"]] if found else [], referenced, None, self.scope(e)))
         return self.count("screen", rows)
+
+    def _beside_a_kept_screen(self, file):
+        """True when a screen the spec keeps is declared in the same file or folder: a TCA reducer and its nested
+        `Path` and `Destination` are the state of that screen, not a screen of their own."""
+        path = _path(file)
+        folder = os.path.dirname(path)
+        return any(_path(s.get("file")) == path or os.path.dirname(_path(s.get("file"))) == folder
+                   for s in self.screens if s.get("file"))
 
     def fields_class(self):
         element_keys = {(e.get("file"), e.get("line"), e.get("kind")) for s in self.screens
@@ -148,7 +176,7 @@ class _Ledger:
                 name = f"{base}-{i}" if base in used else base
                 used.add(name)
                 referenced = (element.get("file"), element.get("line"), element.get("kind")) in element_keys
-                rows.append((f"{owner}.{name}", [f"{owner}.{base}"], referenced, inherited))
+                rows.append((f"{owner}.{name}", [f"{owner}.{base}"], referenced, inherited, self.scope(screen)))
         return self.count("field", rows)
 
     def endpoints_class(self):
@@ -160,20 +188,20 @@ class _Ledger:
             method = str(e.get("method") or "").upper()
             path = _endpoint_path(e.get("path"))
             if not path:
-                rows.append((f"unnamed endpoint in {_path(e.get('file'))}", [], False, None))
+                rows.append((f"unnamed endpoint in {_path(e.get('file'))}", [], False, None, self.scope(e)))
                 continue
             entry = by_key.get((method, path)) if method else None
             used_by = set(entry.get("useCases") or []) if entry else set()
             if entry:
                 used_by |= {c["id"] for c in self.cases if entry["id"] in _strings(c.get("endpoints"))}
             rows.append((f"{method} {path}" if method else path, [entry["id"]] if entry else [],
-                         bool(used_by & self.case_ids), None))
+                         bool(used_by & self.case_ids), None, self.scope(e)))
         for entry in self.endpoints:  # cited by a use case but not in the inventory: a catalog item of its own
             if entry.get("inInventory") is False:
                 used_by = set(entry.get("useCases") or []) | {c["id"] for c in self.cases
                                                               if entry["id"] in _strings(c.get("endpoints"))}
-                rows.append((f"{str(entry.get('method') or '').upper()} {entry.get('path')}", [entry["id"]],
-                             bool(used_by & self.case_ids), None))
+                rows.append((f"{str(entry.get('method') or '').upper()} {entry.get('path') or entry.get('followsLink')}",
+                             [entry["id"]], bool(used_by & self.case_ids), None, "core"))
         return self.count("endpoint", rows)
 
     def strings_class(self):
@@ -181,23 +209,26 @@ class _Ledger:
         keys = _strings(self.module.get("stringKeys")) or sorted(_dict(inv.get("keys")))
         cited = self._kept("strings") | {e.get("textKey") for s in self.screens
                                          for e in _list(s.get("elements")) if isinstance(e, dict) and e.get("textKey")}
-        return self.count("string", [(k, [k], k in cited, None) for k in keys])
+        return self.count("string", [(k, [k], k in cited, None, "core") for k in keys])  # keys the core uses
 
     def events_class(self):
-        names = [e.get("name") if isinstance(e, dict) else e for e in _list(self.inventory.get("events"))]
+        entries = [e if isinstance(e, dict) else {"name": e} for e in _list(self.inventory.get("events"))]
         kept = self._kept("events")
-        return self.count("event", [(str(n), [str(n)], str(n) in kept, None) for n in names if n])
+        return self.count("event", [(str(e["name"]), [str(e["name"])], str(e["name"]) in kept, None, self.scope(e))
+                                    for e in entries if e.get("name")])
 
     def storage_class(self):
-        keys = [s.get("key") or s.get("name") if isinstance(s, dict) else s for s in _list(self.inventory.get("storage"))]
+        entries = [s if isinstance(s, dict) else {"key": s} for s in _list(self.inventory.get("storage"))]
         kept = self._kept("storage")
-        return self.count("storage", [(str(k), [], str(k) in kept, None) for k in keys if k])
+        rows = [(str(k), [], str(k) in kept, None, self.scope(s)) for s in entries for k in [s.get("key") or s.get("name")] if k]
+        return self.count("storage", rows)
 
     def permissions_class(self):
-        names = [p.get("key") or p.get("name") if isinstance(p, dict) else p
-                 for p in _list(_dict(self.inventory.get("platform")).get("permissions"))]
+        entries = [p if isinstance(p, dict) else {"key": p}
+                   for p in _list(_dict(self.inventory.get("platform")).get("permissions"))]
         kept = {norm(v) for v in self._kept("permissions")}
-        return self.count("permission", [(str(n), [], norm(n) in kept, None) for n in names if n])
+        rows = [(str(n), [], norm(n) in kept, None, self.scope(p)) for p in entries for n in [p.get("key") or p.get("name")] if n]
+        return self.count("permission", rows)
 
     def platform_class(self):
         """Every other entry of the platform section as `<section>:<value>`; a use case cites the whole item or the value."""
@@ -208,7 +239,8 @@ class _Ledger:
                 continue
             for part in _platform_values(value):
                 item = f"{section}:{part}" if part else section
-                rows.append((item, [section], norm(item) in kept or bool(part and norm(part) in kept), None))
+                rows.append((item, [section], norm(item) in kept or bool(part and norm(part) in kept), None,
+                             "core"))  # app-wide and without a threshold by default: always listed
         return self.count("platform", rows)
 
     def thresholds(self):
@@ -220,8 +252,8 @@ class _Ledger:
         classes = {c: getattr(self, f"{c}_class")() for c in CLASSES}
         for name, cls in classes.items():
             cls["pass"] = cls["total"] == 0 or cls["covered"] * 100 >= thresholds[name] * cls["total"]
-        # key order of the file: total, covered, withReason, percent, pass, uncovered
-        classes = {n: {k: c[k] for k in ("total", "covered", "withReason", "percent", "pass", "uncovered")}
+        # key order of the file: total, covered, withReason, percent, pass, uncovered, informational
+        classes = {n: {k: c[k] for k in ("total", "covered", "withReason", "percent", "pass", "uncovered", "informational")}
                    for n, c in classes.items()}
         return {"version": 1, "classes": classes, "thresholds": thresholds,
                 "pass": all(c["pass"] for c in classes.values())}
@@ -269,6 +301,12 @@ def render_md(led):
         if c["uncovered"]:
             lines += ["", f"## Uncovered {name}", ""]
             lines += [f"- `{_cell(u['item'])}`: {_cell(u['reason']) if u['reason'] else 'no reason'}" for u in c["uncovered"]]
+    extra = [(name, c["informational"]) for name, c in led["classes"].items() if c.get("informational")]
+    if extra:
+        lines += ["", "## Outside the module (not counted)", "",
+                  "Found only in touch files or app-wide, and referenced by no use case or screen of the spec."]
+        for name, items in extra:
+            lines += ["", f"### {name}", ""] + [f"- `{_cell(i)}`" for i in items]
     return "\n".join(lines) + "\n"
 
 

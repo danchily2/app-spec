@@ -48,6 +48,14 @@ def cover_everything(dest):
     edit(dest, "endpoints.json", endpoints)
 
 
+LIST_VIEW = "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipListView.swift"
+
+
+def card_in_core(dest):
+    """Make the start-page card a core file, so its screen and fields count toward the thresholds."""
+    edit(dest, "module.json", lambda m: m["core"].append(CARD))
+
+
 class LedgerCase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
@@ -117,6 +125,7 @@ class TestRules(LedgerCase):
 
     def test_a_field_drop_counts_with_its_reason(self):
         dest = self.full()
+        card_in_core(dest)
         edit(dest, "screens.json", lambda d: next(s for s in d["screens"] if s["id"] == "SCR-004")["elements"].pop())
         # the second PayslipCard element is gone from the catalog; 9 of 10 fields are covered, below 95 percent
         self.assertFalse(ledger.compute(dest)["pass"])
@@ -143,6 +152,7 @@ class TestRules(LedgerCase):
 
     def test_a_dropped_screen_takes_its_fields_with_it(self):
         dest = self.full()
+        card_in_core(dest)
         write_overrides(dest, {"drop": [{"kind": "screen", "id": "SCR-004", "reason": "out of module"}]})
         led = ledger.compute(dest)
         self.assertTrue(led["pass"])
@@ -165,9 +175,10 @@ class TestRules(LedgerCase):
     def test_events_storage_and_permissions_are_matched_by_name(self):
         dest = self.full()
         edit(dest, "inventory.json", lambda d: d.update(
-            events=[{"name": "payslip_opened", "file": "A.swift:1"}, {"name": "payslip_shared", "file": "A.swift:2"}],
-            storage=[{"kind": "userdefaults", "key": "lastPayslipId", "file": "A.swift:3"}]))
-        edit(dest, "inventory.json", lambda d: d["platform"].update(permissions=[{"key": "NSCameraUsageDescription", "file": "Info.plist"}]))
+            events=[{"name": "payslip_opened", "file": f"{LIST_VIEW}:1"}, {"name": "payslip_shared", "file": f"{LIST_VIEW}:2"}],
+            storage=[{"kind": "userdefaults", "key": "lastPayslipId", "file": f"{LIST_VIEW}:3"}]))
+        edit(dest, "inventory.json", lambda d: d["platform"].update(
+            permissions=[{"key": "NSCameraUsageDescription", "file": f"{LIST_VIEW}:4"}]))
         edit(dest, "use-cases.json", lambda d: next(u for u in d["useCases"] if u["id"] == "UC-001").update(
             events=["payslip_opened"], storage=["lastPayslipId"]))
         led = ledger.compute(dest)["classes"]
@@ -178,9 +189,10 @@ class TestRules(LedgerCase):
 
     def test_dropped_storage_and_permission_leave_the_spec_and_count_with_their_reason(self):
         dest = self.full()
-        edit(dest, "inventory.json", lambda d: d.update(storage=[{"kind": "userdefaults", "key": "lastPayslipId", "file": "A.swift:3"}]))
+        edit(dest, "inventory.json", lambda d: d.update(storage=[{"kind": "userdefaults", "key": "lastPayslipId",
+                                                                  "file": f"{LIST_VIEW}:3"}]))
         edit(dest, "inventory.json", lambda d: d["platform"].update(
-            permissions=[{"key": "NSCameraUsageDescription", "file": "Info.plist"}], urlSchemes=["vismapay"]))
+            permissions=[{"key": "NSCameraUsageDescription", "file": f"{LIST_VIEW}:4"}], urlSchemes=["vismapay"]))
         before = render.spec(dest)
         self.assertIn("lastPayslipId", before)
         self.assertIn("NSCameraUsageDescription", before)
@@ -222,13 +234,14 @@ class TestClasses(LedgerCase):
 
     def test_screens(self):
         cls = self.led["screens"]
-        self.assertEqual((cls["total"], cls["covered"]), (3, 2))
-        self.assertEqual([u["item"] for u in cls["uncovered"]], [f"{CARD}:3 PayslipCard"])
+        self.assertEqual((cls["total"], cls["covered"]), (2, 2))  # the touch-file card is not the module's own
+        self.assertEqual(cls["uncovered"], [])
+        self.assertEqual(cls["informational"], [f"{CARD}:3 PayslipCard"])
 
     def test_fields(self):
         cls = self.led["fields"]
-        self.assertEqual((cls["total"], cls["covered"]), (10, 8))
-        self.assertEqual([u["item"] for u in cls["uncovered"]], [f"{CARD}.payslip-latest", f"{CARD}.text-1"])
+        self.assertEqual((cls["total"], cls["covered"]), (8, 8))
+        self.assertEqual(cls["informational"], [f"{CARD}.payslip-latest", f"{CARD}.text-1"])
 
     def test_endpoints(self):
         cls = self.led["endpoints"]
@@ -311,3 +324,43 @@ class TestFiles(LedgerCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCoreOnly(LedgerCase):
+    """Thresholds hold the module's own items; touch-only items are listed apart."""
+
+    def test_inventory_marks_each_entry_core_or_touch(self):
+        dest = self.base()
+        inv = out.load(dest, "inventory.json")
+        scopes = {e["name"]: e["scope"] for e in inv["screens"] + inv.get("swiftuiViews", [])}
+        self.assertEqual(scopes["PayslipCard"], "touch")
+        self.assertEqual(scopes["PayslipListView"], "core")
+        self.assertEqual({s["screen"]: s["scope"] for s in out.load(dest, "fields.json")["screens"]}["PayslipCard"], "touch")
+
+    def test_a_touch_item_a_use_case_cites_counts(self):
+        dest = self.base()
+        edit(dest, "inventory.json", lambda d: d.update(events=[{"name": "card_seen", "file": f"{CARD}:4", "scope": "touch"},
+                                                              {"name": "card_hidden", "file": f"{CARD}:5", "scope": "touch"}]))
+        edit(dest, "use-cases.json", lambda d: d["useCases"][0].update(events=["card_seen"]))
+        cls = ledger.compute(dest)["classes"]["events"]
+        self.assertEqual((cls["total"], cls["covered"], cls["informational"]), (1, 1, ["card_hidden"]))
+
+    def test_a_reducer_beside_a_kept_screen_is_covered(self):
+        dest = self.base()
+        folder = "Modules/PayslipsFeature/Sources/PayslipsFeature"
+        edit(dest, "inventory.json", lambda d: d["screens"].extend([
+            {"name": "PayslipListFeature", "kind": "tca-feature", "file": f"{folder}/PayslipListFeature.swift:5", "scope": "core"},
+            {"name": "Destination", "kind": "tca-feature", "file": f"{folder}/PayslipListFeature.swift:20", "scope": "core"},
+            {"name": "OrphanFeature", "kind": "tca-feature", "file": "Modules/Other/Sources/Other/Orphan.swift:3", "scope": "core"}]))
+        edit(dest, "module.json", lambda m: m["core"].append("Modules/Other/Sources/Other/Orphan.swift"))
+        cls = ledger.compute(dest)["classes"]["screens"]
+        self.assertEqual([u["item"] for u in cls["uncovered"]], ["Modules/Other/Sources/Other/Orphan.swift:3 OrphanFeature"])
+        self.assertEqual((cls["total"], cls["covered"]), (5, 4))
+
+    def test_ledger_md_lists_touch_only_items_apart(self):
+        dest = self.base()
+        ledger.compute(dest)
+        text = read_text(dest, "LEDGER.md")
+        apart = text.split("## Outside the module (not counted)")[1]
+        self.assertIn(f"`{CARD}:3 PayslipCard`", apart)
+        self.assertNotIn("PayslipCard", text.split("## Outside the module (not counted)")[0])

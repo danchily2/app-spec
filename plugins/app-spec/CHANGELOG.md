@@ -38,6 +38,12 @@ Fixes found in a run on a native iOS payslips module.
   `contracts.py` finds the ASP.NET response property that builds the link from a route constant and sets the path,
   so the year-end report PDF of the payslips run now resolves to `api/v1/employees/report/{reportId}/export/pdf`.
   A next or previous page link becomes a `paging` note on the use case's collection endpoints.
+- **The ledger holds only the module's own items to a threshold.** `inventory.py` marks each entry `scope: core` or
+  `scope: touch` by its file. `ledger.py` counts core items and any item the spec references; a touch-only or
+  app-wide item nothing references is listed under `informational` and apart in LEDGER.md. A TCA reducer and its
+  nested `Path` and `Destination` count as covered when a kept screen sits in the same file or folder. On the
+  payslips run, the Info.plist permissions and the keychain storage no longer fail the ledger, and screens fail only
+  on core items.
 
 ## 0.1.0 - 2026-10-30
 

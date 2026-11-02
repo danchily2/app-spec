@@ -388,6 +388,7 @@ a new one, so a renamed use case keeps its id.
 | `classes.<class>.percent` | `covered / total * 100`, 100 when the class has no items |
 | `classes.<class>.pass` | `true` when `percent` meets the class threshold. A class with no items passes |
 | `classes.<class>.uncovered[]` | Items with no reference. `reason` is `null` when no reason exists. A reason recorded by a person in `overrides.json` is free text and always counts. A reason the scripts assign themselves, which is what "in the catalog" means, must be one of `not user-facing`, `dead code`, `out of module` |
+| `classes.<class>.informational[]` | Items outside the module that nothing in the spec references: their file is a touch point, or they are app-wide with no core file (a permission in `Info.plist`). Listed apart in LEDGER.md, never counted toward `total` or a threshold. A touch item a kept use case or screen references counts like a core item. A TCA reducer (`tca-feature`, with its nested `Path` and `Destination`) is covered when a kept screen sits in the same file or folder |
 | `thresholds` | The percentages in force |
 | `pass` | `true` when every class passes: (covered + covered-with-reason) / total is at least its threshold, and a class with no items passes. An uncovered item without a reason counts against its class |
 

@@ -162,6 +162,9 @@ class TestAcceptedLedgerItems(unittest.TestCase):
         shutil.rmtree(self.tmp, True)
 
     def test_accepting_every_uncovered_item_passes_overrides_reflected(self):
+        module = out.load(self.dest, "module.json")  # the start-page card counts only as a core file
+        module["core"].append("Employee/StartPage/PayslipCard.swift")
+        out.save(self.dest, "module.json", module)
         ledger.compute(self.dest)
         items = review.uncovered(self.dest)
         kinds = {i["kind"] for i in items}

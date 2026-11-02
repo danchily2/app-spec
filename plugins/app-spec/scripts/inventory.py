@@ -5,7 +5,8 @@
 
 Reads app-spec.json and module.json from the output folder `<out>` that module.py wrote. Writes inventory.json and
 INVENTORY.md (App Fusion's inventory shape, only entries whose file is in the module's core or touch points, every
-count with the rule that produced it), fields.json (the elements of every screen in those files) and fills the `hints`
+count with the rule that produced it, every entry that names a file marked `scope: core` or `scope: touch` by that
+file), fields.json (the elements of every screen in those files) and fills the `hints`
 of each shards/<id>.json with the inventory entries inside that shard. Prints the counts with their rules and the
 size of fields.json. Exit code 2 when `<out>` is not an output folder that module.py wrote. Standard library only.
 """
@@ -137,19 +138,25 @@ def run(dest):
 
     result = EXTRACTORS[stack].extract(root)
     inv = {"version": 1, "stack": result["stack"]}
+    core_set = set(core)
+    scope = lambda e: "core" if _path(e) in core_set else "touch"  # noqa: E731
     for key in SCOPED_LISTS:
         if key in result:
-            inv[key] = [e for e in result[key] if _path(e) in inside]
+            inv[key] = [dict(e, scope=scope(e)) for e in result[key] if _path(e) in inside]
     for key in ("routes", "endpoints", "events", "storage"):
         inv.setdefault(key, [])
     inv["strings"] = _scoped_strings(result["strings"], module.get("stringKeys", []))
     inv["platform"] = result["platform"]
+    if isinstance(inv["platform"].get("permissions"), list):  # app-wide, but a permission can name its file
+        inv["platform"]["permissions"] = [dict(p, scope=scope(p)) if isinstance(p, dict) else p
+                                          for p in inv["platform"]["permissions"]]
     inv["counts"] = _counts(inv, files)
     inv["rules"] = _rules(inv["counts"], result.get("rules", {}))
     out.save(dest, "inventory.json", inv)
     out.save_text(dest, "INVENTORY.md", _render(inv, {"query": cfg.get("module", {}).get("query") or [],
                                                       "files": files, "core": core}))
-    out.save(dest, "fields.json", {"version": 1, "screens": fields.extract(stack, root, files)})
+    screens = [dict(s, scope=scope(s)) for s in fields.extract(stack, root, files)]
+    out.save(dest, "fields.json", {"version": 1, "screens": screens})
 
     for entry in module.get("shards", []):
         shard = out.load(dest, entry["file"])
