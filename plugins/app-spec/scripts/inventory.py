@@ -18,7 +18,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from speclib import android, fields, ios, out, rn  # noqa: E402
-from speclib.common import die  # noqa: E402
+from speclib.common import die, match_brace  # noqa: E402
 
 EXTRACTORS = {"ios-native": ios, "android-native": android, "react-native": rn}
 # lists of entries that name the file they come from: the only parts of the extractor result a file scope can cut
@@ -123,6 +123,99 @@ def _render(inv, scope):
     return "\n".join(lines).rstrip() + "\n"
 
 
+_SERVICE_NAME = re.compile(r"\b([A-Z][A-Za-z0-9_]*(?:Service|Client|Repository|API|Api))\b")
+_CODE_EXTS = (".swift", ".kt", ".java", ".ts", ".tsx", ".js", ".jsx")
+
+
+def _read(root, rel):
+    try:
+        with open(os.path.join(root, rel), encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+_CALLED = re.compile(r"\.\s*([a-z][A-Za-z0-9_]*)\s*\(")
+# methods of the standard collections, strings and concurrency types: a call such as `dict.merge(...)` in the module
+# is not a call of a service function that has the same name
+_STD_METHODS = {
+    "append", "appending", "compactMap", "contains", "filter", "first", "flatMap", "forEach", "formatted", "index",
+    "insert", "joined", "last", "map", "merge", "merging", "prefix", "reduce", "remove", "removeAll", "replace",
+    "replacingOccurrences", "reversed", "sort", "sorted", "split", "suffix", "union", "update", "updateValue",
+    "value", "values", "send", "sink", "store", "cancel", "init", "string", "date", "data", "decode", "encode",
+}
+_FUNC_DECL = re.compile(r"\b(?:func|fun|function)\s+([A-Za-z_][A-Za-z0-9_]*)\b")
+
+
+def _service_files(root, core_texts):
+    """{file: text} of the files outside the core that declare, or conform to, a service type a core file names
+    (`let reports: ReportsService` in the module, `class DefaultReportsService: ReportsService` in a shared package),
+    with only the bodies of the service functions a core file calls (`reports.getYearEndReports(...)`) kept and every
+    other character blanked, so line numbers stay right. Only names ending in Service, Client, Repository or API are
+    followed."""
+    names = {m.group(1) for text in core_texts.values() for m in _SERVICE_NAME.finditer(text)}
+    called = {m.group(1) for text in core_texts.values() for m in _CALLED.finditer(text)} - _STD_METHODS
+    if not names or not called:
+        return {}
+    alt = "|".join(sorted(map(re.escape, names)))
+    declares = re.compile(r"\b(?:class|struct|actor|protocol|extension|interface|object)\s+(?:" + alt + r")\b"
+                          r"|\b(?:class|struct|actor|object)\s+[A-Za-z_][A-Za-z0-9_]*\s*(?:<[^>{]*>)?\s*:[^{]*\b(?:" + alt + r")\b")
+    found = {}
+    for base, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ("node_modules", "Pods", "build", "DerivedData")]
+        for f in files:
+            if not f.endswith(_CODE_EXTS):
+                continue
+            rel = os.path.relpath(os.path.join(base, f), root)
+            if rel in core_texts:
+                continue
+            text = _read(root, rel)
+            if not text or not declares.search(text):
+                continue
+            # only the called functions inside the service types: another type or function is not what the module uses
+            kept = ["\n" if c == "\n" else " " for c in text]  # newlines stay, so line numbers stay right
+            for m in declares.finditer(text):
+                start = text.find("{", m.end() - 1)
+                end = match_brace(text, start) if start >= 0 else -1
+                if end <= start:
+                    continue
+                for fm in _FUNC_DECL.finditer(text, start, end):
+                    if fm.group(1) not in called:
+                        continue
+                    open_i = text.find("{", fm.end(), end)
+                    close_i = match_brace(text, open_i) if open_i >= 0 else -1
+                    if close_i > open_i:
+                        kept[open_i:close_i] = text[open_i:close_i]
+            body = "".join(kept)
+            if body.strip():
+                found[rel] = body  # same length as the file, so line numbers stay right
+    return found
+
+
+def _called_requests(root, core, endpoints, inside):
+    """The endpoints declared outside the module's files by a request type that a core file calls
+    (`GetYearEndReports(tenantIds:)` in the module, the type in a shared Reports package), or that a service the core
+    names calls outside the module (`ReportsService` -> `GetYearEndReport(...)`), as touch entries with `usedBy`, the
+    first `file:line` that calls the type."""
+    outside = {}
+    for e in endpoints:
+        name = str(e.get("type") or "")
+        if _path(e) not in inside and re.fullmatch(r"[A-Z][A-Za-z0-9_]*", name):
+            outside.setdefault(name, []).append(e)
+    if not outside:
+        return []
+    call = re.compile(r"\b(" + "|".join(sorted(map(re.escape, outside))) + r")\s*(?:<[^>()]*>)?\s*\(")
+    core_texts = {rel: t for rel in core if (t := _read(root, rel)) is not None}
+    used = {}
+    for texts in (core_texts, None):
+        if texts is None:
+            texts = _service_files(root, core_texts)
+        for rel in sorted(texts):
+            for m in call.finditer(texts[rel]):
+                used.setdefault(m.group(1), f"{rel}:{texts[rel].count(chr(10), 0, m.start()) + 1}")
+    return [dict(e, scope="touch", usedBy=used[name]) for name in sorted(used) for e in outside[name]]
+
+
 def run(dest):
     """Write inventory.json, INVENTORY.md and fields.json for the module in `dest`, fill the shard hints. Return the inventory."""
     cfg = out.load_config(dest)
@@ -144,6 +237,7 @@ def run(dest):
     for key in SCOPED_LISTS:
         if key in result:
             inv[key] = [dict(e, scope=scope(e)) for e in result[key] if _path(e) in inside]
+    inv["endpoints"] = inv.get("endpoints", []) + _called_requests(root, core, result.get("endpoints", []), inside)
     for key in ("routes", "endpoints", "events", "storage"):
         inv.setdefault(key, [])
     inv["strings"] = _scoped_strings(result["strings"], module.get("stringKeys", []))

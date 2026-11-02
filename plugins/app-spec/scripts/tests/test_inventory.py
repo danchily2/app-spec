@@ -91,6 +91,51 @@ class TestInventory(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("not an app-spec output folder", err)
 
+    def test_a_request_type_a_core_file_calls_keeps_its_endpoint(self):
+        # P11/P21: allreports and the report detail are request types of the Reports package, outside the module;
+        # the module's code calls GetYearEndReports(...) and the inventory left the endpoint out
+        app = os.path.join(self.tmp, "ios-reports")
+        shutil.copytree(IOS, app)
+        req = os.path.join(app, "EmployeeServices/Reports/Sources/Reports/Request")
+        os.makedirs(req)
+        with open(os.path.join(req, "GetYearEndReports.swift"), "w") as f:
+            f.write("struct GetYearEndReports: APIClientRequest {\n    var method: HTTPMethod { .get }\n"
+                    "    var path: String { \"\\(APIConstants.URL.v1)/employees/allreports\" }\n}\n"
+                    "struct GetUnusedReport: APIClientRequest {\n    var method: HTTPMethod { .get }\n"
+                    "    var path: String { \"\\(APIConstants.URL.v1)/employees/unused\" }\n}\n"
+                    "struct GetYearEndReport: APIClientRequest {\n    var method: HTTPMethod { .get }\n"
+                    "    var path: String { \"\\(APIConstants.URL.v1)/employees/\\(id)/reports/\\(reportId)\" }\n}\n"
+                    "struct GetViewThing: APIClientRequest {\n    var method: HTTPMethod { .get }\n"
+                    "    var path: String { \"\\(APIConstants.URL.v1)/employees/viewthing\" }\n}\n")
+        svc = os.path.join(app, "EmployeeServices/Reports/Sources/Reports/Service")
+        os.makedirs(svc)
+        with open(os.path.join(svc, "ReportsService.swift"), "w") as f:
+            # the module calls the service; the service, outside the module, calls the request type
+            f.write("final class DefaultReportsService: ReportsService {\n"
+                    "    func getYearEndReport(id: String) async throws { try await api.request(GetYearEndReport(id: id)) }\n"
+                    "    func neverCalled() { _ = GetViewThing() }\n"
+                    "    func merge(items: [String]) async throws { try await api.request(GetViewThing()) }\n}\n"
+                    "struct OtherView: View {\n    func getYearEndReport() { _ = GetViewThing() }\n}\n")
+        view = os.path.join(app, "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift")
+        with open(view, "a") as f:
+            f.write("\nfunc loadReports() async { _ = try? await api.request(GetYearEndReports(tenantIds: [])) }\n"
+                    "struct ReportLoader {\n    let reports: ReportsService\n"
+                    "    func load() async { try? await reports.getYearEndReport(id: \"1\") }\n"
+                    "    func both(a: [String: Int], b: [String: Int]) { var c = a; c.merge(b) { x, _ in x } }\n}\n")
+        dest = build_out(self.tmp, app, "Payslips", "ios-reports-out")
+        inv = inventory.run(dest)
+        kept = {e["path"]: e for e in inv["endpoints"]}
+        self.assertIn("/employee/api/v1/employees/allreports", kept)
+        self.assertEqual(kept["/employee/api/v1/employees/allreports"]["scope"], "touch")
+        self.assertTrue(kept["/employee/api/v1/employees/allreports"]["usedBy"].startswith(
+            "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift:"))
+        detail = kept.get("/employee/api/v1/employees/{}/reports/{}")
+        self.assertIsNotNone(detail, "a request the module's service calls is kept")
+        self.assertTrue(detail["usedBy"].startswith("EmployeeServices/Reports/Sources/Reports/Service/ReportsService.swift:2"), detail["usedBy"])
+        self.assertNotIn("/employee/api/v1/employees/unused", kept)
+        self.assertNotIn("/employee/api/v1/employees/viewthing", kept,
+                         "only the service functions the module calls are followed, and View is no service")
+
     def test_inventory_android_and_rn(self):
         for app in (ANDROID, RN):
             dest = build_out(self.tmp, app, "payslips", os.path.basename(app))

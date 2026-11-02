@@ -19,6 +19,16 @@ Inventory fixes from the Devin run-2 register, group B.
   `url-builder`, type `<Type>.<function>`, and the method the type passes as `httpMethod: .GET` when it passes
   exactly one.
 
+- **An endpoint the module reaches through a shared service is in the inventory (P11/P21).** `allreports` and the
+  year-end report detail are request types of the Reports package, outside the module; the module calls
+  `reportsService.getYearEndReports(...)`, and `ReportsService.swift` (a touch point) calls the request. The
+  inventory kept only endpoints declared in the module's files, so both were missing. It now also keeps, as touch
+  entries with `usedBy` (the calling `file:line`), the endpoints of request types that a core file calls, and of
+  request types called inside the service functions a core file calls on a service type it names (a type ending
+  in Service, Client, Repository or API). Only the called functions are read, and calls of standard methods such
+  as `dict.merge(...)` are not taken for a service function of the same name. On the payslips module this adds
+  the two report endpoints and the two Dottie notification endpoints the start page calls, and nothing else.
+
 ## 0.4.0 - 2026-11-02
 
 Fixes found in the v3 payslips rerun (0.3.0 code).
