@@ -235,8 +235,17 @@ def screens(c):
 
 def _field_rows(fields, missing="not recorded"):
     return [[f.get("name"), f.get("type") or missing,
-             {True: "yes", False: "no"}.get(f.get("required"), missing), f.get("nullable") or missing]
+             {True: "yes", False: "no"}.get(f.get("required"), missing), f.get("nullable") or missing,
+             _field_source(f)]
             for f in fields if isinstance(f, dict)]
+
+
+def _field_source(f):
+    """The field's source as a backticked citation, so the grader checks its range; `-` when it has none."""
+    src = f.get("source")
+    if not src and isinstance(f.get("citations"), list) and f["citations"]:
+        src = f["citations"][0]
+    return f"`{_text(src)}`" if src else "-"
 
 
 def _incomplete_fields(e):
@@ -391,7 +400,7 @@ def endpoints(c):
         for label, key in (("Request fields", "request"), ("Response fields", "response")):
             rows = _field_rows(((e.get(key) or {}).get("fields")) or [], _oq(c, e["id"]))
             if rows:
-                lines += [f"- **{label}:**", ""] + _table(["Name", "Type", "Required", "Nullable"], rows) + [""]
+                lines += [f"- **{label}:**", ""] + _table(["Name", "Type", "Required", "Nullable", "Source"], rows) + [""]
             else:
                 lines.append(f"- **{label}:** " + ("none recorded" if key == "request" else _oq(c, e["id"])))
         errors = [x for x in e.get("errors") or [] if isinstance(x, dict)]

@@ -19,7 +19,8 @@ rebuild it without losing anything a user relied on.
   in `res/values*/strings.xml`).
 - **Read the build.** `settings.gradle(.kts)` modules, `applicationId`, `minSdk`/`targetSdk`, flavors and build types,
   version catalogs. A flavor-only feature is still a feature.
-- **Cite everything.** Every claim gets `path:line` relative to the app root. Say "not found" rather than guess.
+- **Cite everything.** Every claim gets `path:line` relative to the app root. A range ends on or before the last line of the file (check with `wc -l`); a range past the end is a warning in
+  `render-warnings.json` and a grade failure. Say "not found" rather than guess.
   Never `grep -r` a whole large repository: scope searches with a pathspec. Generated dashboards or single-line
   files can dump tens of thousands of tokens.
 

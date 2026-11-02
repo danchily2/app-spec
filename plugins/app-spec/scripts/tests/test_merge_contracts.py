@@ -165,6 +165,21 @@ class TestMerge(unittest.TestCase):
         run_cli(["merge_contracts.py", self.out, a, b])
         self.assertEqual([d["note"] for d in out.load(self.out, merge_contracts.RESULT)["disagreements"]], ["a", "b"])
 
+    def test_a_field_source_past_the_end_of_its_file_is_a_warning(self):
+        bad = "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift:3-70"  # a 14-line app file
+        env = self.envelope("r.json", {"endpoints": [{"id": self.other, "response": {"fields": [
+            {"name": "gross", "type": "decimal", "required": False, "nullable": "explicit", "source": bad}]}}],
+            "disagreements": [], "injectionFlags": []})
+        code, _, err = run_cli(["merge_contracts.py", self.out, env])
+        self.assertEqual(code, 0, err)
+        self.assertIn(f"cites {bad}: the file has", err)
+        records = [r for r in out.load(self.out, "render-warnings.json") if r["kind"] == "citation"]
+        self.assertEqual([r["item"] for r in records], [bad])
+        # a second merge replaces its own warnings instead of adding them again
+        run_cli(["merge_contracts.py", self.out])
+        records = [r for r in out.load(self.out, "render-warnings.json") if r["kind"] == "citation"]
+        self.assertEqual(len(records), 1)
+
     def test_without_a_result_nothing_changes(self):
         before = out.load(self.out, "endpoints.json")
         code, stdout, _ = run_cli(["merge_contracts.py", self.out])

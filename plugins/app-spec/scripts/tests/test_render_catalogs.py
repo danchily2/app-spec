@@ -358,6 +358,17 @@ class TestCatalogs(unittest.TestCase):
         self.assertIn("rule Payslips are newest first names the use case Ghost use case, which understand_result.json does not have", warnings)
         self.assertEqual(len(warnings), 3)
 
+    def test_a_citation_past_the_end_of_its_file_is_a_warning(self):
+        item = "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift"
+        self.edit("rules_result.json", lambda r: r["rules"][0].update(source=f"{item}:10-70"))
+        warnings = self.warnings()
+        self.assertIn(f"rule RULE-001 cites {item}:10-70: the file has 14 lines", warnings)
+        records = [r for r in out.load(self.out, "render-warnings.json") if r["kind"] == "citation"]
+        self.assertEqual([r["item"] for r in records], [f"{item}:10-70"])
+
+    def test_a_citation_within_its_file_is_no_warning(self):
+        self.assertEqual([w for w in self.warnings() if " cites " in w and "lines" in w], [])
+
     def test_warning_cited_endpoint_missing_from_inventory(self):
         self.edit("understand_result.json", lambda r: r["useCases"][0]["endpoints"].append("GET /nothing/here/{id}"))
         warnings = self.warnings()

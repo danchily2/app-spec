@@ -221,7 +221,7 @@ class TestSpec(unittest.TestCase):
         rules = section(render.spec(self.out), "## Business rules and permissions")
         self.assertIn("RULE-001", rules)
         self.assertIn("three payslips", rules)
-        self.assertIn("PayslipItem.swift:10-20", rules)
+        self.assertIn("PayslipItem.swift:10-14", rules)
         self.assertIn("High", rules)
 
     def test_endpoint_section_shows_fields_errors_label_clients_and_backend(self):

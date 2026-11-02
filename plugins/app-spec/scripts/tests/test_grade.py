@@ -194,6 +194,18 @@ class TestOtherChecks(GradeCase):
             dest = self.mutated(f"r_short{i}", lambda t, text=text: t.replace(grade.NO_RULE, text))
             self.assertFalse(check(grade.run(dest), "rules-per-use-case")["pass"], text)
 
+    def test_a_contract_field_source_is_graded(self):
+        dest = self.copy("f_source")
+        data = out.load(dest, "endpoints.json")
+        item = "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift"
+        data["endpoints"][0]["response"] = {"fields": [{"name": "gross", "type": "decimal", "required": False,
+                                                        "nullable": "explicit", "source": f"{item}:3-70"}]}
+        out.save(dest, "endpoints.json", data)
+        render.spec(dest)
+        c = check(grade.run(dest), "citations-resolve")
+        self.assertFalse(c["pass"])
+        self.assertIn(f"{item}:3-70", c["detail"])
+
     def test_criteria_per_use_case(self):
         dest = self.copy("c_gap")
         prose = out.load(dest, "prose.json")

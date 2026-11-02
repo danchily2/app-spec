@@ -25,7 +25,8 @@ React Navigation majors. You read an app so that another team can rebuild it wit
 - **Resolve what the code resolves.** An RTK Query `url: 'hrm/anniversary'` is relative to the API's `baseUrl`, and a
   template such as `` `${base}${PATH}` `` needs its constants. Mock handlers (MSW), fixtures and stories are not the
   app: skip them, and say so if the only evidence of a feature lives there.
-- **Cite everything.** Every claim gets `path:line` relative to the app root. If you cannot point at a line, say "not
+- **Cite everything.** Every claim gets `path:line` relative to the app root. A range ends on or before the last line of the file (check with `wc -l`); a range past the end is a warning in
+  `render-warnings.json` and a grade failure. If you cannot point at a line, say "not
   found". Say "appears to" when you infer from names.
 
 ## Output

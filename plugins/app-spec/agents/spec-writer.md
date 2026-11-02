@@ -69,7 +69,7 @@ Return **one JSON object** in exactly this shape, and nothing outside it:
 
 - **Cite everything.** Every sentence that states a fact carries a backticked citation, relative to the app root or
   to a contract repository root: one `path:line` or `path:line-line` per backtick span; repeat the path for a second
-  range (`a/B.swift:19-20`, `a/B.swift:47-76`). A citation must point at lines that hold what you claim.
+  range (`a/B.swift:19-20`, `a/B.swift:47-76`). A citation must point at lines that hold what you claim. A range ends on or before the last line of the file.
 - **UNKNOWN has a search note and an owner.** Write it as `UNKNOWN; searched: <files, symbols, repositories>;
   owner: <who can answer>` in the line itself. The grader fails any `UNKNOWN` line in sections 1 to 8 that lacks the
   words `searched` and `owner`. Never write `UNKNOWN` followed by a dash: `UNKNOWN — ` is the renderer's own mark for

@@ -38,7 +38,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from speclib import out, paths  # noqa: E402
+from speclib import out, paths, ranges  # noqa: E402
 from speclib.common import die, load_json  # noqa: E402
 
 RESULT = "contracts_result.json"
@@ -139,6 +139,24 @@ def apply(dest, result):
     return changed, unknown
 
 
+def check_ranges(dest):
+    """Add a `citation` warning to render-warnings.json for every citation in endpoints.json (field sources, citations,
+    disagreements) that runs past the end of its file or names no file. Return the new reasons."""
+    checker = ranges.Ranges(out.load_config(dest))
+    records = out.load(dest, "render-warnings.json", []) or []
+    records = [r for r in records if isinstance(r, dict) and not (r.get("kind") == "citation" and r.get("source") == "contracts")]
+    new = []
+    for e in out.load(dest, "endpoints.json")["endpoints"]:
+        if not isinstance(e, dict):
+            continue
+        for cite, reason in checker.problems({k: v for k, v in e.items() if k != "id"}):
+            why = f"endpoint {e.get('id')} cites {cite}: {reason}"
+            records.append({"kind": "citation", "item": cite, "why": why, "source": "contracts"})
+            new.append(why)
+    out.save(dest, "render-warnings.json", records)
+    return new
+
+
 def main(argv=None):
     args = list(sys.argv[1:] if argv is None else argv)
     if not args or args[0].startswith("-"):
@@ -161,6 +179,8 @@ def main(argv=None):
         print(f"{ident}: merged, label {by_id[ident].get('label')}")
     for ident in unknown:
         print(f"{ident}: not in endpoints.json, skipped", file=sys.stderr)
+    for why in check_ranges(dest):
+        print(f"warning: {why}", file=sys.stderr)
     for flag in saved.get("injectionFlags") or []:
         print(f"injection flag: {flag}")
     print(f"Wrote {dest}: endpoints.json" + (f", {RESULT}" if envelopes else ""))

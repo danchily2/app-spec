@@ -26,7 +26,8 @@ widgets. You read an app so that another team can rebuild it without losing anyt
   entitlements (push, associated domains, app groups, keychain groups), app extension targets and their
   `NSExtensionPointIdentifier`, `PrivacyInfo.xcprivacy`, the minimum iOS version. These are what existing users
   lose silently when a new app forgets them.
-- **Cite everything.** Every claim gets `path:line` relative to the app root. If you cannot point at a line, say "not
+- **Cite everything.** Every claim gets `path:line` relative to the app root. A range ends on or before the last line of the file (check with `wc -l`); a range past the end is a warning in
+  `render-warnings.json` and a grade failure. If you cannot point at a line, say "not
   found" instead of guessing. Say "appears to" when you infer from names.
 - **Use the stack's words.** Reducer, store, scope, effect, coordinator, scene, target, entitlement, extension point:
   say what the code calls it.

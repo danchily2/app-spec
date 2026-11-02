@@ -17,6 +17,12 @@ Fixes found in the second payslips run (Devin, v0.2.0).
   into a parent, such as `AnalyticsFeature` or `AppRatingFeature`, goes to `tcaReducers` and is not held to the
   screen threshold of the ledger.
 
+- **Citation ranges are checked in the catalogs.** `render.py catalogs` and `merge_contracts.py` check every
+  `path:line` in the use cases, screens, flows, rules and endpoints (contract field sources included) and add a
+  `citation` warning to `render-warnings.json` for a range past the end of its file or a file that is not there.
+  Contract field tables in the spec get a `Source` column, so the grader's `citations-resolve` now checks field
+  sources too. The agents that cite are told a range ends on or before the file's last line.
+
 ## 0.2.0 - 2026-11-02
 
 Fixes found in a run on a native iOS payslips module.

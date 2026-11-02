@@ -29,7 +29,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from speclib import out, spec_md  # noqa: E402
+from speclib import out, ranges, spec_md  # noqa: E402
 from speclib.common import die, endpoints_match, load_json, normalize_endpoint  # noqa: E402
 from speclib.ids import Registry, element_slug, norm  # noqa: E402
 
@@ -104,6 +104,14 @@ class _Catalogs:
         self.registry = Registry(os.path.join(dest, "ids.json"))
         self.warnings = []  # the sentences, printed to stderr
         self.records = []   # the same as {kind, item, why}, written to render-warnings.json
+
+    def _check_ranges(self, groups):
+        """Warn about every citation in the catalog entries that runs past the end of its file or names no file."""
+        checker = ranges.Ranges(self.cfg)
+        for label, entries in groups:
+            for entry in entries:
+                for cite, reason in checker.problems(entry):
+                    self._warn("citation", cite, f"{label} {entry.get('id')} cites {cite}: {reason}")
 
     def _warn(self, kind, item, why):
         self.warnings.append(why)
@@ -497,6 +505,7 @@ class _Catalogs:
         out.save(self.dest, "endpoints.json", {"version": 1, "endpoints": sorted(endpoints.values(), key=_number)})
         out.save(self.dest, "out-of-scope.json", {"version": 1, "useCases": sorted(self.out_cases, key=_number),
                                                   "rules": sorted(self.out_rules, key=_number)})
+        self._check_ranges([("use case", use_cases), ("screen", screens), ("flow", flows), ("rule", rules)])
         out.save(self.dest, "render-warnings.json", self.records)
         self.registry.save()
         return {"useCases": len(use_cases), "screens": len(screens), "flows": len(flows), "rules": len(rules),

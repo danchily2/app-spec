@@ -1,6 +1,6 @@
 {
   "rules": [
-    {"name": "Payslips are newest first", "category": "ordering", "priority": "P1", "source": "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift:10-20",
+    {"name": "Payslips are newest first", "category": "ordering", "priority": "P1", "source": "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift:10-14",
      "plainEnglish": "The list shows the newest payslip first.", "given": "three payslips", "when": "the list opens",
      "then": "the newest is on top", "parameters": [], "edgeCases": ["same date"], "suspectedDefect": null,
      "confidence": "High", "question": null, "useCase": "View payslip list"},
