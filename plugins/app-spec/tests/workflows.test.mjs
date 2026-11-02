@@ -421,6 +421,15 @@ test('a flag on the analysed repo\'s own agent configuration is not an injection
   assert.deepEqual(rules.result.agentConfig, ['CLAUDE.md:12', 'Modules/X/AGENTS.md:3', '.claude/agents/review.md:1'])
 })
 
+test('rules: the extractor names the use case by id and records conflicts (P23)', async () => {
+  const { calls } = await run(wf('extract-rules.js'), { ...args, useCaseIndex: 'o/use-cases.json' }, () => undefined)
+  const prompt = calls.find(c => c.opts.label === 'extract:core-01').prompt
+  assert.ok(prompt.includes('copy the ID (UC-NNN)') && prompt.includes('conflictsWith'))
+  assert.ok(!prompt.includes('copy the NAME'))
+  const schema = calls.find(c => c.opts.label === 'extract:core-01').opts.schema
+  assert.ok(schema.properties.rules.items.properties.conflictsWith)
+})
+
 test('rules: with a use-case index, a touch shard keeps the rules of indexed use cases', async () => {
   // payslips v4: year-end rules in ReportsService.swift (a touch file) went out of scope although the module's
   // use case "View my year-end reports" was in the index

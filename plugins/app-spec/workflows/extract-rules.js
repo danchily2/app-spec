@@ -3,7 +3,7 @@ export const meta = {
   description:
     'Business rules of one module of one mobile app: one extractor per shard, a citation referee per rule, and a two-judge panel for each P0 rule that keeps P0 only when both judges say real and P0',
   whenToUse:
-    'Invoked by the app-spec skill when the Workflow tool is available. Requires args {out, app: {name, path, stack}, shards: [{id, kind, name, loc, file}], useCaseIndex?: "<out>/use-cases.json"} - pass the shards from <out>/module.json and the use-case index rendered from understand_result.json. Agents read their shard file and the index themselves and name the use case of each rule by its name. Returns the rules_result.json shape {rules, outOfScope, rejected, unverified, corrected, injectionFlags, agentConfig, rerunShards, stats}; the calling session saves it as <out>/rules_result.json and renders it with scripts/render.py. Resumable after a stop: re-invoke with identical args plus resumeFromRunId.',
+    'Invoked by the app-spec skill when the Workflow tool is available. Requires args {out, app: {name, path, stack}, shards: [{id, kind, name, loc, file}], useCaseIndex?: "<out>/use-cases.json"} - pass the shards from <out>/module.json and the use-case index rendered from understand_result.json. Agents read their shard file and the index themselves and name the use case of each rule by its id. Returns the rules_result.json shape {rules, outOfScope, rejected, unverified, corrected, injectionFlags, agentConfig, rerunShards, stats}; the calling session saves it as <out>/rules_result.json and renders it with scripts/render.py. Resumable after a stop: re-invoke with identical args plus resumeFromRunId.',
   phases: [
     { title: 'Extract', detail: 'one business-rules extractor per shard' },
     { title: 'Verify', detail: 'one citation referee per fresh rule' },
@@ -79,7 +79,8 @@ const RULE = {
     suspectedDefect: { type: ['string', 'null'], description: 'a likely bug in the old code the new app should not copy, or null' },
     confidence: { type: 'string', enum: ['High', 'Medium', 'Low'] },
     question: { type: ['string', 'null'], description: 'the exact question for the owner when confidence is below High' },
-    useCase: { type: 'string', description: 'the NAME of the use case it belongs to, as written in the use-case index, or an empty string' },
+    useCase: { type: 'string', description: 'the ID of the use case it belongs to (UC-NNN), copied from the use-case index, or an empty string' },
+    conflictsWith: { type: 'array', items: { type: 'string' }, description: 'the names of other rules you found that state the opposite for the same case (two screens or two code paths disagree); empty when none' },
   },
 }
 const RULES_SCHEMA = {
@@ -143,7 +144,7 @@ const file = src => String(src || '').split(':')[0]
 const lower = c => (c === 'High' ? 'Medium' : c)
 
 const catalog = useCaseIndex
-  ? `Name the use case each rule belongs to in useCase: read ${useCaseIndex} (JSON, a "useCases" list of {id, name, description, screens}) and copy the NAME of the one use case the rule clearly serves, exactly as written there. Leave useCase an empty string when none fits.`
+  ? `Name the use case each rule belongs to in useCase: read ${useCaseIndex} (JSON, a "useCases" list of {id, name, description, screens}) and copy the ID (UC-NNN) of the one use case the rule clearly serves. Leave useCase an empty string when none fits. When two rules you found state the opposite for the same case, name each in the other's conflictsWith.`
   : 'No use-case index exists yet: leave useCase an empty string.'
 
 // ---- per shard: extract -> verify its fresh rules -> P0 panel (a pipeline: shards never wait for each other) ----
@@ -163,7 +164,7 @@ breaks a legal or policy requirement, loses data or grants access wrongly.
 ${catalog}${s.kind === 'touch' ? `
 This shard is of kind touch: its files are OUTSIDE the module, context and not scope. ${useCaseIndex
   ? `A rule found here that serves a use case of the index (the module calls this code for it, such as a shared
-service the module's screen uses) goes in rules, with that use case's name in useCase. Any other rule belongs to a
+service the module's screen uses) goes in rules, with that use case's ID in useCase. Any other rule belongs to a
 neighbour module: list it in outOfScope with its source and the reason.`
   : `A rule found here belongs to a
 neighbour module: list it in outOfScope with its source and the reason, never in rules. Only a rule whose code is in a

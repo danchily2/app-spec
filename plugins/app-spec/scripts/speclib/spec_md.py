@@ -452,6 +452,8 @@ def _rule(c, r):
         lines.append("- **Edge cases:** " + "; ".join(edges))
     if r.get("suspectedDefect"):
         lines.append(f"- **Suspected defect in the old app (do not copy):** {_text(r['suspectedDefect'])}")
+    if r.get("conflictsWith"):
+        lines.append("- **Conflicts with:** " + ", ".join(str(x) for x in r["conflictsWith"]))
     lines.append(f"- **Source:** `{r.get('source')}`" if r.get("source") else "- **Source:** " + gap)
     if r.get("confidence") != "High":
         oq = next((q["id"] for q in open_question_entries(c) if q.get("ref") == r["id"]), None)

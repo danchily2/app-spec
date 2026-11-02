@@ -471,6 +471,24 @@ class TestCatalogs(unittest.TestCase):
         self.assertIn("Nowhere/Missing.swift:1", case["files"])  # no file ends so: left as cited, and reported
         self.assertFalse(any("PayslipsFeature/PayslipItem.swift:10-14: file not found" in w for w in warnings))
 
+    def test_a_rule_names_its_use_case_by_id_and_its_conflicts(self):
+        # P23: useCase was free text, so a name copied slightly wrong lost the link; no field held a conflict
+        render.catalogs(self.out)
+        uid = next(u["id"] for u in out.load(self.out, "use-cases.json")["useCases"] if u["name"] == "View payslip list")
+
+        def rules(r):
+            r["rules"][0]["useCase"] = uid
+            r["rules"][0]["conflictsWith"] = ["Net pay is always shown", "Ghost rule"]
+        self.edit("rules_result.json", rules)
+        warnings = self.warnings()
+        by_name = {r["name"]: r for r in out.load(self.out, "rules.json")["rules"]}
+        first = by_name["Payslips are newest first"]
+        self.assertEqual(first["useCase"], uid)
+        self.assertEqual(first["conflictsWith"], [by_name["Net pay is always shown"]["id"]])
+        self.assertIn("rule Payslips are newest first conflicts with Ghost rule, which rules_result.json does not have",
+                      warnings)
+        self.assertIn(f"- **Conflicts with:** {by_name['Net pay is always shown']['id']}", render.spec(self.out))
+
     def test_a_coordinator_is_not_a_screen(self):
         # payslips v4 critic-1 (High): SCR-015 to SCR-018 were navigation coordinators the mapper listed as screens
         coord = "Employee/Payslips/Coordinator/PayslipsCoordinator.swift:5"

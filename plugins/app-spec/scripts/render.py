@@ -559,9 +559,13 @@ class _Catalogs:
                                    raw.get("reason") or "the extractor found it only in touch files")
         present = {self._rule_key(r["name"], r.get("source")) for r in self.rules_in + self.rules_out
                    if isinstance(r, dict) and r.get("name")}
+        # P23: an extractor names the use case by its id from use-cases.json, or (older results) by its name
+        name_of = {uid: n for n, uid in uc_by_name.items()}
         for raw in self.rules_in:
             if not isinstance(raw, dict) or not raw.get("name"):
                 continue
+            if str(raw.get("useCase") or "").strip() in name_of:
+                raw = dict(raw, useCase=name_of[raw["useCase"].strip()])
             key = self._rule_key(raw["name"], raw.get("source"))
             # with a capability scope, a rule of a kept use case stays even when its source is a touch file: the
             # agents keep such rules for in-scope capabilities (a start-page card gate, a push handler)
@@ -587,7 +591,18 @@ class _Catalogs:
             rule["suspectedDefect"] = raw.get("suspectedDefect")
             rule["question"] = raw.get("question")
             rule["source"] = raw.get("source")
+            rule["conflictsWith"] = _strings(raw.get("conflictsWith"))  # names; resolved to ids below
             rules[rid] = rule
+        ids = {norm(r["name"]): rid for rid, r in rules.items()}
+        for rule in rules.values():
+            resolved = []
+            for other in rule["conflictsWith"]:
+                if ids.get(norm(other)) and ids[norm(other)] != rule["id"]:
+                    resolved.append(ids[norm(other)])
+                else:
+                    self._warn("rule", other, f"rule {rule['name']} conflicts with {other}, which rules_result.json "
+                                              f"does not have")
+            rule["conflictsWith"] = _unique(resolved)
         return list(rules.values())
 
     # ------------------------------------------------------------ labels, rename

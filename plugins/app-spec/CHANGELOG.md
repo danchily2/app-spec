@@ -5,6 +5,12 @@ changes.
 
 ## Unreleased
 
+- **A rule names its use case by id and can name its conflicts (P23).** The rules schema had a free-text `useCase`,
+  so a name copied with a small change lost the link to the use case, and no field said that two rules disagree.
+  The extractor now copies the use case's id (`UC-NNN`) from the index (`render.py` still accepts a name from older
+  results), and a new `conflictsWith` lists the rules that state the opposite. `render.py` turns those names into
+  RULE ids, warns about a name no rule has, and the spec shows **Conflicts with** under the rule.
+
 ## 0.5.0 - 2026-11-02
 
 Fixes found in the v4 payslips run (0.4.0, headless).

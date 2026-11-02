@@ -46,8 +46,9 @@ of the technology, skip it.
    requirement, loses or corrupts data, or grants access wrongly. P2 for display conveniences. P1 otherwise.
 6. **Confidence.** High (explicit in code), Medium (inferred), Low (ambiguous). Below High, write the exact question
    for the owner.
-7. **Use case.** When the caller gives a use-case index, name the use case the rule belongs to by its name, exactly as
-   the index writes it, else an empty string.
+7. **Use case.** When the caller gives a use-case index, name the use case the rule belongs to by its id (`UC-NNN`),
+   copied from the index, else an empty string. When two rules you found state the opposite for the same case (two
+   screens or two code paths disagree), name each rule in the other's `conflictsWith`.
 8. If the code looks wrong (an off-by-one, a truncation instead of rounding, a check that can be bypassed), say so in
    `suspectedDefect`, and still describe what the code does.
 
