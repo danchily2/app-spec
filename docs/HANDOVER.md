@@ -241,4 +241,9 @@ Add one entry per round: date, items, commits, release tag, run folder, scorecar
   v5 run started headless into `~/Documents/GitHub/vmm3/specs/payslips-v5`. Still open in group C: P23 (rule use-case
   id and `conflictsWith`), P9 (which roles write what). Then groups D (sharding) and E (Devin runtime).
   Cost note: v4 used $55.84 before the account's 5-hour limit stopped it; a full run with two passes costs more.
+- **v5 attempt 1 (2026-11-02):** stopped after the inventory. Headless print mode waits only 10 minutes for a
+  background workflow after the turn ends, then kills it (`CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS`). Not a plugin
+  defect; the runner now sets the variable to 0. Folder kept as `payslips-v5-aborted`. Its 0.5.0 inventory confirms
+  Round 2: 11 endpoints (allpayslips, allreports, report detail found), 6 events, 46 string keys (v4: 5, 0, 7).
+  v5 restarted into `payslips-v5`.
 
