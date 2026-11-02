@@ -127,6 +127,44 @@ class TestMerge(unittest.TestCase):
         self.assertEqual(saved["injectionFlags"], ["X.swift:1: flag"])
         self.assertEqual(endpoints(self.out)[self.other]["auth"], "second")
 
+    def test_an_edited_envelope_replaces_its_disagreements(self):
+        def env(name, notes):
+            return self.envelope(name, {
+                "endpoints": [{"id": self.verified, "label": "VERIFIED"}],
+                "disagreements": [{"endpoint": self.verified, "field": f, "client": "A.swift:3", "backend": "B.cs:9",
+                                   "note": n} for f, n in notes]})
+        first = env("a.json", [("gross", "nullable on the client only"), ("net", "missing on the backend")])
+        edited = env("a2.json", [("gross", "nullable on the client only, optional on the backend")])
+        run_cli(["merge_contracts.py", self.out, first])
+        self.assertEqual(len(endpoints(self.out)[self.verified]["disagreements"]), 2)
+        code, _, err = run_cli(["merge_contracts.py", self.out, edited])
+        self.assertEqual(code, 0, err)
+        saved = out.load(self.out, merge_contracts.RESULT)
+        self.assertEqual([d["note"] for d in saved["disagreements"]], ["nullable on the client only, optional on the backend"])
+        self.assertEqual([d["note"] for d in endpoints(self.out)[self.verified]["disagreements"]],
+                         ["nullable on the client only, optional on the backend"])
+        run_cli(["merge_contracts.py", self.out])
+        self.assertEqual(len(endpoints(self.out)[self.verified]["disagreements"]), 1)
+
+    def test_the_ambiguous_route_note_of_contracts_py_stays(self):
+        data = out.load(self.out, "endpoints.json")
+        note = {"field": "route", "client": "A.swift", "backend": "a.cs:1 | b.cs:1", "note": "ambiguous backend route"}
+        next(e for e in data["endpoints"] if e["id"] == self.other)["disagreements"] = [note]
+        out.save(self.out, "endpoints.json", data)
+        env = self.envelope("a.json", {"endpoints": [{"id": self.other, "label": "INFERRED"}],
+                                       "disagreements": [{"endpoint": self.other, "field": "y", "note": "b"}]})
+        run_cli(["merge_contracts.py", self.out, env])
+        self.assertEqual([d["note"] for d in endpoints(self.out)[self.other]["disagreements"]],
+                         ["ambiguous backend route", "b"])
+
+    def test_an_envelope_for_another_endpoint_keeps_the_first_ones(self):
+        a = self.envelope("a.json", {"endpoints": [{"id": self.verified, "label": "VERIFIED"}],
+                                     "disagreements": [{"endpoint": self.verified, "field": "x", "note": "a"}]})
+        b = self.envelope("b.json", {"endpoints": [{"id": self.other, "label": "INFERRED"}],
+                                     "disagreements": [{"endpoint": self.other, "field": "y", "note": "b"}]})
+        run_cli(["merge_contracts.py", self.out, a, b])
+        self.assertEqual([d["note"] for d in out.load(self.out, merge_contracts.RESULT)["disagreements"]], ["a", "b"])
+
     def test_without_a_result_nothing_changes(self):
         before = out.load(self.out, "endpoints.json")
         code, stdout, _ = run_cli(["merge_contracts.py", self.out])

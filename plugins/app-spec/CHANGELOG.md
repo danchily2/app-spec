@@ -28,6 +28,10 @@ Fixes found in a run on a native iOS payslips module.
   `render.py spec` every string of `prose.json`, so an absolute path under the app or a contract root, or one that
   starts with the root's folder name (`me-api/...`), becomes relative to that root and resolves in the grader. The
   contract reader is told to cite that way.
+- **A re-merged envelope replaces its disagreements.** When an envelope holds an endpoint, the saved disagreements of
+  that endpoint go, and `merge_contracts.py` rebuilds each endpoint's list from `contracts_result.json` instead of
+  appending to it, so an edited disagreement no longer sits next to its old version. The ambiguous-route note of
+  `contracts.py` stays.
 
 ## 0.1.0 - 2026-10-30
 

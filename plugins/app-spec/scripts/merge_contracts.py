@@ -10,14 +10,16 @@ Each ENVELOPE is a JSON file in the contract reader's envelope shape:
      "injectionFlags": ["file:line: ..."]}
 
 Every string of an envelope is first rewritten so its citations are relative to the app root or a contract root: an
-absolute root and a leading `<root folder name>/` are stripped. The envelopes are then folded into `<out>/contracts_result.json` (an entry with the same id replaces the earlier one,
-disagreements and flags are added once), and then contracts_result.json is applied to endpoints.json. Without an
+absolute root and a leading `<root folder name>/` are stripped. The envelopes are then folded into `<out>/contracts_result.json` (an entry with the same id replaces the earlier one together with
+its disagreements; other disagreements and flags are added once), and then contracts_result.json is applied to endpoints.json. Without an
 ENVELOPE the saved contracts_result.json is applied again: run it after every `render.py catalogs` and `contracts.py`,
 because `render.py catalogs` writes endpoints.json from scratch.
 
 The merge rule, applied to each endpoint the reader returned, matched by id:
 - `request`, `response`, `errors` and `auth` are written from the reader when the reader gives them.
-- The reader's disagreements for the endpoint are added to its `disagreements` list, once each.
+- The endpoint's `disagreements` list is rebuilt from contracts_result.json: the reader's disagreements for it, once
+  each, after the ones contracts.py wrote (an ambiguous backend route). A disagreement of an earlier merge never
+  lingers next to its edited version.
 - The label: a `VERIFIED` label (set by contracts.py) stays `VERIFIED`, unless the reader returns `UNKNOWN` with a
   `reason` that states which field it could not read (the reason says "field", or names a request or response field
   of the entry after the merge); then it becomes `UNKNOWN` and the reason is kept as `reason`. Any
@@ -43,6 +45,7 @@ RESULT = "contracts_result.json"
 LABELS = ("UNKNOWN", "INFERRED", "VERIFIED")
 FIELDS = ("request", "response", "errors", "auth")
 DISAGREEMENT_KEYS = ("field", "client", "backend", "note")
+CONTRACTS_NOTES = {"ambiguous backend route"}  # disagreements contracts.py writes itself; the merge keeps them
 
 
 def _envelope(path, root_list=()):
@@ -65,13 +68,16 @@ def _add_once(items, new):
 
 
 def fold(saved, envelope):
-    """`saved` with `envelope` folded in: same id replaces, disagreements and flags added once."""
+    """`saved` with `envelope` folded in: an endpoint with the same id replaces the saved one, and the saved
+    disagreements of every endpoint the envelope holds go with it. Other disagreements and flags are added once."""
     by_id = {e["id"]: e for e in saved.get("endpoints") or []}
     for e in envelope["endpoints"]:
         by_id[e["id"]] = e
+    replaced = {e["id"] for e in envelope["endpoints"]}
+    kept = [d for d in saved.get("disagreements") or [] if d.get("endpoint") not in replaced]
     return {"version": 1,
             "endpoints": [by_id[k] for k in sorted(by_id)],
-            "disagreements": _add_once(list(saved.get("disagreements") or []), envelope["disagreements"]),
+            "disagreements": _add_once(kept, envelope["disagreements"]),
             "injectionFlags": _add_once(list(saved.get("injectionFlags") or []), envelope["injectionFlags"])}
 
 
@@ -121,8 +127,12 @@ def apply(dest, result):
             entry["reason"] = reason.strip()
         own = [{k: d.get(k) for k in DISAGREEMENT_KEYS} for d in result.get("disagreements") or []
                if d.get("endpoint") == read["id"]]
-        if own:
-            entry["disagreements"] = _add_once(list(entry.get("disagreements") or []), own)
+        scripted = [d for d in entry.get("disagreements") or [] if isinstance(d, dict) and d.get("note") in CONTRACTS_NOTES]
+        rebuilt = _add_once(list(scripted), own)  # rebuilt, never appended: an earlier merge's list does not linger
+        if rebuilt:
+            entry["disagreements"] = rebuilt
+        else:
+            entry.pop("disagreements", None)
         if json.dumps(entry, sort_keys=True) != before:
             changed.append(read["id"])
     out.save(dest, "endpoints.json", data)
