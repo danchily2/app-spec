@@ -434,7 +434,10 @@ class _Catalogs:
             if not isinstance(raw, dict) or not raw.get("name"):
                 continue
             key = self._rule_key(raw["name"], raw.get("source"))
-            if not self._in_core([raw.get("source")]):
+            # with a capability scope, a rule of a kept use case stays even when its source is a touch file: the
+            # agents keep such rules for in-scope capabilities (a start-page card gate, a push handler)
+            kept_case = bool(self.cfg.get("scope")) and bool(raw.get("useCase")) and norm(raw["useCase"]) in uc_by_name
+            if not kept_case and not self._in_core([raw.get("source")]):
                 self._out_of_scope("rule", "RULE", key, raw["name"],
                                    f"its source {_path(raw.get('source'))} is a touch file, outside the module's core")
                 continue

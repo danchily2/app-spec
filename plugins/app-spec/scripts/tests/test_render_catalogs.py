@@ -67,6 +67,19 @@ class TestOutOfScope(unittest.TestCase):
         self.assertEqual([r["name"] for r in out.load(self.out, "rules.json")["rules"]], ["Payslips are newest first"])
         self.assertEqual([r["name"] for r in out.load(self.out, "out-of-scope.json")["rules"]], ["Net pay is always shown"])
 
+    def test_with_a_capability_scope_a_touch_rule_of_a_kept_use_case_stays(self):
+        card = "Employee/StartPage/PayslipCard.swift"
+        self.edit("app-spec.json", lambda c: c.update(scope=["CAP-001"]))
+        self.edit("rules_result.json", lambda r: r["rules"].append(
+            {**r["rules"][0], "name": "Card shows the latest payslip", "source": f"{card}:5-9"}))
+        render.catalogs(self.out)
+        kept = [r["name"] for r in out.load(self.out, "rules.json")["rules"]]
+        self.assertIn("Card shows the latest payslip", kept)
+        # without a scope the same rule leaves, as before
+        self.edit("app-spec.json", lambda c: c.update(scope=None))
+        render.catalogs(self.out)
+        self.assertNotIn("Card shows the latest payslip", [r["name"] for r in out.load(self.out, "rules.json")["rules"]])
+
     def test_touch_only_use_cases_and_rules_leave_the_catalogs(self):
         card = "Employee/StartPage/PayslipCard.swift"
 
