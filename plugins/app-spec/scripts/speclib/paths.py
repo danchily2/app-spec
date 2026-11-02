@@ -76,10 +76,12 @@ def file_index(root_list):
 
 
 def complete(value, root_list, index):
-    """`value` (a string or a list of strings) with every path that names no file under a root, but names the end of
-    exactly one file in `index` (from `file_index`), rewritten to that file's full relative path. Other paths stay."""
+    """`value` (a JSON value) with every path that names no file under a root, but names the end of exactly one file
+    in `index` (from `file_index`), rewritten to that file's full relative path. Other paths stay."""
     if isinstance(value, list):
         return [complete(v, root_list, index) for v in value]
+    if isinstance(value, dict):
+        return {k: complete(v, root_list, index) for k, v in value.items()}
     if not isinstance(value, str):
         return value
 

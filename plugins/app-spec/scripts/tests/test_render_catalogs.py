@@ -471,6 +471,21 @@ class TestCatalogs(unittest.TestCase):
         self.assertIn("Nowhere/Missing.swift:1", case["files"])  # no file ends so: left as cited, and reported
         self.assertFalse(any("PayslipsFeature/PayslipItem.swift:10-14: file not found" in w for w in warnings))
 
+    def test_a_partial_path_in_any_field_of_a_rule_resolves(self):
+        # payslips v4: RULE-108 cited `nil (ViewModel/ViewModel.PayslipDocument.swift:17)` inside its parameters
+        full = "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift"
+        self.edit("rules_result.json", lambda r: r["rules"][0].update(
+            parameters=[{"name": "Order", "value": "newest first (PayslipsFeature/PayslipItem.swift:10)"}],
+            edgeCases=["an empty list (PayslipsFeature/PayslipItem.swift:11-12)"],
+            plainEnglish="Sorted in PayslipsFeature/PayslipItem.swift:10."))
+        warnings = [w for w in self.warnings() if "file not found" in w]
+        rule = next(r for r in out.load(self.out, "rules.json")["rules"] if r["name"] == "Payslips are newest first")
+        self.assertEqual(rule["parameters"][0]["value"], f"newest first ({full}:10)")
+        self.assertEqual(rule["edgeCases"], [f"an empty list ({full}:11-12)"])
+        self.assertEqual(rule["plainEnglish"], f"Sorted in {full}:10.")
+        self.assertEqual(rule["parameters"][0]["name"], "Order")
+        self.assertEqual(warnings, [])
+
     def test_a_citation_within_its_file_is_no_warning(self):
         self.assertEqual([w for w in self.warnings() if " cites " in w and "lines" in w], [])
 

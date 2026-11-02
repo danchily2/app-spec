@@ -163,15 +163,15 @@ class _Catalogs:
         it the core check sends the entry out of scope and the range check reports the file as not found."""
         root_list = paths.roots(self.cfg)
         index = paths.file_index(root_list)
-        for case in self.understood.get("useCases") or []:
-            if isinstance(case, dict) and isinstance(case.get("files"), list):
-                case["files"] = paths.complete(case["files"], root_list, index)
-        for screen in self.understood.get("screens") or []:
-            if isinstance(screen, dict) and screen.get("file"):
-                screen["file"] = paths.complete(screen["file"], root_list, index)
-        for rule in list(self.rules_in) + list(self.rules_out):
-            if isinstance(rule, dict) and rule.get("source"):
-                rule["source"] = paths.complete(rule["source"], root_list, index)
+        entries = [e for key in ("useCases", "screens", "flows") for e in self.understood.get(key) or []]
+        for entry in entries + list(self.rules_in) + list(self.rules_out):
+            if not isinstance(entry, dict):
+                continue
+            # every field but the name: a citation can sit in a parameter, an edge case or a description; the name
+            # is part of the id key and never holds a path
+            for key, value in list(entry.items()):
+                if key != "name":
+                    entry[key] = paths.complete(value, root_list, index)
 
     def _check_ranges(self, groups):
         """Warn about every citation in the catalog entries that runs past the end of its file or names no file."""

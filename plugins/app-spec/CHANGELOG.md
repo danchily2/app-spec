@@ -5,6 +5,13 @@ changes.
 
 ## Unreleased
 
+Fixes found in the v4 payslips run (0.4.0, headless).
+
+- **Partial paths resolve in every field, not only the source.** RULE-108 cited
+  `nil (ViewModel/ViewModel.PayslipDocument.swift:17)` in its parameters, and the range check reported the file as
+  not found. `render.py catalogs` now completes paths in every field of use cases, screens, flows and rules (nested
+  lists and objects too), except `name`, which is part of the id key.
+
 Agent and schema fixes from the Devin run-2 register, group C.
 
 - **The analysed repo's own agent configuration is not an injection (P27).** `CLAUDE.md`, `AGENTS.md` and `.claude/`
