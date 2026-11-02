@@ -206,6 +206,13 @@ class TestOtherChecks(GradeCase):
         self.assertFalse(c["pass"])
         self.assertIn(f"{item}:3-70", c["detail"])
 
+    def test_a_banned_noun_in_the_out_of_scope_list_is_not_a_failure(self):
+        dest = self.copy("b_oos")
+        out.save(dest, "out-of-scope.json", {"version": 1, "useCases": [
+            {"id": "UC-099", "name": "Shared Realm encryption keys", "reason": "app-wide"}], "rules": []})
+        render.spec(dest)
+        self.assertTrue(check(grade.run(dest), "banned-nouns")["pass"])
+
     def test_criteria_per_use_case(self):
         dest = self.copy("c_gap")
         prose = out.load(dest, "prose.json")

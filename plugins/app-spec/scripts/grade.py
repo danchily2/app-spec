@@ -30,7 +30,7 @@ from ledger import _Ledger, _platform_values  # noqa: E402
 from speclib import out  # noqa: E402
 from speclib.common import die  # noqa: E402
 from speclib.ids import norm  # noqa: E402
-from speclib.spec_md import NO_RULE, NO_RULE_RE, NO_RULE_REASON, Context, _element_rows, target  # noqa: E402
+from speclib.spec_md import NO_RULE, NO_RULE_RE, NO_RULE_REASON, OUT_OF_SCOPE_LEAD, Context, _element_rows, target  # noqa: E402
 from speclib.template import APPENDICES, AC_RE, CITE_RE, HEADINGS  # noqa: E402
 
 CHECKS = ("sections", "rules-per-use-case", "criteria-per-use-case", "criteria-numbering", "citations-resolve",
@@ -337,6 +337,8 @@ class _Grader:
         nouns = [n for n in ((self.cfg.get("options") or {}).get("bannedNouns") or []) if isinstance(n, str) and n]
         items = []
         for number, text in self.spec.lines(BODY):
+            if text.startswith(OUT_OF_SCOPE_LEAD):
+                continue  # the names of neighbour use cases and rules, quoted from the agents
             plain = _unmarked(text)
             for noun in nouns:
                 if re.search(r"(?<!\w)" + re.escape(noun) + r"(?!\w)", plain):

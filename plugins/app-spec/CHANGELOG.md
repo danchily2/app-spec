@@ -41,6 +41,10 @@ Fixes found in the second payslips run (Devin, v0.2.0).
 - **A note after an endpoint path no longer makes a second endpoint.** `GET /x/{id} (push path only)` and
   `GET /Payslip/Export (single company)` normalize to the same endpoint as the plain path.
 
+- **The out-of-scope list is not held to the banned nouns.** The renderer's one-line list of neighbour use cases and
+  rules quotes the agents' names (such as "Shared Realm encryption keychain tags"); the grader no longer fails
+  `banned-nouns` on it.
+
 ## 0.2.0 - 2026-11-02
 
 Fixes found in a run on a native iOS payslips module.

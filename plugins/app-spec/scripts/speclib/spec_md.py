@@ -28,6 +28,8 @@ def _text(value):
 
 _CITE_TOKEN = re.compile(r"(?<![\w@+.\-/`])(" + CITE_RE + r")(?![\w`])")
 NO_RULE = "No client-side rule; the server decides."
+# the renderer's list of neighbour use cases and rules: names quoted from the agents, not requirements
+OUT_OF_SCOPE_LEAD = "- **Out of scope, belongs to neighbour modules**"
 # The two cited sentences that excuse a use case without a rule: the server decides, or a stated reason such as
 # "No client-side rule: this use case only opens the assistant sheet." The reason must be a real clause.
 NO_RULE_REASON = "No client-side rule: <reason>."
@@ -545,7 +547,7 @@ def out_of_scope_line(c):
             parts.append(f"{label} " + "; ".join(f"{e['id']} {e.get('name') or ''}".strip() for e in items))
     if not parts:
         return None
-    return ("- **Out of scope, belongs to neighbour modules** (found only in touch files; see out-of-scope.json): "
+    return (OUT_OF_SCOPE_LEAD + " (found only in touch files; see out-of-scope.json): "
             + ". ".join(parts) + ".")
 
 
