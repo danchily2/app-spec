@@ -15,7 +15,8 @@ Fixes found in the second payslips run (Devin, v0.2.0).
 - **A TCA reducer with no view is not a screen.** The iOS inventory keeps a `@Reducer` type among screens only when
   some Swift file holds a store of it (`StoreOf<Name>` or `Store<Name.State, ...>`). A reducer that is only scoped
   into a parent, such as `AnalyticsFeature` or `AppRatingFeature`, goes to `tcaReducers` and is not held to the
-  screen threshold of the ledger.
+  screen threshold of the ledger. A SwiftUI sub-view (a row, a cell, a body view) declared in the folder of a kept screen
+  now counts as part of that screen, as a reducer already did.
 
 - **Citation ranges are checked in the catalogs.** `render.py catalogs` and `merge_contracts.py` check every
   `path:line` in the use cases, screens, flows, rules and endpoints (contract field sources included) and add a

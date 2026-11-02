@@ -148,7 +148,9 @@ class _Ledger:
                 continue
             found = self._screen_for(name, file)
             item = f"{file} {name}"
-            referenced = found is not None or (e.get("kind") == "tca-feature" and self._beside_a_kept_screen(file))
+            # a reducer, or a SwiftUI sub-view (a row, a cell, a body view), declared beside a kept screen is part of it
+            referenced = found is not None or (e.get("kind") in ("tca-feature", "swiftui-view")
+                                               and self._beside_a_kept_screen(file))
             rows.append((item, [found["id"]] if found else [], referenced, None, self.scope(e)))
         return self.count("screen", rows)
 

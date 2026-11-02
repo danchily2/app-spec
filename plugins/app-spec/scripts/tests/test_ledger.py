@@ -345,6 +345,18 @@ class TestCoreOnly(LedgerCase):
         cls = ledger.compute(dest)["classes"]["events"]
         self.assertEqual((cls["total"], cls["covered"], cls["informational"]), (1, 1, ["card_hidden"]))
 
+    def test_a_swiftui_sub_view_beside_a_kept_screen_is_covered(self):
+        dest = self.base()
+        folder = "Modules/PayslipsFeature/Sources/PayslipsFeature"
+        edit(dest, "inventory.json", lambda d: d.setdefault("swiftuiViews", []).extend([
+            {"name": "PayslipRowView", "kind": "swiftui-view", "file": f"{folder}/PayslipRowView.swift:4", "scope": "core"},
+            {"name": "OrphanView", "kind": "swiftui-view", "file": "Modules/Other/Sources/Other/OrphanView.swift:3", "scope": "core"}]))
+        edit(dest, "module.json", lambda m: m["core"].append("Modules/Other/Sources/Other/OrphanView.swift"))
+        cls = ledger.compute(dest)["classes"]["screens"]
+        uncovered = [u["item"] for u in cls["uncovered"]]
+        self.assertFalse(any("PayslipRowView" in u for u in uncovered))
+        self.assertTrue(any("OrphanView" in u for u in uncovered))
+
     def test_a_reducer_beside_a_kept_screen_is_covered(self):
         dest = self.base()
         folder = "Modules/PayslipsFeature/Sources/PayslipsFeature"
