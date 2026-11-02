@@ -5,6 +5,8 @@ changes.
 
 ## Unreleased
 
+## 0.6.0 - 2026-11-02
+
 - **A rules finding corrects the named cards instead of re-extracting the shard.** In v5 step 7.5 re-ran the
   extraction on each shard a rules finding cited. The new cards got new source keys, so `patch_result.py` added them
   beside the wrong old ones (87 rules became 162, with pairs such as RULE-031 and RULE-125), and critic-2 raised 4 of
