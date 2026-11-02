@@ -5,6 +5,13 @@ changes.
 
 ## Unreleased
 
+Inventory fixes from the Devin run-2 register, group B.
+
+- **Endpoints keep their original spelling in the spec (P10/P26).** `normalize_endpoint` lowercases a path so that
+  the app, the inventory and the backend routes match, and the spec showed the lowercase key
+  (`/payslips/exportfromalltenants`). `endpoints.json` now also has `display`, the same path in the spelling of the
+  app's literal (`/payslips/exportFromAllTenants`); the spec shows it. Matching still uses the lowercase `path`.
+
 ## 0.4.0 - 2026-11-02
 
 Fixes found in the v3 payslips rerun (0.3.0 code).

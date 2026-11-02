@@ -258,6 +258,19 @@ class TestCatalogs(unittest.TestCase):
         change(data)
         out.save(self.out, "rules_result.json", data)
 
+    def test_an_endpoint_keeps_its_original_spelling_for_display(self):
+        # P10/P26: the spec showed /payslips/exportfromalltenants; the app and the backend spell exportFromAllTenants
+        inv = out.load(self.out, "inventory.json")
+        e = next(x for x in inv["endpoints"] if x["path"] == "/employee/api/v1/employees/{}/payslips")
+        e["raw"] = "\\(APIConstants.URL.v1)/employees/\\(id)/Payslips"
+        out.save(self.out, "inventory.json", inv)
+        render.catalogs(self.out)
+        ep = next(x for x in out.load(self.out, "endpoints.json")["endpoints"]
+                  if x["path"] == "/employee/api/v1/employees/{}/payslips")
+        self.assertEqual(ep["display"], "/employee/api/v1/employees/{}/Payslips")
+        text = render.spec(self.out)
+        self.assertIn(f"### {ep['id']} — GET /employee/api/v1/employees/{{}}/Payslips", text)
+
     def test_endpoint_label_unknown_when_unresolved(self):
         render.catalogs(self.out)
         eps = out.load(self.out, "endpoints.json")["endpoints"]

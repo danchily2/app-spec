@@ -380,8 +380,9 @@ def _oq(c, ref):
 
 
 def endpoint_path(e):
-    """The path of endpoint `e`, or `link <expression>` for a server link whose path no backend code named yet."""
-    return e.get("path") or (f"link {e['followsLink']}" if e.get("followsLink") else "path unknown")
+    """The path of endpoint `e` in the app's spelling (`display`, else the lowercase key), or `link <expression>` for a
+    server link whose path no backend code named yet."""
+    return e.get("display") or e.get("path") or (f"link {e['followsLink']}" if e.get("followsLink") else "path unknown")
 
 
 def endpoints(c):

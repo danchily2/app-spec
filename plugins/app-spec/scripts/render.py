@@ -115,6 +115,20 @@ def _endpoint_path(path):
     return normalize_endpoint(path) or _PARAM.sub("{}", str(path or ""))
 
 
+def _display_path(path, raw):
+    """`path` (the lowercase key) in the spelling of the app's literal `raw`, such as
+    `/payslips/exportFromAllTenants`, or None when the literal does not spell the same path. A base-URL constant the
+    literal leaves unresolved (`\\(APIConstants.URL.v1)/employees/...`) keeps the resolved prefix of `path`."""
+    shown = normalize_endpoint(raw, keep_case=True) if path and raw else None
+    if not shown or shown == path:
+        return None
+    if shown.lower() == path:
+        return shown
+    if path.endswith(shown.lower()):  # `shown` starts with "/", so the match falls on a segment boundary
+        return path[: len(path) - len(shown)] + shown
+    return None
+
+
 def _module_slug(cfg):
     query = (cfg.get("module") or {}).get("query") or []
     return (_slug(query[0]) if query else "") or "module"
@@ -226,7 +240,8 @@ class _Catalogs:
                 if client not in entries[eid]["clients"]:
                     entries[eid]["clients"].append(client)
                 continue
-            entries[eid] = {"id": eid, "method": method, "path": path, "raw": e.get("raw"), "useCases": [],
+            entries[eid] = {"id": eid, "method": method, "path": path, "display": _display_path(path, e.get("raw")),
+                            "raw": e.get("raw"), "useCases": [],
                             "client": client, "clients": [client],
                             "request": {"fields": []}, "response": {"fields": []}, "errors": [], "auth": None,
                             "backend": None, "label": "INFERRED"}

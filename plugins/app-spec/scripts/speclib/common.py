@@ -311,12 +311,13 @@ def _replace_templates(s):
     return "".join(out)
 
 
-def normalize_endpoint(raw):
+def normalize_endpoint(raw, keep_case=False):
     """Normalize a URL or path to a comparable form.
 
     Scheme and host are dropped, parameters of any syntax (${x}, \\(x), {x}, :x, %@, <x>) become {}, the query and
     fragment are dropped, a note after the first space is dropped, duplicate slashes collapse, trailing slashes go, and the result is lowercase. Returns None
-    for something that is not path-shaped.
+    for something that is not path-shaped. With `keep_case`, the result keeps the original spelling, for display only:
+    match endpoints by the lowercase form.
     """
     if raw is None:
         return None
@@ -343,8 +344,9 @@ def normalize_endpoint(raw):
     # concrete ids in recorded traffic or literals: numbers, UUIDs, long hex or base64-ish tokens become parameters
     s = "/".join("{}" if re.fullmatch(r"\d+|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-fA-F]{24,}", seg)
                  else seg for seg in s.split("/"))
-    s = s.lower()
-    if s == "/" or not re.search(r"[a-z]", s):
+    if not keep_case:
+        s = s.lower()
+    if s == "/" or not re.search(r"[a-zA-Z]", s):
         return None
     if " " in s or len(s) > 200:
         return None
