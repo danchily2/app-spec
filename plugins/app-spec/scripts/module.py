@@ -398,11 +398,20 @@ def make_shards(app_root, files, kind, max_lines=DEFAULT_MAX_LINES):
 
 # ---------------------------------------------------------------- command line
 
+def plugin_info():
+    """{version, commit} of the plugin that runs: the version from .claude-plugin/plugin.json, the commit of its git
+    checkout when it has one (an installed copy has none: then null)."""
+    folder = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    manifest = load_json(os.path.join(folder, ".claude-plugin", "plugin.json"), {}) or {}
+    return {"version": manifest.get("version"), "commit": git_info(folder)["commit"]}
+
+
 def _config(args, root, stack, contracts):
     git = git_info(root)
     index, scope = _scope_fields(args)
     return {
         "version": 1,
+        "plugin": plugin_info(),
         "app": {"path": root, "name": args.app_name or os.path.basename(root), "stack": stack, "commit": git["commit"],
                 "branch": git["branch"], "clean": git["clean"]},
         "module": {"query": list(args.module or []), "confirmed": bool(args.confirmed)},
@@ -418,6 +427,7 @@ def _config(args, root, stack, contracts):
 def _update_config(cfg, args, root, contracts):
     """A re-run: set the fields this script owns, keep every other field as it is."""
     git = git_info(root)
+    cfg["plugin"] = plugin_info()  # the code of this run, not of an earlier one
     app = cfg.setdefault("app", {})
     app.update({"commit": git["commit"], "branch": git["branch"], "clean": git["clean"]})
     module = cfg.setdefault("module", {})
@@ -531,6 +541,8 @@ def main(argv=None):
         record["touchFilter"] = touch_filter
     out.save(dest, "module.json", record)
 
+    plugin = plugin_info()
+    print(f"app-spec {plugin['version']}" + (f" ({plugin['commit'][:7]})" if plugin["commit"] else ""))
     print(f"Module {', '.join(args.module or scope)} in {os.path.basename(root)} ({stack})")
     print("Core folders:")
     for folder in core_folders:

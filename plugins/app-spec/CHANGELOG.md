@@ -5,6 +5,10 @@ changes.
 
 ## Unreleased
 
+- **A run records which plugin made it (N1).** Devin's plugin cache stayed on an old version, and nothing in the run
+  folder said which code had run. `module.py` now writes `plugin: {version, commit}` to `app-spec.json` (the commit
+  is null for an installed copy, which has no git checkout) and prints `app-spec <version>` as its first line.
+
 - **A shard keeps to one area (P5/P12).** Small folders were merged with their alphabetical neighbours, so a shard
   could hold `EmployeeServices/Payslips` next to `Modules/EmployeeAppCore`, named `[EmployeeServices/Payslips..
   Modules/EmployeeAppCore]`, and its analyst read unrelated code. Small parts now merge only within one top folder,

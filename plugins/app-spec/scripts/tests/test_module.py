@@ -105,6 +105,17 @@ class TestModule(unittest.TestCase):
         self.assertTrue((Path(self.tmp) / "module.json").exists())
         self.assertIn("EmployeeServices/Payslips", stdout)
 
+    def test_the_run_records_and_prints_the_plugin_version(self):
+        # N1: Devin's plugin cache stayed on an old version and nothing in the run folder said which code made it
+        manifest = json.loads((Path(module.__file__).resolve().parent.parent / ".claude-plugin" / "plugin.json")
+                              .read_text(encoding="utf-8"))
+        rc, stdout, _ = run_cli(["module.py", IOS, "--module", "Payslips", "--out", self.tmp])
+        self.assertEqual(rc, 0)
+        plugin = out.load_config(self.tmp)["plugin"]
+        self.assertEqual(plugin["version"], manifest["version"])
+        self.assertIn("commit", plugin)
+        self.assertIn(f"app-spec {manifest['version']}", stdout.splitlines()[0])
+
     def test_cli_refuses_out_inside_a_contract_repository(self):
         backend = os.path.join(self.tmp, "backend")
         os.makedirs(os.path.join(backend, "src"))
