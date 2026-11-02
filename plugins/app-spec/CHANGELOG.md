@@ -12,6 +12,13 @@ Fixes found in a run on a native iOS payslips module.
   another file also declares is ambiguous and does not match, and an event family counts only when the core declares
   it. On the payslips module, touch points fell from 486 to 18. `module.py --touch-keyword WORD` keeps only touch
   points that contain the word and records the filter in `module.json`.
+- **ASP.NET routes given as constants are found.** `[Route(RouteHelper.Payslip.Controller)]` and
+  `[HttpGet(RouteHelper.Payslip.AllPayslips)]` resolve through the repository's `const string` and
+  `static readonly string` fields, by nested class, with `+`, interpolation and `nameof`. An action with several verb
+  attributes gives one route each, `[HttpGet]` with an action `[Route]` uses that template, and a controller inherits
+  the `[Route]`, `[ApiVersion]` and `[Authorize]` of its base class. A constant that cannot be resolved is listed in
+  `contractsRun[].unresolvedRoutes`. The attribute line of an action far into a controller is now right. On the
+  payslips run, 13 of 13 endpoints matched, against 0.
 
 ## 0.1.0 - 2026-10-30
 

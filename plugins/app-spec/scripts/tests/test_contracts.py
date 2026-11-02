@@ -13,6 +13,7 @@ import render
 ASPNET = str(FIX / "backend-aspnet")
 EXPRESS = str(FIX / "backend-express")
 EMPTY = str(FIX / "backend-empty")
+CONSTANTS = str(FIX / "backend-aspnet-constants")
 
 
 class TestLocateRoutes(unittest.TestCase):
@@ -37,6 +38,31 @@ class TestLocateRoutes(unittest.TestCase):
         paths = {(x["method"], x["path"]) for x in contracts.locate_routes(ASPNET, "aspnet")}
         self.assertIn(("GET", "/api/v1/Ping"), paths)
         self.assertIn(("DELETE", "/api/v1/Ping/{id}"), paths)
+
+    def test_aspnet_constant_templates_resolve(self):
+        routes = contracts.locate_routes(CONSTANTS, "aspnet")
+        found = {(r["method"], r["path"], r["line"]) for r in routes if r["file"].endswith("PayslipController.cs")}
+        self.assertEqual(found, {
+            ("GET", "/api/v1/payslip/allpayslips", 10),  # two verb attributes on one action: one route each
+            ("GET", "/api/v1/employees/{odpUserId}/allpayslips", 11),
+            ("GET", "/api/v1/employees/{odpUserId}/payslips/export", 17),  # interpolation of another constant
+            ("GET", "/api/v1/payslip/getpayslipdocumentfile", 20),  # [HttpGet] with the action's [Route]
+            ("GET", "/Status", 24),  # nameof
+            ("DELETE", None, 27),
+        })
+        both = [r for r in routes if r["line"] in (10, 11)]
+        self.assertEqual({r["auth"] for r in both}, {"PayslipUsersOnly"})
+        self.assertEqual({r["responseType"] for r in both}, {"PayslipListDto"})
+
+    def test_aspnet_unresolved_constant_keeps_a_lead(self):
+        r = next(x for x in contracts.locate_routes(CONSTANTS, "aspnet") if x["method"] == "DELETE")
+        self.assertIsNone(r["path"])
+        self.assertEqual(r["constant"], "RouteHelper.Payslip.Missing")
+
+    def test_aspnet_inherited_route_and_api_version(self):
+        r = next(x for x in contracts.locate_routes(CONSTANTS, "aspnet") if x["method"] == "POST")
+        self.assertEqual(r["path"], "/api/v2/Assistant/feedback")
+        self.assertEqual(r["auth"], "Authorize")  # from the base class
 
     def test_express_route(self):
         self.assertIn(("GET", "/employees/:id/payslips"),
@@ -179,6 +205,13 @@ class TestEnrich(unittest.TestCase):
         self.assertIn("routes/a.ts:3 | routes/b.ts:3", d[0]["backend"])
         contracts.enrich(self.out, repo)
         self.assertEqual(self.eps()[0]["disagreements"], d)
+
+    def test_constant_routes_match_behind_a_client_prefix_and_leads_are_kept(self):
+        e = self._one("/employee/api/v1/employees/{}/allpayslips", CONSTANTS)
+        self.assertEqual((e["backend"]["file"], e["backend"]["line"]), ("Controllers/PayslipController.cs", 11))
+        run = out.load(self.out, "endpoints.json")["contractsRun"][-1]
+        self.assertEqual(run["unresolvedRoutes"], [{"method": "DELETE", "file": "Controllers/PayslipController.cs",
+                                                    "line": 27, "constant": "RouteHelper.Payslip.Missing"}])
 
     def test_cli(self):
         code, _, err = run_cli(["contracts.py", self.out, "--repo", ASPNET, "--framework", "aspnet"])

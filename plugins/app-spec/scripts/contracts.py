@@ -54,8 +54,15 @@ _SIGNATURE = re.compile(
     re.M)
 _MODIFIERS = re.compile(r"(?:\b(?:public|internal|sealed|abstract|partial|static)\s+)+$")
 _ATTRS_BEFORE = re.compile(r"((?:\s*\[(?:[^\[\]]|\[[^\]]*\])*\])+)\s*$")
-_ASP_VERB = re.compile(r"\[\s*Http(Get|Post|Put|Delete|Patch|Head|Options)\b(?:\(\s*(?:Template\s*=\s*)?\"([^\"]*)\")?")
-_ROUTE = re.compile(r"\[\s*Route\(\s*\"([^\"]*)\"")
+# an attribute argument: string literals, interpolated strings and constant names joined by `+`, up to `,` or `)`
+_ARG = r"((?:\$?@?\"(?:[^\"\\]|\\.)*\"|\([^()]*\)|[^,()\]\"])*)"
+_ASP_VERB = re.compile(r"(?:\[|,)\s*Http(Get|Post|Put|Delete|Patch|Head|Options)\b(?:\(\s*(?:Template\s*=\s*)?" + _ARG + ")?")
+_ROUTE = re.compile(r"(?:\[|,)\s*Route\(\s*" + _ARG)
+_API_VERSION = re.compile(r"(?:\[|,)\s*ApiVersion\(\s*" + _ARG)
+_CS_SCOPE_HEAD = re.compile(r"\b(class|struct|record|interface|namespace)\s+([\w.]+)[^{};]*$")
+_CS_CONST = re.compile(r"\b(?:const\s+string|static\s+readonly\s+string)\s+(\w+)\s*=\s*([^;]+);")
+_CS_TOKEN = re.compile(
+    r"\s*(?:(\$@|@\$|\$|@)?\"((?:[^\"\\]|\\.|\"\")*)\"|nameof\(\s*([\w.]+)\s*\)|([A-Za-z_][\w.]*)|(\+))\s*")
 _AUTHORIZE = re.compile(r"\[\s*Authorize\b(?:\(([^\]]*)\))?\s*\]")
 _ASP_POLICY = re.compile(r"Policy\s*=\s*\"([^\"]*)\"")
 _ASP_ROLES = re.compile(r"Roles\s*=\s*\"([^\"]*)\"")
@@ -63,9 +70,15 @@ _PRIMITIVES = {"string", "int", "long", "bool", "guid", "datetime", "decimal", "
                "cancellationtoken", "char", "object", "datetimeoffset", "dateonly", "timeonly", "uint", "ulong"}
 
 
+_LOOK_BACK = 8000
+
+
 def _attrs_before(text):
-    """The run of attributes that ends `text`, as a match (looks back at most 2000 characters)."""
-    return _ATTRS_BEFORE.search(text[-2000:])
+    """(attributes, offset): the run of attributes that ends `text` and the offset in `text` where it starts, or None.
+    Looks back at most 8000 characters, enough for a base controller's long run of response types."""
+    start = max(0, len(text) - _LOOK_BACK)
+    m = _ATTRS_BEFORE.search(text, start)
+    return (m.group(1), m.start(1)) if m else None
 
 
 def _split_top(text):
@@ -123,9 +136,141 @@ def _aspnet_request_type(params_text, template):
     return None
 
 
-def _aspnet_routes(repo_root):
-    routes = []
-    for rel, text in _files(repo_root, {".cs"}):
+def _cs_class_paths(text):
+    """[(offset, path)]: the nested class path in force from each offset on; None inside a method or other block.
+    Namespaces do not count in the path."""
+    changes, stack, last = [(0, ())], [], 0
+    for m in re.finditer(r"[{};]", text):
+        ch, i = m.group(0), m.start()
+        if ch == "{":
+            head = _CS_SCOPE_HEAD.search(text, last, i)
+            if not head:
+                stack.append(None)
+            else:
+                stack.append(() if head.group(1) == "namespace" else (head.group(2),))
+        elif ch == "}" and stack:
+            stack.pop()
+        last = i + 1
+        if ch != ";":
+            changes.append((i + 1, None if None in stack else tuple(n for part in stack for n in part)))
+    return changes
+
+
+def _path_at(changes, offset):
+    path = ()
+    for start, value in changes:
+        if start > offset:
+            break
+        path = value
+    return path
+
+
+class Constants:
+    """The `const string` and `static readonly string` fields of a C# repository by nested class path, and the value
+    of an attribute argument such as `RouteHelper.Payslip.Controller + "/x"` or an interpolated `{Root}/x`."""
+
+    def __init__(self, files):
+        self.exprs = {}  # (class, ..., name) -> (expression, the class path it is declared in)
+        for _rel, text in files:
+            changes = _cs_class_paths(text)
+            for m in _CS_CONST.finditer(text):
+                scope = _path_at(changes, m.start())
+                if scope is not None:
+                    self.exprs[scope + (m.group(1),)] = (m.group(2).strip(), scope)
+        self._cache = {}
+
+    def lookup(self, dotted, scope):
+        """The key of the constant `dotted` names from inside `scope`: the innermost enclosing match first, then the
+        only key that ends with the name's parts. None when it is unknown or ambiguous."""
+        parts = tuple(dotted.split("."))
+        for i in range(len(scope), -1, -1):
+            if scope[:i] + parts in self.exprs:
+                return scope[:i] + parts
+        ends = [k for k in self.exprs if k[-len(parts):] == parts]
+        return ends[0] if len(ends) == 1 else None
+
+    def value(self, key, seen=()):
+        """The string value of one constant, or None (unknown, circular or not a string expression)."""
+        if key in self._cache:
+            return self._cache[key]
+        if key in seen:
+            return None
+        expr, scope = self.exprs[key]
+        text, _ = self.evaluate(expr, scope, seen + (key,))
+        self._cache[key] = text
+        return text
+
+    def _name(self, name, scope, seen):
+        key = self.lookup(name, scope)
+        return self.value(key, seen) if key else None
+
+    def evaluate(self, expr, scope=(), seen=()):
+        """(text, None) for an expression of literals, interpolations, nameof and constant names joined by `+`, else
+        (None, the first name or expression that could not be resolved)."""
+        pieces, pos, expr = [], 0, expr.strip()
+        expect_value = True
+        while pos < len(expr):
+            m = _CS_TOKEN.match(expr, pos)
+            if not m or m.end() == pos:
+                return None, expr
+            pos = m.end()
+            prefix, literal, nameof, name, plus = m.groups()
+            if plus:
+                if expect_value:
+                    return None, expr
+                expect_value = True
+                continue
+            if not expect_value:
+                return None, expr
+            expect_value = False
+            if literal is not None:
+                if prefix and "$" in prefix:
+                    text, missing = self._interpolate(literal, scope, seen)
+                    if text is None:
+                        return None, missing
+                    pieces.append(text)
+                else:
+                    pieces.append(literal.replace('""', '"') if prefix else literal)
+            elif nameof:
+                pieces.append(nameof.rsplit(".", 1)[-1])
+            else:
+                text = self._name(name, scope, seen)
+                if text is None:
+                    return None, name
+                pieces.append(text)
+        if expect_value:
+            return None, expr
+        return "".join(pieces), None
+
+    def _interpolate(self, literal, scope, seen):
+        missing = []
+
+        def repl(m):
+            text = self._name(m.group(1), scope, seen)
+            if text is None:
+                missing.append(m.group(1))
+                return ""
+            return text
+
+        text = re.sub(r"(?<!\{)\{([A-Za-z_][\w.]*)\}(?!\})", repl, literal)
+        return (None, missing[0]) if missing else (text.replace("{{", "{").replace("}}", "}"), None)
+
+
+def _cs_arg(constants, arg, scope):
+    """(template, unresolved name) of an attribute argument. ("", None) when there is no argument."""
+    if arg is None or not arg.strip():
+        return "", None
+    return constants.evaluate(arg, scope)
+
+
+_BASE = re.compile(r"\s*(?:<[^>{]*>)?\s*(?:\([^)]*\))?\s*:\s*([\w.]+)")
+
+
+def _aspnet_classes(files):
+    """Every class of the repository: name -> [{file, text, match, open, close, attrs, scope, base}]."""
+    classes = {}
+    for rel, text in files:
+        scopes = _cs_class_paths(text)
         for cm in _CLASS.finditer(text):
             open_i = text.find("{", cm.end())
             if open_i < 0:
@@ -134,34 +279,90 @@ def _aspnet_routes(repo_root):
             if close_i < 0:
                 continue
             head = _attrs_before(_MODIFIERS.sub("", text[:cm.start()]))
-            class_attrs = head.group(1) if head else ""
-            route = _ROUTE.search(class_attrs)
-            name = cm.group(1)
-            controller = name[:-len("Controller")] if name.endswith("Controller") else name
-            prefix = route.group(1).replace("[controller]", controller) if route else ""
-            class_auth = _aspnet_auth(class_attrs)
-            body = text[open_i:close_i]
-            for sm in _SIGNATURE.finditer(body):
-                before = _attrs_before(body[:sm.start()])
-                if not before:
-                    continue
-                attrs = before.group(1)
-                verb = _ASP_VERB.search(attrs)
-                if not verb:
-                    continue
-                params_open = sm.end() - 1
-                params_close = match_brace(body, params_open, "(", ")")
-                params = body[params_open + 1:params_close] if params_close > 0 else ""
-                template = verb.group(2)
-                path = _join(prefix, template)
+            base = _BASE.match(text, cm.end())
+            classes.setdefault(cm.group(1), []).append({
+                "file": rel, "text": text, "match": cm, "open": open_i, "close": close_i,
+                "attrs": head[0] if head else "", "scope": (_path_at(scopes, cm.start()) or ()) + (cm.group(1),),
+                "base": base.group(1).rsplit(".", 1)[-1] if base else None})
+    return classes
+
+
+def _inherited(classes, cls, pattern, seen=()):
+    """(attribute argument, the class that carries it) for the first class up the base chain whose attributes match
+    `pattern`, or (None, None). A base is followed only when exactly one class has its name."""
+    m = pattern.search(cls["attrs"])
+    if m:
+        return m.group(1), cls
+    base = classes.get(cls["base"] or "") or []
+    if len(base) != 1 or cls["base"] in seen:
+        return None, None
+    return _inherited(classes, base[0], pattern, seen + (cls["base"],))
+
+
+def _class_prefix(constants, classes, cls):
+    """(prefix, unresolved name) of a controller: its own or an inherited `[Route]`, with `[controller]` and the
+    `{version}` of `[ApiVersion]` filled in."""
+    arg, owner = _inherited(classes, cls, _ROUTE)
+    if owner is None:
+        return "", None
+    prefix, missing = _cs_arg(constants, arg, owner["scope"])
+    if prefix is None:
+        return None, missing
+    name = cls["match"].group(1)
+    prefix = prefix.replace("[controller]", name[:-len("Controller")] if name.endswith("Controller") else name)
+    arg, owner = _inherited(classes, cls, _API_VERSION)
+    version = _cs_arg(constants, arg, owner["scope"])[0] if owner else None
+    if version:
+        prefix = re.sub(r"\{version(?::[^}]*)?\}", version.split(".")[0], prefix)
+    return prefix, None
+
+
+def _class_auth(classes, cls, seen=()):
+    """The authorization of a controller's own `[Authorize]`, else of the nearest base class that has one."""
+    auth = _aspnet_auth(cls["attrs"])
+    base = classes.get(cls["base"] or "") or []
+    if auth or len(base) != 1 or cls["base"] in seen:
+        return auth
+    return _class_auth(classes, base[0], seen + (cls["base"],))
+
+
+def _aspnet_routes(repo_root):
+    routes = []
+    files = list(_files(repo_root, {".cs"}))
+    constants = Constants(files)
+    classes = _aspnet_classes(files)
+    for cls in (c for group in classes.values() for c in group):
+        text, rel, open_i, scope = cls["text"], cls["file"], cls["open"], cls["scope"]
+        prefix, prefix_missing = _class_prefix(constants, classes, cls)
+        class_auth = _class_auth(classes, cls)
+        body = text[open_i:cls["close"]]
+        for sm in _SIGNATURE.finditer(body):
+            before = _attrs_before(body[:sm.start()])
+            if not before:
+                continue
+            attrs, attrs_at = before
+            params_open = sm.end() - 1
+            params_close = match_brace(body, params_open, "(", ")")
+            params = body[params_open + 1:params_close] if params_close > 0 else ""
+            action_route = _ROUTE.search(attrs)
+            for verb in _ASP_VERB.finditer(attrs):  # an action may carry several verb attributes
+                arg = verb.group(2)
+                if (arg is None or not arg.strip()) and action_route:
+                    arg = action_route.group(1)  # [HttpGet] [Route("x")]: the action's Route is the template
+                template, missing = _cs_arg(constants, arg, scope)
+                missing = prefix_missing or missing
+                path = _join(prefix, template) if prefix is not None and template is not None else None
                 # the line of the verb attribute: the start of the attribute block plus the lines before the verb
-                verb_index = open_i + before.start(1) + verb.start()
-                routes.append({
+                verb_index = open_i + attrs_at + verb.start()
+                entry = {
                     "method": verb.group(1).upper(), "path": path, "file": rel, "line": line_of(text, verb_index),
                     "auth": _aspnet_auth(attrs) or class_auth,
-                    "requestType": _aspnet_request_type(params, f"{prefix}/{template or ''}"),
+                    "requestType": _aspnet_request_type(params, f"{prefix or ''}/{template or ''}"),
                     "responseType": _unwrap(sm.group(1)),
-                })
+                }
+                if missing:
+                    entry["constant"] = missing
+                routes.append(entry)
     return routes
 
 
@@ -230,7 +431,7 @@ def locate_routes(repo_root, framework):
         routes = _express_routes(repo_root)
     else:
         return []
-    return sorted(routes, key=lambda r: (r["file"], r["line"], r["method"]))
+    return sorted(routes, key=lambda r: (r["file"], r["line"], r["method"], r["path"] or ""))
 
 
 def _cited(endpoint, cases):
@@ -282,7 +483,9 @@ def enrich(out_dir, repo_root, framework="auto"):
         die(f"{out_dir} has no endpoints.json (run render.py catalogs first)")
     if framework == "auto":
         framework = detect_framework(repo_root)
-    routes = [(r, normalize_endpoint(r["path"])) for r in locate_routes(repo_root, framework)]
+    located = locate_routes(repo_root, framework)
+    unresolved = [{k: r[k] for k in ("method", "file", "line", "constant")} for r in located if r.get("constant")]
+    routes = [(r, normalize_endpoint(r["path"])) for r in located if r.get("path")]
     routes = [(r, p) for r, p in routes if p]
     use_cases = out.load(out_dir, "use-cases.json", {}) or {}
     cases = {u.get("id"): u for u in use_cases.get("useCases", [])}
@@ -313,10 +516,16 @@ def enrich(out_dir, repo_root, framework="auto"):
     # The record that this repository was read, whether or not a route matched: status.py tests on it. A second run
     # of the same repository replaces its own entry.
     runs = [r for r in data.get("contractsRun") or [] if isinstance(r, dict) and r.get("repo") != name]
-    data["contractsRun"] = runs + [{"repo": name, "at": now_iso().replace("+00:00", "Z")}]
+    run = {"repo": name, "at": now_iso().replace("+00:00", "Z")}
+    if unresolved:  # a lead for the contract reader: the route exists, but its constant could not be resolved
+        run["unresolvedRoutes"] = unresolved
+    data["contractsRun"] = runs + [run]
     out.save(out_dir, "endpoints.json", data)
-    return {"framework": framework, "routes": len(routes), "endpoints": len(data.get("endpoints", [])),
-            "matched": matched}
+    result = {"framework": framework, "routes": len(routes), "endpoints": len(data.get("endpoints", [])),
+              "matched": matched}
+    if unresolved:
+        result["unresolved"] = len(unresolved)
+    return result
 
 
 def main(argv=None):
