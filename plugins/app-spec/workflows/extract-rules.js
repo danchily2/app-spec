@@ -77,7 +77,15 @@ const RULE = {
 const RULES_SCHEMA = {
   type: 'object',
   required: ['rules'],
-  properties: { rules: { type: 'array', items: RULE }, injectionSuspects: LIST },
+  properties: {
+    rules: { type: 'array', items: RULE },
+    outOfScope: {
+      type: 'array',
+      description: 'rules found only in touch files: they belong to a neighbour module',
+      items: { type: 'object', required: ['name', 'source', 'reason'], properties: { name: S, source: S, reason: S } },
+    },
+    injectionSuspects: LIST,
+  },
 }
 const VERDICT = {
   type: 'object',
@@ -114,7 +122,10 @@ Client-side rules only: validations, calculations, eligibility and visibility by
 formatting and rounding a user relies on, offline/retry/cache/session policies. Not layout, styling, logging or
 network plumbing. Given/When/Then with concrete values; one source range per rule; P0 when a wrong result moves money,
 breaks a legal or policy requirement, loses data or grants access wrongly.
-${catalog}
+${catalog}${s.kind === 'touch' ? `
+This shard is of kind touch: its files are OUTSIDE the module, context and not scope. A rule found here belongs to a
+neighbour module: list it in outOfScope with its source and the reason, never in rules. Only a rule whose code is in a
+core file of the module goes in rules.` : ''}
 ${UNTRUSTED}`,
       { agentType: 'app-spec:business-rules-extractor', label: `extract:${s.id}`, phase: 'Extract', schema: RULES_SCHEMA },
     ),
@@ -184,7 +195,8 @@ ${UNTRUSTED}`,
           confirmed.push({ ...p.r, priority: 'P1' })
         }
       }
-      return { shard: stage.shard, rules: confirmed, rejected, unverified, injection: stage.result.injectionSuspects || [] }
+      return { shard: stage.shard, rules: confirmed, rejected, unverified, injection: stage.result.injectionSuspects || [],
+        outOfScope: stage.result.outOfScope || [] }
     })
   },
 )
@@ -195,6 +207,7 @@ const rules = []
 const rejected = []
 const unverified = []
 const injectionFlags = []
+const outOfScope = []
 let consolidated = 0
 perShard.forEach(p => {
   if (!p) return
@@ -206,11 +219,15 @@ perShard.forEach(p => {
   rejected.push(...p.rejected)
   unverified.push(...p.unverified)
   injectionFlags.push(...p.injection)
+  for (const o of p.outOfScope) {
+    if (o && o.name && !outOfScope.some(x => norm(x.name) === norm(o.name))) outOfScope.push({ name: String(o.name), source: String(o.source || ''), reason: String(o.reason || 'found only in touch files') })
+  }
 })
 log(`${rules.length} rules kept (${rules.filter(r => r.priority === 'P0').length} P0), ${rejected.length} rejected, ${unverified.length} unverified, ${consolidated} folded as duplicates`)
 
 return {
   rules,
+  outOfScope,
   rejected,
   unverified,
   injectionFlags: [...new Set(injectionFlags)],

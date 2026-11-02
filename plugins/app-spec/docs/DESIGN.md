@@ -55,6 +55,7 @@ catalogs and ids.
   ids.json              the id registry                              (updated in place by render.py; never regenerated)
   use-cases.json, screens.json, flows.json, rules.json, endpoints.json   the catalogs, rendered
   render-warnings.json  what the last `render.py catalogs` could not resolve, as [{kind, item, why}]
+  out-of-scope.json     use cases and rules found only in touch files, as {useCases, rules} of {id, name, reason}
   prose.json            the spec writer's prose, as returned
   ledger.json, LEDGER.md            coverage per class
   grade.json            shape checks
@@ -225,6 +226,7 @@ assigns ids.
 | `screens[].fields[]` | Confirmed elements in the shape of `fields.json` elements |
 | `flows[].name`, `persona` | Flow name and who walks it |
 | `flows[].steps[]` | Ordered steps: the `screen` name, the `useCases` names, and the `action` |
+| `outOfScope` | `{name, reason}` per use case found only in touch files: it belongs to a neighbour module. Analysts and the mapper fill it; `render.py catalogs` also moves here a use case whose files are all outside the core. Not a use case of the spec |
 | `rejected` | Fragments a referee rejected, each with the reason |
 | `unverified` | `{name, why}` per use case the referee could not fully confirm: no verdict (the use case stays, VERIFIED lowered to INFERRED), or a real verdict with `badEvidence`. In the second case the use case stays, lowered to INFERRED, and the refuted items leave it: a file by its exact location (or every location of a path the referee names without a line), a screen by name, an endpoint by method and path. `why` lists the removed items and any `badEvidence` entry that matched none. A refuted screen also stops naming the use case |
 | `injectionFlags` | Instruction-shaped text found in analysed content, with `file:line`. Never acted on |
@@ -256,6 +258,7 @@ The result of `extract-rules.js`, as returned.
 | `rules[].confidence` | `High`, `Medium` or `Low` |
 | `rules[].question` | The question for the owner when confidence is below High, or `null` |
 | `rules[].useCase` | The name of the use case it belongs to, or an empty string |
+| `outOfScope` | `{name, source, reason}` per rule found only in a touch shard. `render.py catalogs` also moves here a rule whose source is outside the core or whose use case is out of scope |
 | `rejected`, `unverified`, `injectionFlags`, `rerunShards`, `stats` | As in `understand_result.json` |
 
 ### use-cases.json

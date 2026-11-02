@@ -145,6 +145,12 @@ Then render the catalogs:
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/render.py" catalogs OUT
 ```
 
+Touch files are context, not scope. A use case or rule with no evidence in a core file goes to
+`OUT/out-of-scope.json`, and the spec names it on one Dependencies line. Show its use cases (id, name and reason),
+then ask with AskUserQuestion, "These were found only in files outside the module. Keep them out?", with the options
+`Yes` and `Some belong to the module`. For `Some belong to the module`, ask which, add the folders that implement them
+with `--module` in step 1, and run steps 1 to 3 again. With `--headless`, accept the list and report it.
+
 ## 4: Business rules
 
 Build the arguments with the step-3 command and `rules` as its second argument; it adds `useCaseIndex`, the

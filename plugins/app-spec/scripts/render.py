@@ -7,7 +7,10 @@
 `catalogs` reads understand_result.json and rules_result.json (as the workflows returned them), inventory.json,
 fields.json, app-spec.json and overrides.json from the output folder `<out>`. It assigns stable ids through ids.json
 (updated in place: existing keys keep their ids, new keys take max + 1) and writes use-cases.json, screens.json,
-flows.json, rules.json and endpoints.json. It never writes ids.json's old keys away, app-spec.json or overrides.json.
+flows.json, rules.json, endpoints.json and out-of-scope.json. It never writes ids.json's old keys away, app-spec.json or
+overrides.json. Touch files are context, not scope: a use case whose files are all outside the core of module.json,
+a rule whose source is outside it, a rule of such a use case, and the `outOfScope` lists the workflows return go to
+out-of-scope.json (`{useCases, rules}` of `{id, name, reason}`), not to the catalogs.
 Prints the counts, and any reference it could not resolve to stderr; writes the same warnings to render-warnings.json
 as a list of `{kind, item, why}` (an empty list when there are none). An endpoint a use case cites that the inventory
 does not have is kept in endpoints.json with label UNKNOWN and `inInventory: false`. Exit code 2 when `<out>` is not an output
@@ -80,9 +83,14 @@ class _Catalogs:
             die(f"{dest} has no understand_result.json (run the understand workflow first)")
         rules = out.load(dest, "rules_result.json")
         self.rules_in = rules.get("rules", []) if isinstance(rules, dict) else []
+        self.rules_out = (rules.get("outOfScope") or []) if isinstance(rules, dict) else []
         self.inventory = out.load(dest, "inventory.json", {}) or {}
         self.fields = (out.load(dest, "fields.json", {}) or {}).get("screens", [])
         self.overrides = out.load(dest, "overrides.json", {}) or {}
+        module = out.load(dest, "module.json", {}) or {}
+        self.core = {str(f) for f in module.get("core") or []} if isinstance(module, dict) else set()
+        self.out_cases = []  # {id, name, reason}: use cases with no evidence in a core file
+        self.out_rules = []
         self.registry = Registry(os.path.join(dest, "ids.json"))
         self.warnings = []  # the sentences, printed to stderr
         self.records = []   # the same as {kind, item, why}, written to render-warnings.json
@@ -169,13 +177,33 @@ class _Catalogs:
 
     # ------------------------------------------------------------ use cases
 
+    def _in_core(self, files):
+        """True when one of the files is a core file, or when the core is unknown or nothing is cited."""
+        files = [_path(f) for f in files if f]
+        return not self.core or not files or any(f in self.core for f in files)
+
+    def _out_of_scope(self, kind, prefix, key, name, reason):
+        entry = {"id": self.registry.assign(prefix, key), "name": name, "reason": reason}
+        target = self.out_cases if kind == "useCase" else self.out_rules
+        if all(e["id"] != entry["id"] for e in target):
+            target.append(entry)
+        return entry["id"]
+
     def _use_cases(self, screen_ids, endpoints):
         cases = {}
         current = {norm(r["name"]) for r in self.understood.get("useCases", []) if isinstance(r, dict) and r.get("name")}
+        for raw in self.understood.get("outOfScope") or []:
+            if isinstance(raw, dict) and raw.get("name"):
+                self._out_of_scope("useCase", "UC", norm(raw["name"]), raw["name"],
+                                   raw.get("reason") or "the mapper found it only in touch files")
         for raw in self.understood.get("useCases", []):
             if not isinstance(raw, dict) or not raw.get("name"):
                 continue
             files = sorted({_path(f) for f in _strings(raw.get("files"))})
+            if not self._in_core(files):
+                self._out_of_scope("useCase", "UC", norm(raw["name"]), raw["name"],
+                                   "every file it cites is a touch file, outside the module's core")
+                continue
             uid = self._use_case_id(raw["name"], files, current, cases)
             if uid in cases:
                 self._warn("useCase", raw["name"], f"use case {raw['name']} appears twice; the first is kept")
@@ -270,8 +298,11 @@ class _Catalogs:
 
     def _use_case_ids(self, names, by_name, retired, where):
         ids = []
+        outside = {e["id"] for e in self.out_cases}
         for name in names:
             uid = by_name.get(norm(name))
+            if uid in outside:
+                continue  # out of scope: listed in out-of-scope.json, not named by the catalogs
             if uid:
                 ids.append(retired.get(uid, uid))
             else:
@@ -342,10 +373,23 @@ class _Catalogs:
 
     def _rules(self, uc_by_name, retired):
         rules = {}
+        outside = {norm(e["name"]) for e in self.out_cases}
+        for raw in self.rules_out:
+            if isinstance(raw, dict) and raw.get("name"):
+                self._out_of_scope("rule", "RULE", self._rule_key(raw["name"], raw.get("source")), raw["name"],
+                                   raw.get("reason") or "the extractor found it only in touch files")
         for raw in self.rules_in:
             if not isinstance(raw, dict) or not raw.get("name"):
                 continue
-            rid = self.registry.assign("RULE", self._rule_key(raw["name"], raw.get("source")))
+            key = self._rule_key(raw["name"], raw.get("source"))
+            if not self._in_core([raw.get("source")]):
+                self._out_of_scope("rule", "RULE", key, raw["name"],
+                                   f"its source {_path(raw.get('source'))} is a touch file, outside the module's core")
+                continue
+            if raw.get("useCase") and norm(raw["useCase"]) in outside:
+                self._out_of_scope("rule", "RULE", key, raw["name"], f"its use case {raw['useCase']} is out of scope")
+                continue
+            rid = self.registry.assign("RULE", key)
             if rid in rules:
                 self._warn("rule", raw["name"], f"rule {raw['name']} appears twice in {_path(raw.get('source'))}; the first is kept")
                 continue
@@ -395,7 +439,8 @@ class _Catalogs:
         self._alias(cases)
         self._label_endpoints(endpoints, cases)
         uc_by_name = {norm(raw["name"]): self.registry.data["UC"][norm(raw["name"])]
-                      for raw in self.understood.get("useCases", []) if isinstance(raw, dict) and raw.get("name")}
+                      for raw in self.understood.get("useCases", []) if isinstance(raw, dict) and raw.get("name")
+                      and norm(raw["name"]) in self.registry.data["UC"]}
         screens = self._screens(screen_entries, uc_by_name, retired)
         flows = self._flows(screen_by_name, uc_by_name, retired)
         rules = self._rules(uc_by_name, retired)
@@ -406,10 +451,13 @@ class _Catalogs:
         out.save(self.dest, "flows.json", {"version": 1, "flows": sorted(flows, key=_number)})
         out.save(self.dest, "rules.json", {"version": 1, "rules": sorted(rules, key=_number)})
         out.save(self.dest, "endpoints.json", {"version": 1, "endpoints": sorted(endpoints.values(), key=_number)})
+        out.save(self.dest, "out-of-scope.json", {"version": 1, "useCases": sorted(self.out_cases, key=_number),
+                                                  "rules": sorted(self.out_rules, key=_number)})
         out.save(self.dest, "render-warnings.json", self.records)
         self.registry.save()
         return {"useCases": len(use_cases), "screens": len(screens), "flows": len(flows), "rules": len(rules),
-                "endpoints": len(endpoints), "warnings": self.warnings}
+                "endpoints": len(endpoints), "outOfScope": len(self.out_cases) + len(self.out_rules),
+                "warnings": self.warnings}
 
 
 def catalogs(dest):

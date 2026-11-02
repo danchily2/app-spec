@@ -40,6 +40,65 @@ def write_overrides(dest, data):
     out.save(dest, "overrides.json", {"version": 1, "drop": [], "rename": [], "ids": {}, "merge": [], **data})
 
 
+class TestOutOfScope(unittest.TestCase):
+    """Touch files are context: what has no evidence in a core file leaves the catalogs for out-of-scope.json."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.out = build_out(self.tmp, "scope")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, True)
+
+    def edit(self, name, change):
+        data = out.load(self.out, name)
+        change(data)
+        out.save(self.out, name, data)
+
+    def test_touch_only_use_cases_and_rules_leave_the_catalogs(self):
+        card = "Employee/StartPage/PayslipCard.swift"
+
+        def understood(r):
+            r["useCases"].append({"name": "Sign in to the app", "description": "neighbour", "files": [f"{card}:3"],
+                                  "screens": [], "evidence": "VERIFIED"})
+            r["screens"][0]["useCases"].append("Sign in to the app")
+            r["outOfScope"] = [{"name": "Share an expense", "reason": "only the share extension implements it"}]
+
+        def rules(r):
+            r["rules"].append({**r["rules"][0], "name": "Card shows the latest payslip", "source": f"{card}:5-9"})
+            r["rules"].append({**r["rules"][0], "name": "Session expires", "useCase": "Sign in to the app",
+                               "source": "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift:30"})
+            r["outOfScope"] = [{"name": "Calendar week starts on Monday", "reason": "calendar module"}]
+
+        self.edit("understand_result.json", understood)
+        self.edit("rules_result.json", rules)
+        result = render.catalogs(self.out)
+        cases = out.load(self.out, "use-cases.json")["useCases"]
+        self.assertEqual(sorted(u["name"] for u in cases),
+                         ["Refresh the payslip list", "View a payslip's details", "View payslip list"])
+        outside = out.load(self.out, "out-of-scope.json")
+        self.assertEqual(sorted(e["name"] for e in outside["useCases"]), ["Share an expense", "Sign in to the app"])
+        self.assertEqual(sorted(e["name"] for e in outside["rules"]),
+                         ["Calendar week starts on Monday", "Card shows the latest payslip", "Session expires"])
+        self.assertTrue(all(e["id"].startswith(("UC-", "RULE-")) and e["reason"] for k in outside
+                            if k != "version" for e in outside[k]))
+        kept = out.load(self.out, "rules.json")["rules"]
+        self.assertEqual(len(kept), 2)
+        self.assertTrue(all(r["source"].startswith(("Modules/", "EmployeeServices/")) for r in kept))
+        ids = {u["id"] for u in cases}
+        screens = out.load(self.out, "screens.json")["screens"]
+        self.assertTrue(all(set(s["useCases"]) <= ids for s in screens))
+        self.assertEqual(result["outOfScope"], 5)
+        self.assertNotIn("names the use case Sign in", " ".join(result["warnings"]))
+
+        render.spec(self.out)
+        text = read_text(self.out, "SPEC.md")
+        line = next(x for x in text.splitlines() if x.startswith("- **Out of scope"))
+        self.assertIn("Sign in to the app", line)
+        self.assertIn("Calendar week starts on Monday", line)
+        self.assertEqual(text.count("Sign in to the app"), 1, "named only on the out-of-scope line")
+
+
 class TestCatalogs(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
@@ -308,7 +367,8 @@ class TestCatalogs(unittest.TestCase):
 
     def test_warning_duplicates_keep_the_first(self):
         def change(r):
-            r["useCases"].append({**r["useCases"][0], "files": ["Other.swift"]})
+            r["useCases"].append({**r["useCases"][0],
+                                  "files": ["Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift"]})
             r["screens"].append(dict(r["screens"][0]))
             r["flows"].append(dict(r["flows"][0]))
         self.edit("understand_result.json", change)
@@ -350,7 +410,7 @@ class TestCatalogs(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(err, "warning: use case View payslip list cites GET /nothing/here/{id}, which is not in the inventory; "
                               "kept as EP-003 with label UNKNOWN\n")
-        self.assertEqual(stdout, "useCases 3, screens 2, flows 1, rules 2, endpoints 3\n")
+        self.assertEqual(stdout, "useCases 3, screens 2, flows 1, rules 2, endpoints 3, outOfScope 0\n")
 
 
 class TestAlias(unittest.TestCase):

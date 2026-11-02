@@ -314,3 +314,38 @@ test('rules: missing shards, out, stack or a use case index outside out throws',
   await assert.rejects(run(wf('extract-rules.js'), { ...rargs, useCaseIndex: 'elsewhere/use-cases.json' }), /useCaseIndex/)
   await assert.rejects(run(wf('extract-rules.js'), { ...rargs, useCaseIndex: 'o/../x.json' }), /useCaseIndex/)
 })
+
+test('understand: touch shards are context, and outOfScope from analysts and mapper is returned once per name', async () => {
+  const respond = label => {
+    if (label === 'extract:touch-01') return { fragments: [], outOfScope: [{ name: 'Sign in', reason: 'accounts module' }] }
+    if (label === 'extract:core-01') return { fragments: [{ name: 'View payslips', description: 'd', evidence: 'A.swift:1' }] }
+    if (label === 'map') {
+      return {
+        useCases: [{ name: 'View payslips', description: 'd', files: ['A.swift:1'], evidence: 'VERIFIED' }],
+        screens: [], flows: [],
+        outOfScope: [{ name: 'sign in', reason: 'dup' }, { name: 'Share an expense', reason: 'share extension' }, { name: 'View payslips', reason: 'x' }],
+      }
+    }
+    if (label.startsWith('verify:')) return { real: true, badEvidence: [], reason: 'ok' }
+    return undefined
+  }
+  const { result: r, calls } = await run(wf('understand-module.js'), args, respond)
+  assert.deepEqual(r.outOfScope, [{ name: 'Sign in', reason: 'accounts module' }, { name: 'Share an expense', reason: 'share extension' }])
+  assert.deepEqual(r.useCases.map(u => u.name), ['View payslips'])
+  const touch = calls.find(c => c.opts.label === 'extract:touch-01').prompt
+  const core = calls.find(c => c.opts.label === 'extract:core-01').prompt
+  assert.ok(touch.includes('This shard is of kind touch') && !core.includes('This shard is of kind touch'))
+  assert.ok(core.includes('context, not\nscope'), 'every analyst learns that touch files are context')
+  const map = calls.find(c => c.opts.label === 'map').prompt
+  assert.ok(map.includes('"kind":"touch"') && map.includes('goes to outOfScope'))
+})
+
+test('rules: a touch shard is told its rules are out of scope, and outOfScope is returned', async () => {
+  const respond = label => label === 'extract:touch-01'
+    ? { rules: [], outOfScope: [{ name: 'Week starts Monday', source: 'Cal.swift:3', reason: 'calendar' }] }
+    : label === 'extract:core-01' ? { rules: [] } : undefined
+  const { result: r, calls } = await run(wf('extract-rules.js'), args, respond)
+  assert.deepEqual(r.outOfScope, [{ name: 'Week starts Monday', source: 'Cal.swift:3', reason: 'calendar' }])
+  assert.ok(calls.find(c => c.opts.label === 'extract:touch-01').prompt.includes('This shard is of kind touch'))
+  assert.ok(!calls.find(c => c.opts.label === 'extract:core-01').prompt.includes('This shard is of kind touch'))
+})

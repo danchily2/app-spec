@@ -511,9 +511,26 @@ def criteria(c):
     return (lines or [_unknown("no use cases to cover")]) + orphans
 
 
+def out_of_scope_line(c):
+    """One line naming the neighbour use cases and rules found only in touch files, or None."""
+    data = out.load(c.dest, "out-of-scope.json", {}) or {}
+    parts = []
+    for key, label in (("useCases", "use cases"), ("rules", "rules")):
+        items = [e for e in data.get(key) or [] if isinstance(e, dict) and e.get("id")] if isinstance(data, dict) else []
+        if items:
+            parts.append(f"{label} " + "; ".join(f"{e['id']} {e.get('name') or ''}".strip() for e in items))
+    if not parts:
+        return None
+    return ("- **Out of scope, belongs to neighbour modules** (found only in touch files; see out-of-scope.json): "
+            + ". ".join(parts) + ".")
+
+
 def dependencies(c):
-    deps = [_cited(d) for d in _items(c.prose.get("dependencies"))]
-    return [f"- {d}" for d in deps] or [_unknown("dependencies and decisions not written yet")]
+    deps = [f"- {_cited(d)}" for d in _items(c.prose.get("dependencies"))]
+    extra = out_of_scope_line(c)
+    if not deps:
+        deps = [_unknown("dependencies and decisions not written yet")]
+    return deps + ([extra] if extra else [])
 
 
 def open_questions(c):
