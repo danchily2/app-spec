@@ -30,7 +30,7 @@ from ledger import _Ledger, _platform_values  # noqa: E402
 from speclib import out  # noqa: E402
 from speclib.common import die  # noqa: E402
 from speclib.ids import norm  # noqa: E402
-from speclib.spec_md import NO_RULE, Context, _element_rows, target  # noqa: E402
+from speclib.spec_md import NO_RULE, NO_RULE_RE, NO_RULE_REASON, Context, _element_rows, target  # noqa: E402
 from speclib.template import APPENDICES, AC_RE, CITE_RE, HEADINGS  # noqa: E402
 
 CHECKS = ("sections", "rules-per-use-case", "criteria-per-use-case", "criteria-numbering", "citations-resolve",
@@ -48,7 +48,7 @@ _CITE_FULL = re.compile("^" + CITE_RE + "$")
 _PLACEHOLDER = "UNKNOWN — "
 _NO_RULES_LINE = "UNKNOWN — no rules extracted"  # the renderer's two own lines; rules-per-use-case judges them
 _NO_RULE_LINE = re.compile(r"^UNKNOWN — no rule extracted for ((?:UC|CAP)-\d{3,}(?:, (?:UC|CAP)-\d{3,})*); add a rule or write "
-                           r'"' + re.escape(NO_RULE) + r'" with a citation$')
+                           r'"' + re.escape(NO_RULE) + r'" or "' + re.escape(NO_RULE_REASON) + r'" with a citation$')
 _ROW_SPLIT = re.compile(r"(?<!\\)\|")
 _OQ_REF = re.compile(r"\bopen question (OQ-\d{3,})\b")
 _OQ_ITEM = re.compile(r"^- \*\*(OQ-\d{3,}):\*\* .*\bSearched: .*\bOwner: ")
@@ -167,8 +167,8 @@ class _Grader:
                 continue
             sentence = [t for _, t in self._screen_section_lines(screens, case)]
             sentence += [t for _, t, ids in acs if ids & self._shown_ids(case)]
-            if not any(NO_RULE in t and _has_citation(t) for t in sentence):
-                items.append(f"{self._label(case)} has no rule and no cited sentence '{NO_RULE}'")
+            if not any(NO_RULE_RE.search(t) and _has_citation(t) for t in sentence):
+                items.append(f"{self._label(case)} has no rule and no cited sentence '{NO_RULE}' or '{NO_RULE_REASON}'")
         return items
 
     def _screen_section_lines(self, screens, case):

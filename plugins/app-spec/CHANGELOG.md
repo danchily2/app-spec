@@ -3,6 +3,15 @@
 A release gets a new number in `.claude-plugin/plugin.json`. Claude Code only offers an update when that number
 changes.
 
+## Unreleased
+
+Fixes found in the second payslips run (Devin, v0.2.0).
+
+- **A use case without a rule can state the real reason.** Next to `No client-side rule; the server decides.`, the
+  grader and the renderer accept a cited `No client-side rule: <reason>.`, such as "this use case only opens the
+  assistant sheet". A placeholder or a reason under 12 characters still fails. The writer is told never to claim the
+  server decides when the code does not show it.
+
 ## 0.2.0 - 2026-11-02
 
 Fixes found in a run on a native iOS payslips module.

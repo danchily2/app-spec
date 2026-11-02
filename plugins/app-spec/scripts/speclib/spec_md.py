@@ -28,6 +28,10 @@ def _text(value):
 
 _CITE_TOKEN = re.compile(r"(?<![\w@+.\-/`])(" + CITE_RE + r")(?![\w`])")
 NO_RULE = "No client-side rule; the server decides."
+# The two cited sentences that excuse a use case without a rule: the server decides, or a stated reason such as
+# "No client-side rule: this use case only opens the assistant sheet." The reason must be a real clause.
+NO_RULE_REASON = "No client-side rule: <reason>."
+NO_RULE_RE = re.compile(r"\bNo client-side rule(?:; the server decides\.|: [^.`<>]{12,}\.)")
 
 
 def _cited(value):
@@ -462,7 +466,7 @@ def rules(c):
     if bare:
         lines += ["### Use cases without a rule", "",
                   _unknown("no rule extracted for " + ", ".join(bare)
-                           + f'; add a rule or write "{NO_RULE}" with a citation'), ""]
+                           + f'; add a rule or write "{NO_RULE}" or "{NO_RULE_REASON}" with a citation'), ""]
     return lines
 
 
@@ -477,7 +481,7 @@ def _has_citation(line):
 
 
 def _says_no_rule(c, case):
-    """True when the spec states the cited sentence NO_RULE for `case`: in an acceptance criterion that names it, or in
+    """True when the spec states a cited no-rule sentence (NO_RULE_RE) for `case`: in an acceptance criterion that names it, or in
     the block of one of its screens. The same test as the grader's rules-per-use-case, so both list the same use cases."""
     shown = {case["id"], c.shown[case["id"]]}
     lines = [t for t in criteria(c) if (m := re.match(r"^- \*\*AC\d+ \(([^)]*)\):\*\*", t))
@@ -489,7 +493,7 @@ def _says_no_rule(c, case):
             inside = any(f"({s})" in t for s in ids)
         if inside:
             lines.append(t)
-    return any(NO_RULE in t and _has_citation(t) for t in lines)
+    return any(NO_RULE_RE.search(t) and _has_citation(t) for t in lines)
 
 
 def criteria(c):

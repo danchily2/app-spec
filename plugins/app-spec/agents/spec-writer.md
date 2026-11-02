@@ -74,9 +74,12 @@ Return **one JSON object** in exactly this shape, and nothing outside it:
   owner: <who can answer>` in the line itself. The grader fails any `UNKNOWN` line in sections 1 to 8 that lacks the
   words `searched` and `owner`. Never write `UNKNOWN` followed by a dash: `UNKNOWN — ` is the renderer's own mark for
   an empty slot, and the grader fails every line that holds it.
-- **No client rule.** When a use case has no rule in `rules.json` and the code shows the server decides, write the
-  exact sentence `No client-side rule; the server decides.` followed by a backticked citation of the call that hands
-  the decision to the server, inside one of that use case's criteria or in the purpose of one of its screens.
+- **No client rule.** When a use case has no rule in `rules.json`, write one cited sentence inside one of that use
+  case's criteria or in the purpose of one of its screens. When the code shows the server decides, write the exact
+  sentence `No client-side rule; the server decides.` followed by a backticked citation of the call that hands the
+  decision to the server. Otherwise write `No client-side rule: <reason>.` with the true reason the code shows, for
+  example `No client-side rule: this use case only opens the assistant sheet.`, followed by a backticked citation.
+  Never write the server sentence when the code does not show it.
 - **Behaviour, never structure.** Sections 1 to 8 state what the user sees and does. Words from
   `options.bannedNouns` in `app-spec.json` (Realm, ViewModel, NotificationCenter and the like) appear only in
   `keepDrop.drop`. Write "the list is available offline for 24 hours", not "store the list in the local database".

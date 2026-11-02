@@ -421,7 +421,7 @@ nullability, or an error without a reaction; a rule below High confidence, or wi
 source. Each question says what was searched (the entry's files, declaration, clients or source; for a rule without
 source lines, the rule card in `rules_result.json` and the files of its use case) and its owner,
 `owner of <app name>`. Section 5 ends with `UNKNOWN — no rule extracted for <ids>` for the use cases that have no
-rule and no cited `No client-side rule; the server decides.` in one of their criteria or screen blocks: the same test
+rule and no cited no-rule sentence (`No client-side rule; the server decides.` or `No client-side rule: <reason>.`) in one of their criteria or screen blocks: the same test
 `rules-per-use-case` applies, so the renderer and the grader name the same use cases. The ids run from `OQ-001` in that order (use cases, screens, endpoints, rules) after the
 writer's own questions, and `review.py questions` writes `OPEN_QUESTIONS.md` from the same list. What is not a
 question is written so that it is not an unknown fact: a cited file whose line could not be resolved reads
@@ -483,7 +483,7 @@ What the spec writer returns. `render.py spec` puts each entry into its slot; a 
 
 Every entry cites `path:line` in backticks, or says `UNKNOWN; searched: ...; owner: ...` (never `UNKNOWN — `, the
 renderer's mark for an empty slot, which `prose-complete` fails). A use case without a rule
-carries the sentence `No client-side rule; the server decides.` with a backticked citation in one of its criteria or
+carries a no-rule sentence (`No client-side rule; the server decides.` or `No client-side rule: <reason>.`) with a backticked citation in one of its criteria or
 in the purpose of one of its screens.
 
 ### SPEC.md and OPEN_QUESTIONS.md
@@ -563,7 +563,7 @@ is observable on screen, so a Maestro flow or a unit test can assert it. Tools s
   from the catalogs and the cited code, and adds no fact without a citation.
 - Every claim is cited as `file:line`, or marked UNKNOWN with what was searched.
 - Requirement sentences use no word from `bannedNouns`. Such words are allowed only in Appendix C.
-- Every use case has at least one rule, or the sentence "no client-side rule, server decides" with a citation.
+- Every use case has at least one rule, or a cited no-rule sentence: "the server decides" or a stated reason.
 - Every use case has at least one acceptance criterion.
 
 ## Thresholds and defaults

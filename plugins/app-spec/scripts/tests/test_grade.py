@@ -184,6 +184,16 @@ class TestOtherChecks(GradeCase):
         render.spec(dest)
         self.assertTrue(check(grade.run(dest), "rules-per-use-case")["pass"])
 
+    def test_a_stated_reason_also_excuses_a_use_case(self):
+        dest = self.mutated("r_reason", lambda t: t.replace(
+            grade.NO_RULE, "No client-side rule: this use case only opens the assistant sheet."))
+        self.assertTrue(check(grade.run(dest), "rules-per-use-case")["pass"])
+
+    def test_a_placeholder_or_short_reason_does_not_excuse_a_use_case(self):
+        for i, text in enumerate(("No client-side rule: <reason>.", "No client-side rule: none.")):
+            dest = self.mutated(f"r_short{i}", lambda t, text=text: t.replace(grade.NO_RULE, text))
+            self.assertFalse(check(grade.run(dest), "rules-per-use-case")["pass"], text)
+
     def test_criteria_per_use_case(self):
         dest = self.copy("c_gap")
         prose = out.load(dest, "prose.json")
@@ -406,7 +416,7 @@ class TestFixRound1(GradeCase):
             self.assertIn(noun, c["detail"])
 
     def test_rule_placeholder_exemption_is_anchored(self):
-        hint = 'UNKNOWN — no rule extracted for UC-003; add a rule or write "No client-side rule; the server decides." with a citation'
+        hint = 'UNKNOWN — no rule extracted for UC-003; add a rule or write "No client-side rule; the server decides." or "No client-side rule: <reason>." with a citation'
         screens = self.mutated("ph_screens", lambda t: t.replace("List the payslips of the year.", hint))
         self.assertFalse(check(grade.run(screens), "prose-complete")["pass"])
         fake = self.mutated("ph_fake", lambda t: t.replace("## Dependencies and decisions\n",

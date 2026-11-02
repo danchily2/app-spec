@@ -121,7 +121,8 @@ it, and what the user sees when the gate is closed.
 1. A rule has no value: "the date must be valid" instead of "the new date is at least 2 days after today and on a
    weekday".
 2. A rule restates layout or plumbing ("the list uses a diffable data source").
-3. A use case has neither a rule nor the cited sentence `No client-side rule; the server decides.`
+3. A use case has neither a rule nor a cited no-rule sentence: `No client-side rule; the server decides.` or
+   `No client-side rule: <reason>.` with the true reason.
 
 ## Acceptance criteria
 
