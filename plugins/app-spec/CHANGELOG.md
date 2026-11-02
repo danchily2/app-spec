@@ -3,7 +3,7 @@
 A release gets a new number in `.claude-plugin/plugin.json`. Claude Code only offers an update when that number
 changes.
 
-## Unreleased
+## 0.2.0 - 2026-11-02
 
 Fixes found in a run on a native iOS payslips module.
 
