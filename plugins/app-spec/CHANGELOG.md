@@ -29,6 +29,12 @@ Inventory fixes from the Devin run-2 register, group B.
   as `dict.merge(...)` are not taken for a service function of the same name. On the payslips module this adds
   the two report endpoints and the two Dottie notification endpoints the start page calls, and nothing else.
 
+- **String keys behind a generated accessor type are found (P6).** me-ios reads its strings through `struct S`
+  (`S.Payslips.payslipTitle.localized`, with `static let payslipTitle = "PAYSLIP_TITLE"` in `Strings.swift`), and
+  the module's string keys were only the quoted literals of its core files: 7 on payslips, and the ledger's strings
+  class had 0 of 1. `module.py` now maps every nested Swift `static let` whose value is a catalog key to its
+  qualified name and resolves the core files' references through it: 46 keys on payslips.
+
 ## 0.4.0 - 2026-11-02
 
 Fixes found in the v3 payslips rerun (0.3.0 code).

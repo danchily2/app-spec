@@ -52,6 +52,23 @@ class TestModule(unittest.TestCase):
         self.assertEqual(sorted(module.string_keys_for(core_files(IOS), catalog(IOS))),
                          ["payslip.latest", "payslip.list.title", "payslip.pdf"])
 
+    def test_string_keys_through_a_generated_accessor_type(self):
+        # P6: me-ios uses S.Payslips.payslipTitle (Strings.swift: static let payslipTitle = "PAYSLIP_TITLE"); the run
+        # found 0 of the payslip strings because only quoted literals in core files were read
+        app = os.path.join(self.tmp, "accessors")
+        write(app, "Resources/Strings.swift",
+              'public struct S {\n    public static let ok = "OK"\n    public struct Payslips {\n'
+              '        public static let payslipTitle = "PAYSLIP_TITLE"\n        public static let unused = "X_UNUSED"\n'
+              '        public struct Export { public static let button = "EXPORT_BUTTON" }\n    }\n'
+              '    public static let notAKey = "not in the catalog"\n}\n')
+        write(app, "Feature/PayslipView.swift",
+              'struct PayslipView: View {\n    var body: some View {\n'
+              '        Text(S.Payslips.payslipTitle.localized)\n        Button(S.ok.localized) {}\n'
+              '        Text(S.Payslips.Export.button.localized)\n    }\n}\n')
+        catalog = {"keys": {"OK": {}, "PAYSLIP_TITLE": {}, "X_UNUSED": {}, "EXPORT_BUTTON": {}}}
+        self.assertEqual(module.string_keys_for(["Feature/PayslipView.swift"], catalog, app),
+                         ["EXPORT_BUTTON", "OK", "PAYSLIP_TITLE"])
+
     def test_shards_respect_max_lines_and_lose_no_file(self):
         app = os.path.join(self.tmp, "big")
         big_file_list = []

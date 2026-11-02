@@ -239,14 +239,54 @@ def load_catalog(app_root, stack):
     return strings.combine()
 
 
+_SWIFT_SCOPE = re.compile(r"\b(?:struct|enum|class|extension)\s+([A-Za-z_][A-Za-z0-9_.]*)[^{};]*\{|(\{)|(\})"
+                          r"|\bstatic\s+let\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?::\s*String\s*)?=\s*\"((?:[^\"\\\n]|\\.)*)\"")
+_QUALIFIED = re.compile(r"\b([A-Z][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+)")
+
+
+def swift_accessors(app_root, known):
+    """{qualified name: catalog key} of the Swift string constants whose value is a key of the catalog: a generated
+    accessor type such as `struct S { struct Payslips { static let payslipTitle = "PAYSLIP_TITLE" } }` gives
+    `S.Payslips.payslipTitle`. Only files that hold such a constant count."""
+    found = {}
+    for rel, full in walk(os.path.realpath(app_root), {".swift"}):
+        text = read_text(full)
+        if not text or "static let" not in text:
+            continue
+        stack = []  # one entry per open brace: the type name it opens, or None
+        for m in _SWIFT_SCOPE.finditer(strip_comments(text)):
+            if m.group(1):
+                stack.append(m.group(1))
+            elif m.group(2):
+                stack.append(None)
+            elif m.group(3):
+                if stack:
+                    stack.pop()
+            elif m.group(5) in known and stack and all(stack):
+                found.setdefault(".".join(stack + [m.group(4)]), m.group(5))
+    return found
+
+
 def string_keys_for(core_files, catalog, app_root=None):
-    """The catalog keys the core files use, sorted. Paths are read as given, or under `app_root` when it is set."""
+    """The catalog keys the core files use, sorted: quoted literals, and on iOS the constants of a generated accessor
+    type (`S.Payslips.payslipTitle.localized`). Paths are read as given, or under `app_root` when it is set."""
     known = set((catalog or {}).get("keys") or {})
+    accessors = swift_accessors(app_root, known) if app_root and known else {}
     used = set()
     for path in core_files:
         text = read_text(os.path.join(app_root, path) if app_root else path)
-        if text:
-            used |= touchpoints.string_literals(strip_comments(text)) & known
+        if not text:
+            continue
+        text = strip_comments(text)
+        used |= touchpoints.string_literals(text) & known
+        if accessors and path.endswith(".swift"):
+            for m in _QUALIFIED.finditer(text):
+                parts = m.group(1).split(".")
+                for n in range(len(parts), 1, -1):  # the longest prefix that names a constant: drop `.localized`
+                    key = accessors.get(".".join(parts[:n]))
+                    if key:
+                        used.add(key)
+                        break
     return sorted(used)
 
 
