@@ -270,4 +270,10 @@ Add one entry per round: date, items, commits, release tag, run folder, scorecar
 - **v5 assessment (2026-11-02):** full run, both passes, $72.66; render warnings 0 (v4: 40), fields 92.5% (100% with
   Round 4), all in-scope capabilities covered. Exit criteria not met: items 25-28 (Round 5). Manual step: large answers
   stored as files, 3 times (fixed in Round 4, `9665a53`).
+- **Round 5 + release 0.6.0 (2026-11-02):** items 25 (`81f3426`, rules findings correct the named cards), 26
+  (`efe2692`, endpoints verified through the calling service, inferred ones get a reason), 27 (`4d6d96b`, grader
+  resolves bare file names). Item 28 (19 start-page strings) is a person decision: give the reasons in Appendix F
+  (`review.py accept`). Released with Round 4 as 0.6.0 (`af14f14`, tag `v0.6.0`), pushed, installed plugin updated.
+  Tests: 389 Python, 36 Node. v6 is scheduled to start at 23:55 (after the 5-hour usage window resets at 23:50) into
+  `~/Documents/GitHub/vmm3/specs/payslips-v6`.
 
