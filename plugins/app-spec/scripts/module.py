@@ -336,25 +336,35 @@ def _split(name, prefix, files, max_lines):
 
 
 def _pack(parts, max_lines):
-    """Merge neighbouring parts under MERGE_BELOW lines, in name order, into shards of at most max_lines."""
-    packed, names, current = [], [], {}
+    """Merge neighbouring parts under MERGE_BELOW lines, in name order, into shards of at most max_lines. A shard never
+    mixes top folders (`EmployeeServices/...` and `Modules/...`): one area per shard, so its analyst reads related
+    code."""
+    packed, names, current, top = [], [], {}, None
     for name, files in sorted(parts, key=lambda p: p[0].lower()):
         size = sum(files.values())
         if size >= MERGE_BELOW:
             packed.append((name, files))
             continue
-        if current and sum(current.values()) + size > max_lines:
+        here = name.split("/")[0]
+        if current and (here != top or sum(current.values()) + size > max_lines):
             packed.append((_pack_name(names), current))
             names, current = [], {}
         names.append(name)
         current.update(files)
+        top = here
     if current:
         packed.append((_pack_name(names), current))
     return packed
 
 
 def _pack_name(names):
-    return names[0] if len(names) == 1 else f"[{names[0]}..{names[-1]}]"
+    """The name of a merged shard: `EmployeeServices/{Payslips, PayslipsInterface}`, the shared folder and each part."""
+    if len(names) == 1:
+        return names[0]
+    prefix = os.path.commonpath(names)
+    if prefix and all(n == prefix or n.startswith(prefix + "/") for n in names):
+        return f"{prefix}/{{{', '.join(n[len(prefix) + 1:] or '.' for n in names)}}}"  # `.`: the shared folder itself
+    return "{" + ", ".join(names) + "}"
 
 
 def _slug(name):

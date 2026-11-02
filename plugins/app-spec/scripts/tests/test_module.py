@@ -69,6 +69,18 @@ class TestModule(unittest.TestCase):
         self.assertEqual(module.string_keys_for(["Feature/PayslipView.swift"], catalog, app),
                          ["EXPORT_BUTTON", "OK", "PAYSLIP_TITLE"])
 
+    def test_small_parts_merge_only_within_one_top_folder(self):
+        # P5/P12: shards such as [EmployeeServices/Payslips..Modules/EmployeeAppCore] mixed unrelated packages
+        parts = [("EmployeeServices/Payslips", {"a.swift": 50}), ("EmployeeServices/PayslipsInterface", {"b.swift": 40}),
+                 ("Modules/EmployeeAppCore", {"c.swift": 30}), ("Modules/RemoteControl", {"d.swift": 20}),
+                 ("Employee", {"e.swift": 900})]
+        packed = module._pack(parts, 2000)
+        names = sorted(name for name, _ in packed)
+        self.assertEqual(names, ["Employee", "EmployeeServices/{Payslips, PayslipsInterface}",
+                                 "Modules/{EmployeeAppCore, RemoteControl}"])
+        self.assertEqual(sorted(f for _, files in packed for f in files), ["a.swift", "b.swift", "c.swift", "d.swift", "e.swift"])
+        self.assertEqual(module._pack_name(["Modules", "Modules/EmployeeAppCore"]), "Modules/{., EmployeeAppCore}")
+
     def test_shards_respect_max_lines_and_lose_no_file(self):
         app = os.path.join(self.tmp, "big")
         big_file_list = []

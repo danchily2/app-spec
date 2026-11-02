@@ -5,6 +5,11 @@ changes.
 
 ## Unreleased
 
+- **A shard keeps to one area (P5/P12).** Small folders were merged with their alphabetical neighbours, so a shard
+  could hold `EmployeeServices/Payslips` next to `Modules/EmployeeAppCore`, named `[EmployeeServices/Payslips..
+  Modules/EmployeeAppCore]`, and its analyst read unrelated code. Small parts now merge only within one top folder,
+  and a merged shard is named by its folder and parts: `EmployeeServices/{Payslips, PayslipsInterface}`.
+
 - **A large agent answer the harness stores as a file is saved directly.** In v5 the contract reader's answer for 10
   endpoints was 61.7 KB; the harness stored it as a tool-result file (a JSON list of `{type, text}` blocks) and
   showed a 2 KB preview, so the session could not copy it, and joined the blocks with a one-line script (recorded in
