@@ -26,6 +26,8 @@ class TestDocs(unittest.TestCase):
         self.assertIn("OUT/answers/", skill)
         self.assertIn("Never search session or transcript folders", skill)
         self.assertNotIn("transcript (`.jsonl`)", skill)
+        # payslips v5: a 61.7 KB answer was stored as a file and joined by hand
+        self.assertIn("the harness stores it as a file", skill)
 
     def test_the_skill_says_which_role_writes(self):
         # P9: role prompts say read-only while the path without the Workflow tool needs one agent to save results

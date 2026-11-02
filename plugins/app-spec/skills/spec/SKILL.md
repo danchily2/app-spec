@@ -25,7 +25,9 @@ Below, `OUT` is the absolute output folder, `NAME` the spec's file name, and `P`
 **Saving JSON.** Agents answer with fenced JSON inside prose, and a workflow's task output wraps its result as
 `{"summary", "result"}`. Never write an ad-hoc extractor. A workflow's result is in its task output file: pass that
 file. An agent's answer reaches you as text: write it unchanged with the Write tool to `OUT/answers/<file>.txt`,
-then pass that file. Never search session or transcript folders for it. `save_json.py` takes the last JSON value
+then pass that file. When an answer is too large to show, the harness stores it as a file and shows only a preview
+and the file's path: pass that path as it is (`save_json.py` reads the stored text blocks). Never search session or
+transcript folders for an answer, and never join or edit the blocks yourself. `save_json.py` takes the last JSON value
 that holds the key, unwraps `result`, checks that it parses and writes the file (exit code 2 when none matches; then
 ask the agent once more for valid JSON):
 

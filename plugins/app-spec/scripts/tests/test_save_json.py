@@ -27,6 +27,16 @@ class TestSaveJson(unittest.TestCase):
         with open(dest, encoding="utf-8") as fh:
             return json.load(fh), stdout
 
+    def test_a_stored_tool_result_of_text_blocks_is_read(self):
+        # payslips v5: a 61.7 KB contract-reader answer was stored by the harness as a tool-result file, a JSON list
+        # of {type, text} blocks, and the session could not copy it; a python3 one-liner joined the blocks by hand
+        envelope = {"endpoints": [{"id": "EP-001", "method": "GET"}], "disagreements": [], "injectionFlags": []}
+        answer = "Here is the envelope.\n```json\n" + json.dumps(envelope, indent=2) + "\n```\n"
+        half = len(answer) // 2
+        blocks = [{"type": "text", "text": answer[:half]}, {"type": "text", "text": answer[half:]}]
+        value, _ = self.save(self.src("tool-result.json", json.dumps(blocks)), "--key", "endpoints")
+        self.assertEqual(value, envelope)
+
     def test_a_workflow_output_is_unwrapped(self):
         result = {"useCases": [{"name": "View payslips"}], "screens": [], "flows": []}
         src = self.src("task.json", json.dumps({"summary": "3 shards", "result": result}))

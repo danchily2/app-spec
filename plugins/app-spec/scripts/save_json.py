@@ -4,8 +4,9 @@
     python3 save_json.py <src> <dest> [--key KEY] [--list]
 
 `src` is a workflow output file (`{"summary": ..., "result": {...}}`), a transcript in JSON Lines (the text of the
-assistant messages is read, last message last) or plain text, such as an agent's answer saved to a file; `-` reads
-standard input. The script takes the last JSON value in it: a fenced block (```json ... ``` or ``` ... ```) or a bare
+assistant messages is read, last message last), a tool result the harness stored as a file because the answer was
+too large to show (a JSON list of `{"type": "text", "text": ...}` blocks, read as their joined text) or plain text,
+such as an agent's answer saved to a file; `-` reads standard input. The script takes the last JSON value in it: a fenced block (```json ... ``` or ``` ... ```) or a bare
 object or list inside prose. With `--key`, only an object that holds KEY at its top level, or a list whose first
 object does, is taken. With `--list`, only a list. A `{"result": ...}` wrapper is unwrapped first, also when the result
 is a JSON string, unless the object holds KEY itself. The value is written to `dest` as JSON (two-space indent, UTF-8, trailing newline), creating its
@@ -95,12 +96,21 @@ def _assistant_texts(lines):
     return texts if records > 1 or texts else None
 
 
+def _text_blocks(value):
+    """Whether `value` is a stored tool result: a non-empty list of `{"type": "text", "text": ...}` blocks only."""
+    return isinstance(value, list) and bool(value) and all(
+        isinstance(b, dict) and b.get("type") == "text" and isinstance(b.get("text"), str) for b in value)
+
+
 def candidates(text, key=None):
     """Every JSON value `text` offers, last one last."""
     try:
         whole = json.loads(text)
     except ValueError:
         whole = None
+    if _text_blocks(whole):
+        # a tool result the harness stored as a file: the answer is the text of its blocks, joined
+        return candidates("".join(b["text"] for b in whole), key)
     if isinstance(whole, (dict, list)):
         if isinstance(whole, dict) and "message" not in whole:
             return [unwrap(whole, key)]

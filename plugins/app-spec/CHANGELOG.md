@@ -5,6 +5,12 @@ changes.
 
 ## Unreleased
 
+- **A large agent answer the harness stores as a file is saved directly.** In v5 the contract reader's answer for 10
+  endpoints was 61.7 KB; the harness stored it as a tool-result file (a JSON list of `{type, text}` blocks) and
+  showed a 2 KB preview, so the session could not copy it, and joined the blocks with a one-line script (recorded in
+  `MANUAL_STEPS.md`). `save_json.py` now reads such a file as the joined text of its blocks, and the skill says to
+  pass the stored file's path as it is.
+
 - **A screen takes the fields of the sub-views it uses.** `PayslipRowView` and `PayslipDetailFooterView` (in the file
   of SCR-008) and `YearEndReportView` (its own file, used by SCR-011) belonged to no screen, so their 8 fields were
   uncovered and the ledger's fields class failed at 84.9 percent. A screen now also takes the `fields.json` elements
