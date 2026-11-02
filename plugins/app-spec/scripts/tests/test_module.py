@@ -271,6 +271,42 @@ class TestModule(unittest.TestCase):
         self.assertEqual(data["touchFilter"], {"keyword": "card", "dropped": 1})
         self.assertIn("Touch points: 1 (only those that contain 'card'; 1 dropped)", stdout)
 
+    def test_a_rerun_with_other_modules_leaves_only_its_own_shards(self):
+        dest = os.path.join(self.tmp, "out")
+        run_cli(["module.py", IOS, "--module", "Payslips", "--out", dest])
+        first = set(os.listdir(os.path.join(dest, "shards")))
+        code, _, err = run_cli(["module.py", IOS, "--module", "Modules/CalendarFeature", "--out", dest])
+        self.assertEqual(code, 0, err)
+        second = {e["file"].split("/", 1)[1] for e in json.loads(Path(dest, "module.json").read_text())["shards"]}
+        self.assertEqual(set(os.listdir(os.path.join(dest, "shards"))), second)
+        self.assertTrue(first - second, "the first run had shards the second does not")
+        Path(dest, "shards", "notes.txt").write_text("kept")
+        run_cli(["module.py", IOS, "--module", "Modules/CalendarFeature", "--out", dest])
+        self.assertTrue(Path(dest, "shards", "notes.txt").is_file(), "only shards/*.json are removed")
+
+    def test_a_source_file_or_file_glob_joins_the_core(self):
+        dest = os.path.join(self.tmp, "file")
+        card = "Employee/StartPage/PayslipCard.swift"
+        code, stdout, err = run_cli(["module.py", IOS, "--module", "Modules/PayslipsFeature", "--module", card,
+                                     "--out", dest])
+        self.assertEqual(code, 0, err)
+        data = json.loads(Path(dest, "module.json").read_text())
+        self.assertIn(card, data["core"])
+        self.assertNotIn(card, [t["file"] for t in data["touchPoints"]])
+        self.assertIn(f"Core files:\n  {card}", stdout)
+        code, _, err = run_cli(["module.py", IOS, "--module", "EmployeeServices/Payslips/Sources/Payslips/Get*.swift",
+                                "--out", os.path.join(self.tmp, "glob")])
+        self.assertEqual(code, 0, err)
+        core = json.loads(Path(self.tmp, "glob", "module.json").read_text())["core"]
+        self.assertEqual(core, ["EmployeeServices/Payslips/Sources/Payslips/GetPayslipPdf.swift",
+                                "EmployeeServices/Payslips/Sources/Payslips/GetPayslips.swift"])
+
+    def test_a_file_that_is_not_a_source_file_matches_nothing(self):
+        code, _, err = run_cli(["module.py", IOS, "--module", "Resources/Localizable.xcstrings",
+                                "--out", os.path.join(self.tmp, "none")])
+        self.assertEqual(code, 2)
+        self.assertIn("no folder or source file matches", err)
+
 
 if __name__ == "__main__":
     unittest.main()

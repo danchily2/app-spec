@@ -42,8 +42,8 @@ Show the proposal, then ask with AskUserQuestion, "Is this the module?", with th
 and `Cancel`:
 
 - `Yes`: run the same command again with `--confirmed`, so `app-spec.json` records that a person confirmed the scope.
-- `Edit the folders`: ask which folders or globs to use, run `module.py` again with one `--module` per folder, and ask
-  again.
+- `Edit the folders`: ask which folders, source files or globs to use, run `module.py` again with one `--module` per
+  value, and ask again. A re-run replaces the shard files itself: never delete `OUT/shards/`.
 - `Cancel`: stop, and say that `OUT` holds only the proposal.
 
 With `--headless`, ask nothing: take the proposal, do not pass `--confirmed`, and say in the report that nobody

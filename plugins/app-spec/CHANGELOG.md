@@ -48,6 +48,9 @@ Fixes found in a run on a native iOS payslips module.
   decision. The critic maps Appendix A (fields) to `analyst` and Appendix F (coverage reasons) to `person`, and
   `review.py` enforces that by section. `REVIEW.md` lists person findings under "For a person to decide", and the
   skill never sends them to an agent nor keeps a pass running for them.
+- **`--module` takes a source file or a file glob.** `--module Employee/StartPage/.../PayslipCardDetailsProvider.swift`
+  puts that one file in the core. A test now holds that a re-run with other modules leaves only its own
+  `shards/*.json`, so the skill never needs to delete the folder.
 
 ## 0.1.0 - 2026-10-30
 

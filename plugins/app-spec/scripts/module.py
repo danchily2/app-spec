@@ -6,7 +6,8 @@
                       [--capabilities FILE --scope CAP-001,CAP-002]
 
 A --module value is a folder name (matched against package roots: Swift packages, Gradle modules, React Native screen
-and feature folders), or a folder or glob inside the app. With --scope, the files of the named capabilities in
+and feature folders), or a folder, a source file or a glob of either inside the app. A file joins the core on its own.
+A re-run removes the shard files of an earlier run (only `shards/*.json`). With --scope, the files of the named capabilities in
 --capabilities are the core, and --module is not needed. Writes app-spec.json (a re-run updates the fields this script owns in place),
 module.json and shards/<id>.json (one file per shard, hints empty until inventory.py fills them). Exit code 2 when a
 name matches no folder or several unrelated folders, or when --out lies inside the app or a --contracts repository, or
@@ -121,18 +122,25 @@ def _ancestors(folder):
     return ["/".join(parts[:i]) for i in range(1, len(parts) + 1)]
 
 
-def resolve_by_paths(app_root, paths):
-    """Explicit folders or globs inside the app. Anything that resolves outside the app, or to a file, is dropped."""
+def resolve_by_paths(app_root, paths, exts=None):
+    """Explicit folders, files or globs inside the app. `core` holds the folders, `files` the source files (with one
+    of `exts`, when given) that no folder of `core` holds. Anything that resolves outside the app is dropped."""
     root = os.path.realpath(app_root)
-    found = []
+    found, files = [], []
     for raw in paths:
         pattern = raw if os.path.isabs(raw) else os.path.join(root, raw)
         hits = glob.glob(pattern, recursive=True) if glob.has_magic(raw) else [pattern]
-        for hit in hits:
+        for hit in sorted(hits):
             real = os.path.realpath(hit)
-            if os.path.isdir(real) and real != root and real.startswith(root + os.sep):
-                found.append(os.path.relpath(real, root).replace(os.sep, "/"))
-    return {"core": _topmost(found), "candidates": []}
+            if real == root or not real.startswith(root + os.sep):
+                continue
+            rel = os.path.relpath(real, root).replace(os.sep, "/")
+            if os.path.isdir(real):
+                found.append(rel)
+            elif os.path.isfile(real) and (exts is None or os.path.splitext(real)[1] in exts):
+                files.append(rel)
+    core = _topmost(found)
+    return {"core": core, "files": sorted({f for f in files if not _inside(f, core)}), "candidates": []}
 
 
 def _base(folder):
@@ -148,17 +156,21 @@ def _base(folder):
 
 
 def _is_path(app_root, value):
-    return glob.has_magic(value) or "/" in value or os.path.isabs(value) or os.path.isdir(os.path.join(app_root, value))
+    return (glob.has_magic(value) or "/" in value or os.path.isabs(value) or os.path.isdir(os.path.join(app_root, value))
+            or os.path.isfile(os.path.join(app_root, value)))
 
 
 def resolve_module(app_root, stack, query):
-    """The core folders for the --module values. Exit 2 when a name matches nothing or several modules."""
-    core = []
+    """(core folders, core files outside them) for the --module values. Exit 2 when a value matches nothing or a name
+    matches several modules."""
+    core, files = [], []
     for item in query:
         if _is_path(app_root, item):
-            folders = resolve_by_paths(app_root, [item])["core"]
-            if not folders:
-                die(f"no folder matches {item}")
+            hit = resolve_by_paths(app_root, [item], touchpoints.source_exts(stack))
+            folders = hit["core"]
+            files += hit["files"]
+            if not folders and not hit["files"]:
+                die(f"no folder or source file matches {item}")
         else:
             found = resolve_by_name(app_root, stack, [item])
             folders = found["core"] or [c["folder"] for c in found["candidates"]]
@@ -167,7 +179,8 @@ def resolve_module(app_root, stack, query):
             if len({_base(f) for f in folders}) > 1:
                 die(f"several folders match {item}: {', '.join(folders)}")
         core += folders
-    return _topmost(core)
+    core = _topmost(core)
+    return core, sorted({f for f in files if not _inside(f, core)})
 
 
 # ---------------------------------------------------------------- capabilities
@@ -396,7 +409,7 @@ def _write_shards(dest, shards):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("app")
-    ap.add_argument("--module", action="append", help="a folder name, folder or glob; repeat for several (not needed with --scope)")
+    ap.add_argument("--module", action="append", help="a folder name, a folder, a source file or a glob; repeat for several (not needed with --scope)")
     ap.add_argument("--capabilities", metavar="FILE", help="capabilities.json of an App Fusion program, read with --scope")
     ap.add_argument("--scope", metavar="CAP-001,CAP-002", help="capability ids whose files are the core")
     ap.add_argument("--out", required=True)
@@ -431,6 +444,7 @@ def main(argv=None):
     stack = detect.detect(root)["stack"]
 
     index, scope = _scope_fields(args)
+    single = []
     if scope:
         core_files = scope_from_index(index, scope, args.app_name or os.path.basename(root))
         for rel in core_files:  # an index out of date with the checkout fails here, before any analysis
@@ -438,8 +452,8 @@ def main(argv=None):
                 die(f"index file not found: {os.path.join(root, rel)}")
         core_folders = _topmost(os.path.dirname(rel) for rel in core_files)
     else:
-        core_folders = resolve_module(root, stack, args.module)
-        core_files = files_under(root, stack, core_folders)
+        core_folders, single = resolve_module(root, stack, args.module)
+        core_files = files_under(root, stack, core_folders) + single
     if not core_files:
         die(f"no source files under {', '.join(core_folders)}")
     keys = string_keys_for(core_files, load_catalog(root, stack), root)
@@ -469,6 +483,10 @@ def main(argv=None):
     for folder in core_folders:
         info = _folder_summary(root, stack, folder)
         print(f"  {folder}  ({info['files']} files, {info['loc']} lines)")
+    if single:
+        print("Core files:")
+        for rel in single:
+            print(f"  {rel}  ({_loc(os.path.join(root, rel))} lines)")
     print(f"Touch points: {len(touch)}"
           + (f" (only those that contain '{touch_filter['keyword']}'; {touch_filter['dropped']} dropped)"
              if touch_filter else ""))
