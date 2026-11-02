@@ -29,6 +29,12 @@ Fixes found in the v3 payslips rerun (0.3.0 code).
   citation never counts, so a shared file such as a tab coordinator does not hide a neighbour. An out-of-scope rule
   inside a kept use case's code has no given/when/then to keep; it gets a `scope` warning in `render-warnings.json`.
 
+- **Referees can correct, not only keep or drop (P18).** RULE-091 ("Offset is the page size, not an offset") passed
+  its referee with the wrong value, and only the critic caught it. The rule referee's verdict now has `corrections`:
+  the corrected text of a wrong `plainEnglish`, `given`, `when`, `then` or `category`, with a citation. The use-case
+  referee can correct a `description` the same way. The workflow applies each correction and lists it in a new
+  `corrected` result field (`{name, field, from, to, citation}`) and `stats.corrected`; the Finish report names them.
+
 ## 0.3.0 - 2026-11-02
 
 Fixes found in the second payslips run (Devin, v0.2.0).

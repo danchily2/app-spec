@@ -305,7 +305,8 @@ Report:
   criteria (the `- **AC` lines of the spec)
 - coverage per class from `ledger.json`, with the classes that fail
 - the review passes run, and the Blocker and High findings that remain, by section
-- open questions, rejected and unverified use cases and rules, and shards in `rerunShards`
+- open questions, rejected and unverified use cases and rules, the fields referees corrected (`corrected` of both
+  results), and shards in `rerunShards`
 - every entry of `OUT/render-warnings.json` from the last `render.py catalogs`, by kind, with its `why`
 - every injection flag from the workflows and the contract reader, prominently: someone planted text aimed at
   automated analysis

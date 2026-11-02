@@ -160,7 +160,8 @@ test('understand: a dead analyst is reported in rerunShards, a rejected use case
   assert.deepEqual(r.useCases.map(u => u.name), ['Real one'])
   assert.deepEqual(r.screens[0].useCases, ['Real one'])
   assert.deepEqual(r.flows[0].steps[0].useCases, ['Real one'])
-  assert.deepEqual(r.stats, { shards: 2, fragments: 2, useCases: 1, screens: 1, flows: 1, rejected: 1 })
+  // the sample referee fills every schema field, so the kept use case gets one description correction
+  assert.deepEqual(r.stats, { shards: 2, fragments: 2, useCases: 1, screens: 1, flows: 1, rejected: 1, corrected: 1 })
 })
 
 test('understand: the analyst follows the stack; an injected fence marker cannot close the fence', async () => {
@@ -303,7 +304,9 @@ test('rules: duplicate rules inside and across shards fold into one', async () =
 test('rules: the result has the rules_result.json keys and stats', async () => {
   const { result: r } = await run(wf('extract-rules.js'), rargs, oneRule({ priority: 'P0' }))
   for (const key of ['rules', 'rejected', 'unverified', 'injectionFlags', 'rerunShards', 'stats']) assert.ok(key in r, key)
-  assert.deepEqual(r.stats, { shards: 2, rules: 1, p0: 1, rejected: 0, unverified: 0 })
+  // the sample referee fills every schema field, so the kept rule gets one correction
+  assert.deepEqual(r.stats, { shards: 2, rules: 1, p0: 1, rejected: 0, unverified: 0, corrected: 1 })
+  assert.equal(r.corrected.length, 1)
 })
 
 test('rules: missing shards, out, stack or a use case index outside out throws', async () => {
@@ -364,6 +367,41 @@ test('rules: an out-of-scope rule with the name of a kept rule leaves the list',
   const { result: r } = await run(wf('extract-rules.js'), args, respond)
   assert.deepEqual(r.rules.map(x => x.name), ['Net pay is shown'])
   assert.deepEqual(r.outOfScope.map(x => x.name), ['Week starts Monday'])
+})
+
+test('rules: a referee correction replaces the wrong field and is recorded (P18)', async () => {
+  // payslips v3: RULE-091 said offset is an offset; the code passes the page size. The referee could only keep or drop.
+  const rule = { name: 'Payslips load in pages', category: 'calculation', priority: 'P1', confidence: 'High',
+    plainEnglish: 'The list asks for the next page by offset.', given: 'g', when: 'w', then: 'offset is the item count',
+    source: 'A.swift:3', useCase: '' }
+  const respond = label => label === 'extract:core-01' ? { rules: [rule] }
+    : label === 'extract:touch-01' ? { rules: [] }
+    : label.startsWith('verify:') ? { real: true, reason: 'offset is the page size',
+      corrections: [{ field: 'then', value: 'offset is the page size, 20', citation: 'A.swift:5' },
+        { field: 'source', value: 'B.swift:1', citation: 'B.swift:1' }] } : undefined
+  const { result: r, calls } = await run(wf('extract-rules.js'), args, respond)
+  assert.equal(r.rules[0].then, 'offset is the page size, 20')
+  assert.equal(r.rules[0].source, 'A.swift:3', 'only the listed rule fields can be corrected')
+  assert.deepEqual(r.corrected, [{ name: 'Payslips load in pages', field: 'then', from: 'offset is the item count',
+    to: 'offset is the page size, 20', citation: 'A.swift:5' }])
+  assert.equal(r.stats.corrected, 1)
+  assert.ok(calls.find(c => c.opts.label.startsWith('verify:')).prompt.includes('corrections'))
+})
+
+test('understand: a referee correction replaces the use case description', async () => {
+  const respond = label => {
+    if (label === 'extract:core-01') return { fragments: [{ name: 'View payslips', description: 'd', evidence: 'A.swift:1' }] }
+    if (label === 'extract:touch-01') return { fragments: [] }
+    if (label === 'map') return { useCases: [{ name: 'View payslips', description: 'Shows every payslip', files: ['A.swift:1'], evidence: 'VERIFIED' }], screens: [], flows: [] }
+    if (label.startsWith('verify:')) return { real: true, badEvidence: [], reason: 'only the last 24 months',
+      corrections: [{ field: 'description', value: 'Shows the payslips of the last 24 months', citation: 'A.swift:4' }] }
+    return undefined
+  }
+  const { result: r } = await run(wf('understand-module.js'), args, respond)
+  assert.equal(r.useCases[0].description, 'Shows the payslips of the last 24 months')
+  assert.equal(r.useCases[0].evidence, 'VERIFIED')
+  assert.deepEqual(r.corrected, [{ name: 'View payslips', field: 'description', from: 'Shows every payslip',
+    to: 'Shows the payslips of the last 24 months', citation: 'A.swift:4' }])
 })
 
 test('rules: a touch shard is told its rules are out of scope, and outOfScope is returned', async () => {
