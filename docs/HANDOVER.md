@@ -296,4 +296,7 @@ Add one entry per round: date, items, commits, release tag, run folder, scorecar
 - **Release 0.7.0 (2026-11-03):** the rule-wording fix (`5357001`) plus a `passes` argument for the runner;
   `0fc9d9d`, tag `v0.7.0`, pushed, installed. v7 started with `--passes 3` into `vmm3/specs/payslips-v7`. A 6-7
   minute presentation of the plugin and this loop is at https://claude.ai/artifact/9YSqWuZkaN1J4AQxo7ZFvn (private).
+- **v7 stopped (2026-11-03, 11:03):** the account's usage limit was reached 15 minutes in ($24.25), after the
+  understand step (catalogs rendered, no rules, no spec). Not a plugin result. Rerun v7 into a new folder in a fresh
+  usage window: `zsh docs/acceptance/run.sh payslips-v7b 3`.
 
