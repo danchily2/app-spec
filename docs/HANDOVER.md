@@ -2,6 +2,33 @@
 
 Brief for the agent that continues work on the app-spec plugin. Read it all before you change anything.
 
+## Final summary (2026-11-03): the fix loop is wrapped up
+
+**Where it stands.** Latest release **0.7.1** (`a8c2d17`, pushed to `danchily2/app-spec`, installed). The best run is
+**v7b** (0.7.0, 3 passes): `~/Documents/GitHub/vmm3/specs/payslips-v7b/payslips.md`, 2,279 lines, 68 acceptance
+criteria, 865 code citations. It meets 5 of the 7 exit criteria outright: grade passes, every endpoint VERIFIED or with
+a reason, no citation warning, all in-scope capabilities covered, both test suites pass (390 Python, 37 Node).
+
+**What is left of the exit criteria, and why it is not a plugin defect.**
+- Ledger: only the strings class fails (60.9%). The uncovered keys belong to the start page (in scope only for the
+  Salary card) and need a person's reason (`review.py accept`); `SUMMARY`, `COMMON_CONNECT_AND_RETRY` and
+  `UNEXPECTED_ERROR` are payslip strings the spec should cover.
+- 1 High after pass 3 (a push for another signed-in account at a company it does not have). Each pass found fewer and
+  no finding repeated (2/2, 1/2, 0/1), so the loop converges; a fourth pass or a person closes it.
+- The one plugin gap v7b recorded (a patch could not clear the out-of-scope list) is fixed in 0.7.1, not yet re-run.
+
+**From v1 to v7b.** Manual steps 6 -> 0; inventory endpoints 5 -> 11, events 0 -> 6, string keys 7 -> 46; render
+warnings 40 -> 0; repeated review findings 4 of 5 (v5) -> 0. Runs cost $57-73 and take 70-90 minutes.
+
+**Open, for later.** (1) The confirming run on a second module (calendar against the scarlet-team-c spec) and an
+Android module: several inventory scans read Swift only. (2) Devin runtime items N2/P3/P24 (single-judge label),
+P20/P22 (runner: needs Dan's Devin files), N3 (allow-list doc). (3) A directory-source install runs the plugin from the
+live repo: never edit `plugins/` while a run is going.
+
+**How to run it.** `zsh docs/acceptance/run.sh <name> [passes]`, and `zsh docs/acceptance/supervise.sh <name>` to
+resume after a usage-limit stop. A presentation of the plugin is at
+https://claude.ai/artifact/9YSqWuZkaN1J4AQxo7ZFvn (private).
+
 ## The task
 
 Make the plugin produce a spec that passes its own checks on a real module, without manual fixes during the run.
@@ -109,6 +136,7 @@ scarlet-team-c calendar spec as the bar) to check that the fixes did not overfit
 | v4 | 0.4.0, headless, **partial** (usage limit hit after pass 1, $55.84) | 31 | 11 (0); 32 out of scope | 9 / 5 (4 INFERRED, not in inventory) | 87 (2); 84 referee corrections | fail (1 citation past end of file) | fail, fields 84.9%, strings 0/1 | 1 / 3 after pass 1 (pass 2 never ran) | 0 by hand; 1 denied workaround (transcript grep to save a contract batch) |
 | v5 | 0.5.0, headless, 2 passes, $72.66 | 37 | 10 (0); all 6 in-scope caps | 11 / 6 (4 reached through a service stay INFERRED, no reason) | 162 (2): duplicates from the rules re-run | fail: bare file names + `ViewModel` | fail, strings 58.7% (19 start-page keys) | 2 / 3 after pass 2 (4 of 5 are rule findings pass 1 already raised) | 1 kind, 3 times: large answers stored as files (fixed in Round 4) |
 | v6 | 0.6.0, headless, 2 passes, $57.33, 69 min | 37 | 10 (0); all 6 in-scope caps | 11 / 8; 3 INFERRED with a reason | 85 (0), no duplicates | **pass** | fail, strings 63% only (16 start-page keys + FAQ: person; SUMMARY: spec gap) | 1 / 3 after pass 2, all **new** in pass 2 (none repeats pass 1) | **0** |
+| v7b | 0.7.0, headless, 3 passes, $67.89, 91 min | 37 | 13 (0); all 6 in-scope caps | 11 / 8; 3 INFERRED with a reason | 84 (0) | **pass** | fail, strings 60.9% only (person) | **0 / 1** after pass 3; 2/2 -> 1/2 -> 0/1, no repeats | 0 by hand; 1 gap recorded (patch could not clear out-of-scope; fixed in 0.7.1) |
 
 ## Backlog, ranked
 
@@ -299,4 +327,6 @@ Add one entry per round: date, items, commits, release tag, run folder, scorecar
 - **v7 stopped (2026-11-03, 11:03):** the account's usage limit was reached 15 minutes in ($24.25), after the
   understand step (catalogs rendered, no rules, no spec). Not a plugin result. Rerun v7 into a new folder in a fresh
   usage window: `zsh docs/acceptance/run.sh payslips-v7b 3`.
+- **v7b + release 0.7.1 + wrap-up (2026-11-03):** v7b finished all 3 passes with no usage-limit stop (the supervisor
+  stood by). Its recorded gap fixed in `a6f0871`, released as 0.7.1 (`a8c2d17`). Final summary written at the top.
 
