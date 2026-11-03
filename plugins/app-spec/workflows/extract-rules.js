@@ -159,7 +159,7 @@ The app root is ${app.path}. Every path you cite is "path:line-line" relative to
 Its file list and the facts the inventory scripts found in it are in ${s.file} (JSON: "files" are relative to the app root); read that file first.
 Client-side rules only: validations, calculations, eligibility and visibility by role or flag, status lifecycles,
 formatting and rounding a user relies on, offline/retry/cache/session policies. Not layout, styling, logging or
-network plumbing. Given/When/Then with concrete values; one source range per rule; P0 when a wrong result moves money,
+network plumbing. Given/When/Then with concrete values, in behaviour words only: never a type, property, function, enum case or flag name of the old app (Date.distantPast, hasNextItems, isOnline) in the card text, only in source; a server permission, API field, push payload key or string key may stay. One source range per rule; P0 when a wrong result moves money,
 breaks a legal or policy requirement, loses data or grants access wrongly.
 ${catalog}${s.kind === 'touch' ? `
 This shard is of kind touch: its files are OUTSIDE the module, context and not scope. ${useCaseIndex

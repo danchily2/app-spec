@@ -5,6 +5,13 @@ changes.
 
 ## Unreleased
 
+- **Rule cards in behaviour words.** In every payslips run (v4, v5, v6) critic-1 raised rule cards that state old-app
+  identifiers as values (`Date.distantPast`, `hasNextItems`, `isInitialLoading`, `reachabilityService.isOnline`),
+  and the review loop could only fix the cards it was shown. The extractor prompt and agent now say to write the
+  sentence, Given/When/Then, parameters and edge cases in behaviour words and keep the names in `source`; a server
+  permission, API field, push payload key or string key may stay. A regex check was tried on the v6 rules and
+  dropped: most of its hits were names the new app needs.
+
 ## 0.6.0 - 2026-11-02
 
 - **A rules finding corrects the named cards instead of re-extracting the shard.** In v5 step 7.5 re-ran the

@@ -421,6 +421,13 @@ test('a flag on the analysed repo\'s own agent configuration is not an injection
   assert.deepEqual(rules.result.agentConfig, ['CLAUDE.md:12', 'Modules/X/AGENTS.md:3', '.claude/agents/review.md:1'])
 })
 
+test('rules: the extractor writes rule cards in behaviour words, not old-app names', async () => {
+  // payslips v4, v5 and v6: critic-1 raised rule cards that state old-app identifiers every run
+  const { calls } = await run(wf('extract-rules.js'), args, () => undefined)
+  const prompt = calls.find(c => c.opts.label === 'extract:core-01').prompt
+  assert.ok(prompt.includes('in behaviour words only') && prompt.includes('only in source'))
+})
+
 test('rules: the extractor names the use case by id and records conflicts (P23)', async () => {
   const { calls } = await run(wf('extract-rules.js'), { ...args, useCaseIndex: 'o/use-cases.json' }, () => undefined)
   const prompt = calls.find(c => c.opts.label === 'extract:core-01').prompt

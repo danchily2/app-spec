@@ -42,6 +42,11 @@ of the technology, skip it.
 3. Encode Given/When/Then with **concrete values** ("Given a mileage claim of 42 km at 3.50 NOK/km, when the total is
    shown, then it reads 147.00 kr"). Use no placeholders.
 4. List the parameters with their current values (limits, rates, magic numbers). These often become configuration.
+   **Behaviour words only.** In the sentence, Given/When/Then, parameters and edge cases, never name a type,
+   property, function, enum case or flag of the old app (`Date.distantPast`, `hasNextItems`, `isInitialLoading`,
+   `reachabilityService.isOnline`): say what the user sees or what the app does ("payslips without a date sort
+   last", "only when the device is online"). The names belong in `source` only. A name the new app must keep is
+   allowed: a server permission, an API field, a push payload key or a string key.
 5. **Priority.** P0 when a wrong result is costly or irreversible: it moves money, breaches a legal or policy
    requirement, loses or corrupts data, or grants access wrongly. P2 for display conveniences. P1 otherwise.
 6. **Confidence.** High (explicit in code), Medium (inferred), Low (ambiguous). Below High, write the exact question
