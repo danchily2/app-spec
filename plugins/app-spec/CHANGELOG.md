@@ -5,6 +5,8 @@ changes.
 
 ## Unreleased
 
+## 0.7.0 - 2026-11-03
+
 - **Rule cards in behaviour words.** In every payslips run (v4, v5, v6) critic-1 raised rule cards that state old-app
   identifiers as values (`Date.distantPast`, `hasNextItems`, `isInitialLoading`, `reachabilityService.isOnline`),
   and the review loop could only fix the cards it was shown. The extractor prompt and agent now say to write the
