@@ -280,4 +280,10 @@ Add one entry per round: date, items, commits, release tag, run folder, scorecar
   running. Resume: start v6 with 0.6.0 (installed) into `~/Documents/GitHub/vmm3/specs/payslips-v6` with the runner
   script (headless, `--headless`, `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0`; a copy of the command is in this file's
   step 5 plus those two settings), then assess it (step 6). Open for Dan: the 19 start-page string keys (item 28).
+- **Resumed (2026-11-03):** runner moved into the repo (`docs/acceptance/run.sh`, `c344e5d`; logs in
+  `vmm3/specs/run-logs/`). v6 started 08:43 with 0.6.0. Found: the headless sessions set the plugin folder `P` to the
+  live repo (`plugins/app-spec`) because the runner gave `--add-dir` to the repo, so **v5's scripts came from the
+  working tree while Round 4 commits landed** (v5 is partly 0.5.0, partly Round 4) and v6 uses `main` at 0.6.0 (do
+  not edit `plugins/` until v6 ends). The runner no longer adds the repo. Item 28 classified: 17 start-page keys and
+  `FAQ` need a person reason; `SUMMARY` (PayslipSummaryFeature) is a real payslip string the spec misses.
 

@@ -5,6 +5,8 @@
 # ~/Documents/GitHub/vmm3/specs/run-logs/<name>.{stream,stderr}.txt.
 # CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0: print mode otherwise kills a background workflow 10 minutes after the turn
 # ends (v5 attempt 1). --headless: no person answers the scope question; the report says so.
+# No --add-dir for the app-spec repo: with it, v5 and v6 ran the scripts from the live working tree (P set to the
+# repo path) instead of the installed copy, so edits during a run changed the code under test.
 set -u
 NAME=${1:?run name, such as payslips-v6}
 SPECS=~/Documents/GitHub/vmm3/specs
@@ -17,6 +19,6 @@ This is an acceptance run of the app-spec plugin. Take every proposal as the ski
 echo "started $(date)" > "$LOGS/$NAME.stderr.txt"
 CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 command claude -p "$PROMPT" \
   --permission-mode bypassPermissions --output-format stream-json --verbose \
-  --add-dir ~/Documents/GitHub/visma-scarlet --add-dir ~/code/me-api --add-dir ~/Documents/GitHub/app-spec \
+  --add-dir ~/Documents/GitHub/visma-scarlet --add-dir ~/code/me-api \
   > "$LOGS/$NAME.stream.txt" 2>> "$LOGS/$NAME.stderr.txt"
 echo "exit $? at $(date)" >> "$LOGS/$NAME.stderr.txt"
