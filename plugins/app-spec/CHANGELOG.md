@@ -5,6 +5,14 @@ changes.
 
 ## Unreleased
 
+## 0.7.1 - 2026-11-03
+
+- **A review patch can clear the out-of-scope list.** In v7b the critic raised year-end items that `out-of-scope.json`
+  still listed in all 3 passes, while kept use cases covered them; the mapper sent their names in `remove`, but
+  `remove` reached only use cases, screens, flows and rules, and the run recorded it in `MANUAL_STEPS.md`.
+  `patch_result.py` now also removes a listed name from `outOfScope` (names match without bracket notes or capability
+  ids), and the skill says so.
+
 ## 0.7.0 - 2026-11-03
 
 - **Rule cards in behaviour words.** In every payslips run (v4, v5, v6) critic-1 raised rule cards that state old-app

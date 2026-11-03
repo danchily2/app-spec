@@ -51,6 +51,26 @@ class TestPatch(unittest.TestCase):
         for key, ident in ids_before.items():
             self.assertEqual(ids_after[key], ident)
 
+    def test_remove_also_takes_an_entry_out_of_the_out_of_scope_list(self):
+        # payslips v7b MANUAL_STEPS.md: the critic raised year-end items listed out of scope in all 3 passes; the
+        # mapper sent their names in `remove`, but remove reached only useCases, screens and flows
+        result = out.load(self.out, "understand_result.json")
+        result["outOfScope"] = [{"name": "View a year-end report (CAP-229)", "reason": "touch file"},
+                                {"name": "Switch account", "reason": "accounts module"}]
+        out.save(self.out, "understand_result.json", result)
+        rules = out.load(self.out, "rules_result.json")
+        rules["outOfScope"] = [{"name": "Year-end PDF is saved", "source": "R.swift:1", "reason": "x"},
+                               {"name": "Week starts Monday", "source": "C.swift:1", "reason": "x"}]
+        out.save(self.out, "rules_result.json", rules)
+        code, _, err = run_cli(["patch_result.py", self.out, "understand",
+                                self.write("u.json", {"remove": ["View a year-end report"]})])
+        self.assertEqual(code, 0, err)
+        code, _, err = run_cli(["patch_result.py", self.out, "rules",
+                                self.write("r2.json", {"remove": ["Year-end PDF is saved"]})])
+        self.assertEqual(code, 0, err)
+        self.assertEqual([o["name"] for o in out.load(self.out, "understand_result.json")["outOfScope"]], ["Switch account"])
+        self.assertEqual([o["name"] for o in out.load(self.out, "rules_result.json")["outOfScope"]], ["Week starts Monday"])
+
     def test_rules_match_by_name_and_source_file_and_rerun_shards_replace(self):
         rule = self.rules["rules"][0]
         same = {**rule, "source": rule["source"].split(":")[0] + ":1-2", "priority": "P0"}

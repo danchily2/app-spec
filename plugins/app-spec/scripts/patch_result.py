@@ -14,7 +14,7 @@ PATCH is a JSON file in the shape of the result it patches: a follow-up run over
   run saw other shards, so a same-key entry is merged instead: each list field (screens, files, endpoints, events,
   strings, storage, platform, permissions, states, fields ...) becomes the union of both, once each, and only the
   scalar fields are replaced. A use case never loses evidence the first run found.
-- `remove` takes out every entry whose normalized name is listed.
+- `remove` takes out every entry whose normalized name is listed, in the out-of-scope list too (names match without bracket notes or capability ids).
 - `rejected`, `unverified` and `injectionFlags` are added once each. `rerunShards` is replaced when the patch has it
   (a follow-up run says which shards failed again) and kept when it does not.
 - `stats` is kept, with `patches` counting the patches applied.
@@ -35,6 +35,11 @@ from speclib.common import die, load_json  # noqa: E402
 from speclib.ids import norm  # noqa: E402
 
 _LINE = re.compile(r":\d[\d,\-– ]*$")
+
+
+def _core(name):
+    """`norm(name)` without bracket notes and capability ids, as render.py compares out-of-scope names."""
+    return norm(re.sub(r"\bCAP-\d+\b", " ", re.sub(r"\([^()]*\)", " ", str(name or "")), flags=re.I))
 
 
 def _file(location):
@@ -97,6 +102,14 @@ def patch(result, part, kind, rerun=False):
                 entries.append(e)
                 added += 1
         result[name] = entries
+    # `remove` also takes an entry out of the out-of-scope list: a reviewer can say a listed neighbour is covered by
+    # a kept use case or rule (names match without bracket notes or capability ids)
+    if gone and isinstance(result.get("outOfScope"), list):
+        names = {_core(n) for n in part.get("remove") or [] if isinstance(n, str)}
+        before = len(result["outOfScope"])
+        result["outOfScope"] = [o for o in result["outOfScope"]
+                                if not (isinstance(o, dict) and _core(o.get("name")) in names)]
+        removed += before - len(result["outOfScope"])
     for name in ("rejected", "unverified", "injectionFlags"):
         result[name] = _add_once(list(result.get(name) or []), list(part.get(name) or []))
     if isinstance(part.get("rerunShards"), list):

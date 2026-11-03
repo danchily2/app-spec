@@ -272,7 +272,8 @@ For pass `n` from 1:
    `OUT/patches/`:
    - `analyst`: give the stack analyst the finding and the files it cites, with the `FRAGMENT_SCHEMA` prompt; then
      give the use-case mapper the finding, those fragments and the entries of `understand_result.json` the finding
-     names. It returns the corrected entries in `USECASES_SCHEMA`, plus `"remove": [names]` for entries it folds away.
+     names. It returns the corrected entries in `USECASES_SCHEMA`, plus `"remove": [names]` for entries it folds away,
+     and for out-of-scope entries that a kept use case covers.
      Fold them in with `patch_result.py OUT understand <file>`.
    - `mapper`: the mapper alone, with the finding and the entries it names; fold in the same way.
    - `rules`: give one `app-spec:business-rules-extractor` the findings, the rule cards the findings name (from
