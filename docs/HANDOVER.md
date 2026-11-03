@@ -108,6 +108,7 @@ scarlet-team-c calendar spec as the bar) to check that the fixes did not overfit
 | v3 | branch `2ab0bd1`→`a1c1138` | 31 | 11 (0) | 9/9 / 5 | 85 (0) | pass | fail, fields 51/58, strings 0/1 | 0 / 2 | 5 plugin fixes made mid-run, 1 rule path patched by hand |
 | v4 | 0.4.0, headless, **partial** (usage limit hit after pass 1, $55.84) | 31 | 11 (0); 32 out of scope | 9 / 5 (4 INFERRED, not in inventory) | 87 (2); 84 referee corrections | fail (1 citation past end of file) | fail, fields 84.9%, strings 0/1 | 1 / 3 after pass 1 (pass 2 never ran) | 0 by hand; 1 denied workaround (transcript grep to save a contract batch) |
 | v5 | 0.5.0, headless, 2 passes, $72.66 | 37 | 10 (0); all 6 in-scope caps | 11 / 6 (4 reached through a service stay INFERRED, no reason) | 162 (2): duplicates from the rules re-run | fail: bare file names + `ViewModel` | fail, strings 58.7% (19 start-page keys) | 2 / 3 after pass 2 (4 of 5 are rule findings pass 1 already raised) | 1 kind, 3 times: large answers stored as files (fixed in Round 4) |
+| v6 | 0.6.0, headless, 2 passes, $57.33, 69 min | 37 | 10 (0); all 6 in-scope caps | 11 / 8; 3 INFERRED with a reason | 85 (0), no duplicates | **pass** | fail, strings 63% only (16 start-page keys + FAQ: person; SUMMARY: spec gap) | 1 / 3 after pass 2, all **new** in pass 2 (none repeats pass 1) | **0** |
 
 ## Backlog, ranked
 
@@ -286,4 +287,10 @@ Add one entry per round: date, items, commits, release tag, run folder, scorecar
   working tree while Round 4 commits landed** (v5 is partly 0.5.0, partly Round 4) and v6 uses `main` at 0.6.0 (do
   not edit `plugins/` until v6 ends). The runner no longer adds the repo. Item 28 classified: 17 start-page keys and
   `FAQ` need a person reason; `SUMMARY` (PayslipSummaryFeature) is a real payslip string the spec misses.
+- **v6 assessment (2026-11-03):** grade passes, no manual step, every endpoint VERIFIED or with a reason, no citation
+  warning, all in-scope capabilities covered, rules not duplicated (85). Left: (a) strings: 16 start-page keys and FAQ
+  need a person reason (`review.py accept`), SUMMARY is a payslip string the spec misses; (b) 1 Blocker + 3 High after
+  pass 2, all new findings (error-path tracing, unreachable guard, legacy names in rule cards). The legacy-names class
+  recurred in v4-v6: fixed in the extractor prompt (`5357001`, branch `fix/round6-rule-wording`). Next: release 0.7.0,
+  run v7 with `--passes 3`, then the confirming run on a second module.
 
