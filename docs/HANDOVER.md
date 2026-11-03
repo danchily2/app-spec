@@ -293,4 +293,7 @@ Add one entry per round: date, items, commits, release tag, run folder, scorecar
   pass 2, all new findings (error-path tracing, unreachable guard, legacy names in rule cards). The legacy-names class
   recurred in v4-v6: fixed in the extractor prompt (`5357001`, branch `fix/round6-rule-wording`). Next: release 0.7.0,
   run v7 with `--passes 3`, then the confirming run on a second module.
+- **Release 0.7.0 (2026-11-03):** the rule-wording fix (`5357001`) plus a `passes` argument for the runner;
+  `0fc9d9d`, tag `v0.7.0`, pushed, installed. v7 started with `--passes 3` into `vmm3/specs/payslips-v7`. A 6-7
+  minute presentation of the plugin and this loop is at https://claude.ai/artifact/9YSqWuZkaN1J4AQxo7ZFvn (private).
 
