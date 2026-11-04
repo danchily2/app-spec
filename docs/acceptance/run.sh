@@ -7,14 +7,20 @@
 # ends (v5 attempt 1). --headless: no person answers the scope question; the report says so.
 # No --add-dir for the app-spec repo: with it, v5 and v6 ran the scripts from the live working tree (P set to the
 # repo path) instead of the installed copy, so edits during a run changed the code under test.
+# Other modules: set SCOPE, MODULE, SPEC (file name) and BAR (a hand-written spec the critic reads) in the
+# environment, e.g. SCOPE=CAP-001,CAP-002 MODULE=Modules/CalendarFeature SPEC=calendar.md BAR=<path> zsh run.sh calendar-v1 3
 set -u
 NAME=${1:?run name, such as payslips-v6}
 PASSES=${2:-}
+SCOPE=${SCOPE:-CAP-029,CAP-080,CAP-225,CAP-226,CAP-227,CAP-231}
+MODULE=${MODULE:-Modules/PayslipsFeature}
+SPEC=${SPEC:-payslips.md}
+BAR=${BAR:-}
 SPECS=~/Documents/GitHub/vmm3/specs
 LOGS=$SPECS/run-logs
 mkdir -p "$LOGS"
 cd ~/Documents/GitHub/vmm3 || exit 1
-PROMPT="/app-spec:spec ~/Documents/GitHub/visma-scarlet/sources/me-ios --capabilities ~/Documents/GitHub/visma-scarlet/analysis/work-app/capabilities.json --scope CAP-029,CAP-080,CAP-225,CAP-226,CAP-227,CAP-231 --module Modules/PayslipsFeature --contracts ~/code/me-api --out $SPECS/$NAME --name payslips.md --headless${PASSES:+ --passes $PASSES}
+PROMPT="/app-spec:spec ~/Documents/GitHub/visma-scarlet/sources/me-ios --capabilities ~/Documents/GitHub/visma-scarlet/analysis/work-app/capabilities.json --scope $SCOPE --module $MODULE --contracts ~/code/me-api --out $SPECS/$NAME --name $SPEC --headless${PASSES:+ --passes $PASSES}${BAR:+ --bar $BAR}
 
 This is an acceptance run of the app-spec plugin. Take every proposal as the skill offers it. Never fix plugin output by hand and never edit the plugin. If the run needs a manual step, stop that step and record it in $SPECS/$NAME/MANUAL_STEPS.md with what was needed and why. End with the Finish report of the skill."
 echo "started $(date)" > "$LOGS/$NAME.stderr.txt"
