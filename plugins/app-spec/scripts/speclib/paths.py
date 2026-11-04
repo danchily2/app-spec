@@ -91,6 +91,13 @@ def complete(value, root_list, index):
             return cited
         if any(_exists(real, cited) for real, _ in root_list):
             return cited
+        if "/.../" in cited:
+            # a path shortened with `...` (`Modules/PayslipsFeature/.../Mapper.swift`): the one file that starts with
+            # the part before the dots and ends with the part after them
+            head, _, tail = cited.partition("/.../")
+            matches = {p for p in index.get(cited.rsplit("/", 1)[-1], [])
+                       if p.startswith(head + "/") and (p == tail or p.endswith("/" + tail))}
+            return matches.pop() if len(matches) == 1 else cited
         matches = {p for p in index.get(cited.rsplit("/", 1)[-1], []) if p.endswith("/" + cited)}
         return matches.pop() if len(matches) == 1 else cited
 

@@ -565,6 +565,17 @@ class TestCatalogs(unittest.TestCase):
         clamped = [r for r in out.load(self.out, "render-warnings.json") if r["kind"] == "clamped"]
         self.assertEqual([r["item"] for r in clamped], [f"{item}:10-16"])
 
+    def test_a_path_shortened_with_dots_resolves_to_its_one_file(self):
+        # payslips v8: RULE-121 cited `Modules/PayslipsFeature/.../PayslipUIModel.Mapper.swift:111`
+        full = "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift"
+        self.edit("rules_result.json", lambda r: r["rules"][0].update(
+            source="Modules/PayslipsFeature/.../PayslipItem.swift:10-14",
+            plainEnglish="Also in Modules/.../Nowhere.swift:1."))
+        warnings = self.warnings()
+        rule = next(r for r in out.load(self.out, "rules.json")["rules"] if r["name"] == "Payslips are newest first")
+        self.assertEqual(rule["source"], f"{full}:10-14")
+        self.assertIn("Modules/.../Nowhere.swift:1", rule["plainEnglish"])  # no file fits: left as cited
+
     def test_a_partial_path_in_any_field_of_a_rule_resolves(self):
         # payslips v4: RULE-108 cited `nil (ViewModel/ViewModel.PayslipDocument.swift:17)` inside its parameters
         full = "Modules/PayslipsFeature/Sources/PayslipsFeature/PayslipItem.swift"

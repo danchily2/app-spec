@@ -5,7 +5,13 @@ changes.
 
 ## Unreleased
 
+## 0.7.2 - 2026-11-04
+
 Fixes found in the v8 payslips run (0.7.1).
+
+- **A path shortened with `...` resolves.** RULE-121 cited `Modules/PayslipsFeature/.../PayslipUIModel.Mapper.swift:111`,
+  the run's one `citation` warning. Path completion now rewrites such a path to the one file that starts with the
+  part before the dots and ends with the part after them; with no such file, or several, it stays and is reported.
 
 - **A saved contract patch always reaches the endpoints.** In pass 2 the session saved `contracts/batch-4.json` and
   ran `merge_contracts.py OUT` without it (the skill's after-patch step names no file), so the corrected error
