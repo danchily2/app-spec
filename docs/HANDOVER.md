@@ -337,3 +337,5 @@ Add one entry per round: date, items, commits, release tag, run folder, scorecar
   3 passes, bar = work-app-v2 calendar spec) hit the usage limit at 10:35; `supervise.sh` resumes it at about 13:45.
 - **Devin cloud support, 0.8.0, items 16 + cloud docs (2026-11-04):** added cloud-specific skill instructions and
   recorded single-agent P0 judging; released as 0.8.0.
+- **Devin cloud parity, 0.9.0: child-session driver, start skill, source check (2026-11-04):** added replayable
+  workflow child sessions, recorded the source immutability check and child-session independence mode.

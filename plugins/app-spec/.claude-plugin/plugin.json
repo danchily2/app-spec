@@ -1,7 +1,7 @@
 {
   "name": "app-spec",
   "displayName": "App Spec",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Turn one module of one existing mobile app (native iOS, React Native or native Android) into a spec complete enough to plan and build the same feature in a new app without reading the old code again. Start with /app-spec:spec and get a deterministic inventory of the module, its use cases, screens, fields, endpoints, business rules and flows, a coverage ledger that lists every uncovered item with a reason, and a reviewed spec in a fixed template with numbered acceptance criteria. A critic grades the draft and sends gaps back for up to two review rounds. Includes a source write guard, and the spec never reproduces secrets.",
   "author": {
     "name": "Dan-Mihai Cuc",
