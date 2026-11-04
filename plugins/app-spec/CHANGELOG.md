@@ -3,6 +3,8 @@
 A release gets a new number in `.claude-plugin/plugin.json`. Claude Code only offers an update when that number
 changes.
 
+## Unreleased
+
 ## 0.8.0 - 2026-11-04
 
 - **Devin cloud sessions have a documented path through the plugin.** Evidence from Devin cloud session 2026-11-04:
@@ -11,8 +13,6 @@ changes.
 - **P0 judges are marked when they were not independent.** Evidence from Devin cloud session 2026-11-04: there was no
   `run_subagent` tool or agent profiles, so one session had to play every role. `options.independence` records that
   run mode, the P0 cards and summary say so, and status reports it.
-
-## Unreleased
 
 ## 0.7.2 - 2026-11-04
 
