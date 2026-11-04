@@ -8,6 +8,9 @@ changes.
 - **Devin cloud sessions can start a full spec run with independent agents.** The start skill resolves the plugin folder
   from the base directory Devin prints and the spec guide uses child sessions with structured answers. Evidence: Devin
   cloud parity request, 2026-11-04.
+- **Devin cloud can resume workflow agents across child-session rounds.** The replay driver writes stable task keys,
+  structured answer schemas and results using the existing workflow logic. Evidence: Devin cloud parity request,
+  2026-11-04.
 
 ## 0.8.0 - 2026-11-04
 
