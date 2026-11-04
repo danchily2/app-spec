@@ -11,6 +11,9 @@ changes.
 - **Devin cloud can resume workflow agents across child-session rounds.** The replay driver writes stable task keys,
   structured answer schemas and results using the existing workflow logic. Evidence: Devin cloud parity request,
   2026-11-04.
+- **Devin cloud can detect writes to its source folders.** The source check records and verifies Git revisions and
+  working-tree changes, with a file inventory fallback for non-Git folders. Evidence: Devin cloud parity request,
+  2026-11-04.
 
 ## 0.8.0 - 2026-11-04
 
