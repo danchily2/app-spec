@@ -33,10 +33,12 @@ class DevinContext(unittest.TestCase):
         hook = json.loads(run_devin_context(env={"DEVIN_PLUGIN_ROOT": PLUGIN, "DEVIN_PROJECT_DIR": "/x"}, via_sh=True))["hookSpecificOutput"]
         self.assertEqual(hook["hookEventName"], "SessionStart")
         text = hook["additionalContext"]
-        for word in (os.path.realpath(PLUGIN), "ask_user_question", "run_subagent", "app-spec:", "Without the Workflow tool", "exec",
+        for word in (os.path.realpath(PLUGIN), f"Base directory: {os.path.realpath(PLUGIN)}/skills/<skill>",
+                     "ask_user_question", "run_subagent", "app-spec:", "Without the Workflow tool", "exec",
                      "read", "write", "edit", "grep", "glob", "APP_SPEC_GUARD=false", ".devin/config.json",
-                     "Devin cloud runs no plugin hooks", "content_type` is `user_question",
-                     "single-agent", "agents/<agent>.md", "sort -V | tail -1"):
+                     "Devin cloud runs no plugin hooks", "content_type` is `user_question", "single-agent",
+                     "skills/start/SKILL.md", "devin_workflow.mjs", "devin_session_create", "source_check.py",
+                     "sort -V | tail -1"):
             self.assertIn(word, text)
         self.assertNotIn("app-fusion", text.lower())
         self.assertNotIn("<root>", text)

@@ -50,15 +50,33 @@ class TestDocs(unittest.TestCase):
         readme = (PLUGIN / "README.md").read_text(encoding="utf-8")
         for text in (spec, review, status, readme):
             self.assertIn("Devin cloud runs no plugin hooks", text)
-            self.assertIn("sort -V | tail -1", text)
             self.assertIn("module.py`'s first output line", text)
-        for text in (spec, review, readme):
+        for text in (review, status, readme):
+            self.assertIn("Base directory: <root>/skills/<skill>", text)
+            self.assertIn("two levels above", text)
+            self.assertIn("sort -V | tail -1", text)
+        for text in (spec, readme):
             self.assertIn("content_type", text)
             self.assertIn("user_question", text)
-        self.assertIn("read `<root>/skills/spec/SKILL.md` and follow it", " ".join(spec.split()))
+        cloud = " ".join(spec.split())
+        self.assertIn("## In Devin cloud", cloud)
+        self.assertIn("two levels above the base directory Devin prints", cloud)
+        self.assertIn("devin_workflow.mjs", cloud)
+        self.assertIn("source_check.py", cloud)
+        self.assertIn("devin_session_create", cloud)
         self.assertIn("run app-spec spec on <app> --module X", readme)
+        self.assertIn("model-invocable `/app-spec:start`", readme)
+        self.assertIn("child Devin sessions with `devin_workflow.mjs`", readme)
         self.assertIn("single-agent", spec)
         self.assertIn("run_subagent` tool or agent profiles", spec)
+
+    def test_cloud_start_skill_and_child_prompt_template_exist(self):
+        skill = (PLUGIN / "skills" / "start" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("name: start", skill)
+        self.assertIn("description:", skill)
+        self.assertNotIn("disable-model-invocation", skill)
+        self.assertIn("app-spec:start", (PLUGIN / "README.md").read_text(encoding="utf-8"))
+        self.assertTrue((PLUGIN / "references" / "devin-child.md").is_file())
 
     def test_single_agent_option_is_documented_and_set_for_cloud_runs(self):
         design = (PLUGIN / "docs" / "DESIGN.md").read_text(encoding="utf-8")

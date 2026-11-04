@@ -19,8 +19,9 @@ Exit code 2 means `OUT` is not an output folder: say so, and name the command th
 ## In Devin
 
 - Write the plugin's real folder out instead of `${CLAUDE_PLUGIN_ROOT}`, here and in the `Next:` command
-  `status.py` prints. Devin CLI/Desktop gives it in the session-start note. Devin cloud runs no plugin hooks, so when
-  no note gave it, find the installed folder with
+  `status.py` prints. Devin CLI/Desktop gives it in the session-start note. When Devin cloud loads a skill, it prints
+  `Base directory: <root>/skills/<skill>`, so the plugin folder is two levels above that. Devin cloud runs no plugin
+  hooks; if no base directory was printed, find the installed folder with
   `ls -d ~/.devin/plugins/cache/*app-spec_plugins_app-spec*/*/ 2>/dev/null | sort -V | tail -1`, or use a local
   clone's `plugins/app-spec`. Check that `module.py`'s first output line (`app-spec <version>`) matches the expected
   version.

@@ -5,6 +5,10 @@ changes.
 
 ## Unreleased
 
+- **Devin cloud sessions can start a full spec run with independent agents.** The start skill resolves the plugin folder
+  from the base directory Devin prints and the spec guide uses child sessions with structured answers. Evidence: Devin
+  cloud parity request, 2026-11-04.
+
 ## 0.8.0 - 2026-11-04
 
 - **Devin cloud sessions have a documented path through the plugin.** Evidence from Devin cloud session 2026-11-04:

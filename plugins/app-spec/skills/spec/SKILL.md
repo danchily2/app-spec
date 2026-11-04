@@ -309,25 +309,52 @@ with its id, what was searched and who can answer.
 ## In Devin
 
 - `${CLAUDE_PLUGIN_ROOT}` is not set in Devin's shell. In Devin CLI/Desktop, the session-start note gives the plugin
-  folder. Devin cloud runs no plugin hooks, so when no note gave it, find the installed folder with
-  `ls -d ~/.devin/plugins/cache/*app-spec_plugins_app-spec*/*/ 2>/dev/null | sort -V | tail -1`, or use a local
-  clone's `plugins/app-spec`. At step 1, check that `module.py`'s first output line, `app-spec <version>`, matches
+  folder; write it out in commands. At step 1, check that `module.py`'s first output line, `app-spec <version>`, matches
   the version expected.
-- `/app-spec:spec` may not be offered as a skill in Devin cloud. When a person asks for a spec run, read
-  `<root>/skills/spec/SKILL.md` and follow it.
-- AskUserQuestion is `ask_user_question` in Devin CLI/Desktop (1 to 4 questions, 2 to 4 options each). In Devin cloud,
-  ask with a blocking message whose `content_type` is `user_question`, with the same limits.
+- AskUserQuestion is `ask_user_question` in Devin CLI/Desktop (1 to 4 questions, 2 to 4 options each).
 - There is no Workflow tool. In Devin CLI/Desktop, take the "Without the Workflow tool" path of steps 3 and 4 and run
   each agent with `run_subagent` and profile `app-spec:<agent>`. For several in parallel, start them in the background
   and wait for each with `read_subagent`.
-- Devin cloud has no `run_subagent` tool or agent profiles. Play each role in this session one after another: read
-  `<root>/agents/<agent>.md` as that role's instructions, write nothing while in the role, then save its JSON as the
-  session under `OUT`, following "Who writes". Pass `single-agent` as the fourth argument in the options command
-  above (otherwise pass an empty fourth argument); this records that the P0 judges were not independent. This setting
-  is `options.independence` and is `separate-agents` when absent.
 - Devin has no plugin options: the passes default to `options.passes` in `app-spec.json`, else 2. `APP_SPEC_GUARD=false`
   turns the guard off.
 - Put the printed `Write(...)` deny rules in `.devin/config.json`, not `.claude/settings.json`.
+
+## In Devin cloud
+
+Devin cloud runs no plugin hooks and has no Workflow tool, no `run_subagent` and no agent profiles. It can start
+child Devin sessions (`devin_session_create`), each with its own machine and a structured answer. Run every agent of
+steps 3 and 4 (and the critic of step 8) in child sessions, so each agent stays independent, as in Claude Code:
+
+- **Plugin folder:** two levels above the base directory Devin prints when it loads this skill.
+- **Choose once, at step 1:** ask "Run the agents in child sessions (independent, parallel, about <N> sessions) or in
+  this session (cheaper, the spec labels its P0 rules single-judge)?". Headless, or when `devin_session_create` is not
+  available, or the app is not a repository Devin can clone: use this session. Pass `child-sessions` or
+  `single-agent` as the fourth argument of the options command.
+- **Source check:** after the options command, run `python3 <root>/scripts/source_check.py save OUT`; after every
+  stage, run `python3 <root>/scripts/source_check.py verify OUT`. Devin cloud has no write guard, and this check is
+  how you find out about a write to the source app. If it fails, stop and report the files it lists.
+- **Steps 3 and 4 with child sessions:** run the workflow with the driver, and repeat until it exits 0:
+
+  ```bash
+  node <root>/scripts/devin_workflow.mjs understand-module OUT --args <args.json> --children 6
+  ```
+
+  Exit 3 means agents are needed. It wrote `OUT/devin/understand-module/round-<r>/batch-<n>/` with `tasks.json`,
+  `child.json` (the fields for the child prompt) and `schema.json`. For each batch, fill `references/devin-child.md`
+  from `child.json`, upload `tasks.json` and the `shards.zip` the driver wrote, and start all batches of the round in
+  one `devin_session_create` call: one session per batch, `repos` = the app's repository,
+  `structured_output_schema` = `schema.json`, `notify_on_response` = true. When each one settles, read its structured
+  output with `devin_session_interact` (action `get`), save it to a file, and run
+  `node <root>/scripts/devin_workflow.mjs understand-module OUT --save-answers <file>`. When every batch of the round is
+  saved, run the driver again. Exit 0 means it wrote `OUT/devin/understand-module/result.json`: save that as step 3
+  says for a Workflow result. Do the same for `extract-rules` at step 4. A child that ends with no structured output
+  counts as an agent that returned nothing: save `{"answers": {}}` for it.
+- **Critic (step 8) with child sessions:** start one fresh child per pass with the role `app-spec:spec-critic`, the
+  spec, `ledger.json` and `grade.json` attached, and the critic's output shape from DESIGN.md as its schema.
+- **Without child sessions:** play each role in this session one after another. Read `<root>/agents/<agent>.md` as its
+  instructions, write nothing while you are in the role, then save its JSON as the session under `OUT`, following
+  "Who writes".
+- **Asking a person:** a blocking message with `content_type: user_question` (1 to 4 questions, 2 to 4 options each).
 
 ## Finish
 

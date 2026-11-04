@@ -61,15 +61,17 @@ leaves the spec on the next `render.py spec`, and that the grader then checks it
 ## In Devin
 
 - Write the plugin's real folder out instead of `${CLAUDE_PLUGIN_ROOT}`. Devin CLI/Desktop gives it in the
-  session-start note. Devin cloud runs no plugin hooks, so when no note gave it, find the installed folder with
-  `ls -d ~/.devin/plugins/cache/*app-spec_plugins_app-spec*/*/ 2>/dev/null | sort -V | tail -1`, or use a local
-  clone's `plugins/app-spec`. Check that `module.py`'s first output line (`app-spec <version>`) matches the expected
-  version.
+  session-start note. When Devin cloud loads a skill, it prints `Base directory: <root>/skills/<skill>`, so the
+  plugin folder is two levels above that. Devin cloud runs no plugin hooks; if no base directory was printed, find the
+  installed folder with `ls -d ~/.devin/plugins/cache/*app-spec_plugins_app-spec*/*/ 2>/dev/null | sort -V | tail -1`,
+  or use a local clone's `plugins/app-spec`. Check that `module.py`'s first output line (`app-spec <version>`) matches
+  the expected version.
 - AskUserQuestion is `ask_user_question` in Devin CLI/Desktop. In Devin cloud, ask with a blocking message whose
   `content_type` is `user_question` (1 to 4 questions, 2 to 4 options each).
-- Run the critic with `run_subagent` and profile `app-spec:spec-critic` where available. Devin cloud has no
-  `run_subagent` tool or agent profiles: read `<root>/agents/spec-critic.md` as the critic's instructions, write
-  nothing while in that role, then save its JSON as the session under `OUT`, following "Who writes".
+- Run the critic with `run_subagent` and profile `app-spec:spec-critic` where available. In Devin cloud, start a fresh
+  child Devin session for every pass with role `app-spec:spec-critic`, attach the spec, `ledger.json` and `grade.json`,
+  and set `structured_output_schema` to the critic's output shape from DESIGN.md. See
+  `<root>/skills/spec/SKILL.md` under "In Devin cloud" for the child-session path.
 - This command needs no Workflow tool.
 
 ## Finish

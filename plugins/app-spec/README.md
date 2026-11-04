@@ -31,7 +31,8 @@ It runs in Devin (the CLI and Devin Desktop) too, which loads the same Claude Co
 devin plugins install danchily2/app-spec#plugins/app-spec      # or --local /path/to/app-spec/plugins/app-spec
 ```
 
-The commands are the same (`/app-spec:spec` and so on). See *Devin differences* below.
+Devin CLI/Desktop uses the same slash commands (`/app-spec:spec` and so on). Devin cloud should use the model-invocable
+start skill described in *Devin differences* below.
 
 The full spec run starts many agents, one per slice of the module and one per use case, so expect real usage on a large
 module (see *What to expect*).
@@ -72,6 +73,13 @@ into each backend repository you gave.
 | 7 | Write | `prose.json`: the spec writer's text, from the catalogs and the cited code only. |
 | 8 | Review loop | `SPEC.md`, `LEDGER.md`, `grade.json`, `REVIEW.md`: render, count, grade, critic, fix, up to the configured passes. |
 | 9 | Open questions | `OPEN_QUESTIONS.md`, each question with what was searched and who can answer. |
+
+## Skills
+
+- `/app-spec:spec` starts a spec run.
+- `/app-spec:review` re-grades a spec, and `/app-spec:status` reports its state.
+- `/app-spec:start` is model-invocable and starts a spec only when a person explicitly asks in a session that cannot
+  type the slash command, such as Devin cloud.
 
 `/app-spec:review <out>` runs the count, the grader and the critic again on a spec a person has edited. It changes
 nothing in the spec. `/app-spec:review <out> --accept` offers each uncovered item and records the reason you give in
@@ -142,13 +150,15 @@ full coverage says so: it hands over the spec with the gaps listed, never a clea
 
 - The guard hook matches Devin's tools as well (`edit`, `write`, `notebook_edit`, `apply_patch`, `exec`,
   `write_to_process`). Devin has no plugin options: start it with `APP_SPEC_GUARD=false` to turn the guard off.
-- In Devin CLI/Desktop, a session-start note gives the plugin folder and tool names. Devin cloud runs no plugin hooks,
-  so when no note gave the folder, find the installed copy with
+- In Devin CLI/Desktop, a session-start note gives the plugin folder and tool names. Devin cloud runs no plugin hooks.
+  When cloud loads a skill, it prints `Base directory: <root>/skills/<skill>`, so the plugin folder is two levels above
+  that. If no base directory was printed, find the installed copy with
   `ls -d ~/.devin/plugins/cache/*app-spec_plugins_app-spec*/*/ 2>/dev/null | sort -V | tail -1`, or use a local
   clone's `plugins/app-spec`. When running step 1, check that `module.py`'s first output line (`app-spec <version>`)
   matches the version expected.
-- `/app-spec:spec` may not be offered as a skill in Devin cloud. If a person asks for a spec run, read
-  `<root>/skills/spec/SKILL.md` and follow it. They can simply ask: "run app-spec spec on <app> --module X".
+- In Devin cloud, a person can ask "run app-spec spec on <app> --module X" and use the model-invocable
+  `/app-spec:start` skill. Its spec skill instructions describe running workflow agents in child Devin sessions with
+  `devin_workflow.mjs`.
 - AskUserQuestion is `ask_user_question` in Devin CLI/Desktop (1 to 4 questions, 2 to 4 options each). In Devin cloud,
   ask with a blocking message whose `content_type` is `user_question`, with the same limits.
 - Devin has no Workflow tool. In CLI/Desktop, the analysts, referees and judges run as subagents with profile
