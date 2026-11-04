@@ -224,6 +224,39 @@ class TestSpec(unittest.TestCase):
         self.assertIn("PayslipItem.swift:10-14", rules)
         self.assertIn("High", rules)
 
+    def test_single_agent_marks_only_p0_judges_and_records_the_run_in_summary(self):
+        data = out.load(self.out, "rules.json")
+        base = data["rules"][0]
+        data["rules"] = [
+            {**base, "id": "RULE-001", "name": "P0 rule", "priority": "P0", "useCase": "UC-001"},
+            {**base, "id": "RULE-002", "name": "P1 rule", "priority": "P1", "useCase": "UC-001"},
+        ]
+        out.save(self.out, "rules.json", data)
+        config = out.load_config(self.out)
+        config["options"]["independence"] = "single-agent"
+        out.save(self.out, "app-spec.json", config)
+
+        text = render.spec(self.out)
+        rules = section(text, "## Business rules and permissions")
+        p0 = next(block for block in rules.split("### ") if block.startswith("RULE-001"))
+        p1 = next(block for block in rules.split("### ") if block.startswith("RULE-002"))
+        self.assertIn("- **Judges:** single agent (not independent)", p0)
+        self.assertNotIn("Judges:", p1)
+        self.assertIn("Run: Every role was played in one agent.", section(text, "## Summary"))
+
+    def test_default_independence_keeps_the_render_unchanged(self):
+        data = out.load(self.out, "rules.json")
+        data["rules"][0]["priority"] = "P0"
+        out.save(self.out, "rules.json", data)
+        default = render.spec(self.out)
+        self.assertNotIn("Judges:", default)
+        self.assertNotIn("Run: Every role was played in one agent.", default)
+
+        config = out.load_config(self.out)
+        config["options"]["independence"] = "separate-agents"
+        out.save(self.out, "app-spec.json", config)
+        self.assertEqual(default, render.spec(self.out))
+
     def test_endpoint_section_shows_fields_errors_label_clients_and_backend(self):
         data = out.load(self.out, "endpoints.json")
         e = next(x for x in data["endpoints"] if x["path"].endswith("/payslips"))

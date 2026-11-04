@@ -265,8 +265,12 @@ def report(dest):
     stale = _stale(dest, spec_name)
     passes, blocking = _review(dest)
     command, reason = _next(dest, cfg, stages, stale, spec_name, blocking)
-    return {"out": dest, "spec": spec_name, "stages": stages, "stale": stale, "coverage": _coverage(dest),
-            "passes": passes, "blocking": blocking, "next": {"command": command, "reason": reason}}
+    result = {"out": dest, "spec": spec_name, "stages": stages, "stale": stale, "coverage": _coverage(dest),
+              "passes": passes, "blocking": blocking, "next": {"command": command, "reason": reason}}
+    options = cfg.get("options")
+    if isinstance(options, dict) and options.get("independence") == "single-agent":
+        result["independence"] = "single-agent"
+    return result
 
 
 def main(argv=None):
@@ -281,6 +285,8 @@ def main(argv=None):
         print(json.dumps(r, indent=2, default=str))
         return 0
     print(f"Output {r['out']}")
+    if r.get("independence") == "single-agent":
+        print("  independence: single-agent")
     for name, s in r["stages"].items():
         when = datetime.fromtimestamp(s["mtime"]).strftime("%Y-%m-%d %H:%M") if s["mtime"] else "-"
         print(f"  {name:<11} {s['status']:<5} {when}")

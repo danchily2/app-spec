@@ -76,6 +76,8 @@ class Context:
         self.cfg = out.load_config(dest)
         self.app = self.cfg["app"]["name"]
         self.locale = (self.cfg.get("options") or {}).get("locale", "en")
+        options = self.cfg.get("options")
+        self.independence = options.get("independence") if isinstance(options, dict) else None
         self.overrides = out.load(dest, "overrides.json", {}) or {}
         self.drops = [d for d in self.overrides.get("drop") or [] if isinstance(d, dict) and d.get("id")]
         self.dropped = {(d.get("kind"), str(d["id"])): d.get("reason") for d in self.drops}
@@ -151,7 +153,10 @@ def head(c):
 
 def summary(c):
     text = _cited(c.prose.get("summary"))
-    return [text or _unknown("summary not written yet")]
+    lines = [text or _unknown("summary not written yet")]
+    if c.independence == "single-agent":
+        lines.append("Run: Every role was played in one agent.")
+    return lines
 
 
 def _design(c, case):
@@ -444,6 +449,8 @@ def _rule(c, r):
              f"- **Given:** {_text(r.get('given'))}",
              f"- **When:** {_text(r.get('when'))}",
              f"- **Then:** {_text(r.get('then'))}"]
+    if c.independence == "single-agent" and r.get("priority") == "P0":
+        lines.append("- **Judges:** single agent (not independent)")
     params = [_param(p) for p in _items(r.get("parameters"))]
     if params:
         lines.append("- **Parameters:** " + "; ".join(params))

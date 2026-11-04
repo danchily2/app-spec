@@ -167,6 +167,17 @@ class TestStatus(unittest.TestCase):
         self.assertEqual(r["stages"]["compare"]["status"], "-")
         self.assertTrue(r["next"]["command"].startswith("(a person)"))
 
+    def test_single_agent_independence_is_in_the_status_summary(self):
+        dest = self.good()
+        config = out.load_config(dest)
+        config["options"]["independence"] = "single-agent"
+        out.save(dest, "app-spec.json", config)
+        report = status.report(dest)
+        self.assertEqual(report["independence"], "single-agent")
+        code, stdout, err = run_cli(["status.py", dest], module=status)
+        self.assertEqual(code, 0, err)
+        self.assertIn("  independence: single-agent", stdout)
+
     def test_inventory_and_catalog_staleness(self):
         dest = self.good()
         touch(dest, "module.json", later=True)

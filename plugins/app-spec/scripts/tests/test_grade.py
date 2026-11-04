@@ -111,6 +111,14 @@ class TestBrief(GradeCase):
         self.assertEqual(out.load(self.good, "grade.json"), result)
         self.assertEqual(result["version"], 1)
 
+    def test_single_agent_spec_passes(self):
+        dest = self.copy("single-agent")
+        config = out.load_config(dest)
+        config["options"]["independence"] = "single-agent"
+        out.save(dest, "app-spec.json", config)
+        render.spec(dest)
+        self.assertTrue(grade.run(dest)["pass"])
+
     def test_citation_beyond_file_length_fails(self):
         dest = self.mutated("cite9999", lambda t: t.replace(f"`{LIST}:12`", f"`{LIST}:9999`", 1))
         c = check(grade.run(dest), "citations-resolve")

@@ -8,6 +8,10 @@ changes.
 - **Devin cloud sessions have a documented path through the plugin.** Evidence from Devin cloud session 2026-11-04:
   no plugin hooks, no `/app-spec:spec`, and no `run_subagent` or agent profiles. The skills and README now explain how
   to find the installed plugin, run the spec skill directly, ask a person, and perform agent roles in one session.
+- **P0 judges are marked when they were not independent.** Evidence from Devin cloud session 2026-11-04: there was no
+  `run_subagent` tool or agent profiles, so one session had to play every role. `options.independence` records that
+  run mode, the P0 cards and summary say so, and status reports it.
+
 
 ## 0.7.2 - 2026-11-04
 

@@ -60,6 +60,15 @@ class TestDocs(unittest.TestCase):
         self.assertIn("single-agent", spec)
         self.assertIn("run_subagent` tool or agent profiles", spec)
 
+    def test_single_agent_option_is_documented_and_set_for_cloud_runs(self):
+        design = (PLUGIN / "docs" / "DESIGN.md").read_text(encoding="utf-8")
+        spec = (PLUGIN / "skills" / "spec" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("`options.independence`", design)
+        self.assertIn("`separate-agents` (default when absent) or `single-agent`", design)
+        self.assertIn('o["independence"]="single-agent"', spec)
+        self.assertIn('o.pop("independence",None)', spec)
+        self.assertIn("not independent", design)
+
     def test_agents_name_the_injection_field_the_schemas_have(self):
         # P16: the mapper prompt said "the flags field"; the schema field is injectionSuspects
         for path in sorted((PLUGIN / "agents").glob("*.md")) + sorted((PLUGIN / "workflows").glob("*.js")):
