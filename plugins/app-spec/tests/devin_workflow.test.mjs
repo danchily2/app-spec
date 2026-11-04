@@ -114,19 +114,25 @@ function understandAnswer(label) {
 
 test('workflow driver resumes understand-module through extract, map, and verify', async t => {
   const f = fixture(t)
-  const expected = await run(workflowPath('understand-module.js'), f.args, understandAnswer)
+  const expected = await run(workflowPath('understand-module'), f.args, understandAnswer)
 
   let result = invoke(f, 'understand-module', '--args', f.argsFile)
   assert.equal(result.status, 3, result.stderr)
-  assert.equal(result.stdout.trim().split('\n').length, 1)
+  const firstBatches = roundBatches(f, 'understand-module', 1)
+  const batchLines = result.stdout.trim().split('\n')
+  assert.equal(batchLines.length, firstBatches.length)
+  firstBatches.forEach((batch, index) => assert.ok(batchLines[index].includes(batch)))
   const first = roundTasks(f, 'understand-module', 1)
   assert.deepEqual(first.map(task => task.key), ['extract:core-01~1', 'extract:touch-01~1'])
   assert.ok(first.every(task => task.schema && task.prompt.includes('Read ONE area')))
   const firstBatch = roundBatches(f, 'understand-module', 1)[0]
+  const firstBatchTasks = readJson(join(firstBatch, 'tasks.json'))
   assert.deepEqual(readJson(join(firstBatch, 'schema.json')), {
     type: 'object',
     required: ['answers'],
-    properties: { answers: { type: 'object', properties: Object.fromEntries(first.map(task => [task.key, task.schema])) } },
+    properties: {
+      answers: { type: 'object', properties: Object.fromEntries(firstBatchTasks.map(task => [task.key, task.schema])) },
+    },
   })
   const child = readJson(join(firstBatch, 'child.json'))
   assert.equal(child.agentType, 'app-spec:ios-analyst')
@@ -167,7 +173,7 @@ test('workflow driver turns an error referee answer into an unverified use case'
     if (label.startsWith('verify:')) throw new Error('dead')
     return understandAnswer(label, prompt, opts)
   }
-  const expected = await run(workflowPath('understand-module.js'), f.args, throwingReferee)
+  const expected = await run(workflowPath('understand-module'), f.args, throwingReferee)
   let result = invoke(f, 'understand-module', '--args', f.argsFile)
   assert.equal(result.status, 3, result.stderr)
   result = saveRound(f, 'understand-module', 1, understandAnswer)
