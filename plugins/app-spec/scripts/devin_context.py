@@ -3,8 +3,9 @@
 
 Prints a hookSpecificOutput.additionalContext with the plugin's real folder (for ${CLAUDE_PLUGIN_ROOT}, which Devin
 does not expand inside a skill), the Devin names of the tools the skills mention, the path to take without the
-Workflow tool, and the defaults of the plugin options Devin does not have. Prints nothing outside Devin (neither
-DEVIN_PLUGIN_ROOT nor DEVIN_PROJECT_DIR set). Standard library only.
+Workflow tool, and the defaults of the plugin options Devin does not have. The note is unavailable in Devin cloud,
+which runs no plugin hooks. Prints nothing outside Devin (neither DEVIN_PLUGIN_ROOT nor DEVIN_PROJECT_DIR set).
+Standard library only.
 """
 
 import json
@@ -16,13 +17,23 @@ ROOT = os.path.realpath(os.environ.get("DEVIN_PLUGIN_ROOT") or os.environ.get("C
 CONTEXT = """\
 The app-spec plugin is installed at <root>. Its skills (/app-spec:*) and agents were written for Claude Code; \
 when you run one in Devin, read it this way:
-- `${CLAUDE_PLUGIN_ROOT}` is <root>. Your shell does not set it: write that path out in every command.
-- AskUserQuestion is ask_user_question, with the same limits (1-4 questions, 2-4 options each; multiSelect is \
-multi_select).
-- There is no Workflow tool: take each skill's "Without the Workflow tool" path, with run_subagent and the plugin's \
-profiles app-spec:<agent> (for example app-spec:ios-analyst). One foreground subagent runs at a time; to run \
-several in parallel start them in the background and wait for each with read_subagent (block=true). Background \
-subagents only get tools already approved in this session.
+- `${CLAUDE_PLUGIN_ROOT}` is <root>. Your shell does not set it: write that path out in every command. In Devin \
+CLI/Desktop the session-start note gives it. Devin cloud runs no plugin hooks; when no note gave it, find the \
+installed folder with `ls -d ~/.devin/plugins/cache/*app-spec_plugins_app-spec*/*/ 2>/dev/null | sort -V | tail -1`, \
+or use a local clone's `plugins/app-spec`. At step 1, check that `module.py`'s first output line, \
+`app-spec <version>`, matches the version expected.
+- `/app-spec:spec` may not be offered as a skill in Devin cloud. When a person asks for a spec run, read \
+`<root>/skills/spec/SKILL.md` and follow it.
+- AskUserQuestion is `ask_user_question` in Devin CLI/Desktop, with the same limits (1-4 questions, 2-4 options each; \
+multiSelect is `multi_select`). In Devin cloud, ask with a blocking message whose `content_type` is `user_question`, \
+with the same limits.
+- There is no Workflow tool. In Devin CLI/Desktop, take each skill's "Without the Workflow tool" path, with \
+`run_subagent` and the plugin's profiles `app-spec:<agent>` (for example `app-spec:ios-analyst`). One foreground \
+subagent runs at a time; to run several in parallel start them in the background and wait for each with \
+`read_subagent` (block=true). Background subagents only get tools already approved in this session.
+- Devin cloud has no `run_subagent` tool or agent profiles. Play each role in this session one after another: read \
+`<root>/agents/<agent>.md` as that role's instructions, write nothing while in the role, then save its JSON as the \
+session under `OUT`, following "Who writes". Set `independence` to `single-agent` in `app-spec.json`.
 - Bash is exec (a long command returns a shell_id: read it with get_output); Read, Write, Edit, Grep and Glob are \
 read, write, edit, grep and glob.
 - Devin has no plugin options: the review passes default is 2 unless the person names another number, and \

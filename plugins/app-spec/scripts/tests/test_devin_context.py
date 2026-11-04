@@ -1,4 +1,4 @@
-"""The Devin session note: printed only under Devin, names the plugin folder and the Devin tool names."""
+"""The Devin session note: printed only under Devin, names the plugin folder and cloud adaptations."""
 
 import json
 import os
@@ -34,7 +34,9 @@ class DevinContext(unittest.TestCase):
         self.assertEqual(hook["hookEventName"], "SessionStart")
         text = hook["additionalContext"]
         for word in (os.path.realpath(PLUGIN), "ask_user_question", "run_subagent", "app-spec:", "Without the Workflow tool", "exec",
-                     "read", "write", "edit", "grep", "glob", "APP_SPEC_GUARD=false", ".devin/config.json"):
+                     "read", "write", "edit", "grep", "glob", "APP_SPEC_GUARD=false", ".devin/config.json",
+                     "Devin cloud runs no plugin hooks", "content_type` is `user_question",
+                     "single-agent", "agents/<agent>.md", "sort -V | tail -1"):
             self.assertIn(word, text)
         self.assertNotIn("app-fusion", text.lower())
         self.assertNotIn("<root>", text)

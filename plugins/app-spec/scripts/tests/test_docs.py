@@ -43,6 +43,23 @@ class TestDocs(unittest.TestCase):
         self.assertIn("**Who writes.**", skill)
         self.assertIn("write nothing while you act in that role", skill)
 
+    def test_devin_cloud_fallbacks_cover_skill_invocation_tools_and_plugin_folder(self):
+        spec = (PLUGIN / "skills" / "spec" / "SKILL.md").read_text(encoding="utf-8")
+        review = (PLUGIN / "skills" / "review" / "SKILL.md").read_text(encoding="utf-8")
+        status = (PLUGIN / "skills" / "status" / "SKILL.md").read_text(encoding="utf-8")
+        readme = (PLUGIN / "README.md").read_text(encoding="utf-8")
+        for text in (spec, review, status, readme):
+            self.assertIn("Devin cloud runs no plugin hooks", text)
+            self.assertIn("sort -V | tail -1", text)
+            self.assertIn("module.py`'s first output line", text)
+        for text in (spec, review, readme):
+            self.assertIn("content_type", text)
+            self.assertIn("user_question", text)
+        self.assertIn("read `<root>/skills/spec/SKILL.md` and follow it", " ".join(spec.split()))
+        self.assertIn("run app-spec spec on <app> --module X", readme)
+        self.assertIn("single-agent", spec)
+        self.assertIn("run_subagent` tool or agent profiles", spec)
+
     def test_agents_name_the_injection_field_the_schemas_have(self):
         # P16: the mapper prompt said "the flags field"; the schema field is injectionSuspects
         for path in sorted((PLUGIN / "agents").glob("*.md")) + sorted((PLUGIN / "workflows").glob("*.js")):

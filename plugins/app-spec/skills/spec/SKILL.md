@@ -304,12 +304,23 @@ with its id, what was searched and who can answer.
 
 ## In Devin
 
-- `${CLAUDE_PLUGIN_ROOT}` is not set in Devin's shell: write the plugin's real folder out in every command. The
-  session-start note prints it.
-- AskUserQuestion is `ask_user_question` (1 to 4 questions, 2 to 4 options each).
-- There is no Workflow tool: take the "Without the Workflow tool" path of steps 3 and 4, and run every agent with
-  `run_subagent` and the profile `app-spec:<agent>`. For several in parallel, start them in the background and wait
-  for each with `read_subagent`.
+- `${CLAUDE_PLUGIN_ROOT}` is not set in Devin's shell. In Devin CLI/Desktop, the session-start note gives the plugin
+  folder. Devin cloud runs no plugin hooks, so when no note gave it, find the installed folder with
+  `ls -d ~/.devin/plugins/cache/*app-spec_plugins_app-spec*/*/ 2>/dev/null | sort -V | tail -1`, or use a local
+  clone's `plugins/app-spec`. At step 1, check that `module.py`'s first output line, `app-spec <version>`, matches
+  the version expected.
+- `/app-spec:spec` may not be offered as a skill in Devin cloud. When a person asks for a spec run, read
+  `<root>/skills/spec/SKILL.md` and follow it.
+- AskUserQuestion is `ask_user_question` in Devin CLI/Desktop (1 to 4 questions, 2 to 4 options each). In Devin cloud,
+  ask with a blocking message whose `content_type` is `user_question`, with the same limits.
+- There is no Workflow tool. In Devin CLI/Desktop, take the "Without the Workflow tool" path of steps 3 and 4 and run
+  each agent with `run_subagent` and profile `app-spec:<agent>`. For several in parallel, start them in the background
+  and wait for each with `read_subagent`.
+- Devin cloud has no `run_subagent` tool or agent profiles. Play each role in this session one after another: read
+  `<root>/agents/<agent>.md` as that role's instructions, write nothing while in the role, then save its JSON as the
+  session under `OUT`, following "Who writes". Pass `single-agent` as the fourth argument in the options command
+  above (otherwise pass an empty fourth argument); this records that the P0 judges were not independent. This setting
+  is `options.independence` and is `separate-agents` when absent.
 - Devin has no plugin options: the passes default to `options.passes` in `app-spec.json`, else 2. `APP_SPEC_GUARD=false`
   turns the guard off.
 - Put the printed `Write(...)` deny rules in `.devin/config.json`, not `.claude/settings.json`.

@@ -5,6 +5,10 @@ changes.
 
 ## Unreleased
 
+- **Devin cloud sessions have a documented path through the plugin.** Evidence from Devin cloud session 2026-11-04:
+  no plugin hooks, no `/app-spec:spec`, and no `run_subagent` or agent profiles. The skills and README now explain how
+  to find the installed plugin, run the spec skill directly, ask a person, and perform agent roles in one session.
+
 ## 0.7.2 - 2026-11-04
 
 Fixes found in the v8 payslips run (0.7.1).
