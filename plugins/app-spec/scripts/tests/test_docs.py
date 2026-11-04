@@ -49,8 +49,9 @@ class TestDocs(unittest.TestCase):
         status = (PLUGIN / "skills" / "status" / "SKILL.md").read_text(encoding="utf-8")
         readme = (PLUGIN / "README.md").read_text(encoding="utf-8")
         for text in (spec, review, status, readme):
-            self.assertIn("Devin cloud runs no plugin hooks", text)
-            self.assertIn("module.py`'s first output line", text)
+            normalized = " ".join(text.split())
+            self.assertIn("Devin cloud runs no plugin hooks", normalized)
+            self.assertIn("module.py`'s first output line", normalized)
         for text in (review, status, readme):
             self.assertIn("Base directory: <root>/skills/<skill>", text)
             self.assertIn("two levels above", text)
@@ -64,11 +65,14 @@ class TestDocs(unittest.TestCase):
         self.assertIn("devin_workflow.mjs", cloud)
         self.assertIn("source_check.py", cloud)
         self.assertIn("devin_session_create", cloud)
-        self.assertIn("run app-spec spec on <app> --module X", readme)
-        self.assertIn("model-invocable `/app-spec:start`", readme)
-        self.assertIn("child Devin sessions with `devin_workflow.mjs`", readme)
+        cloud_readme = " ".join(readme.split())
+        self.assertIn("run app-spec spec on <app> --module X", cloud_readme)
+        self.assertIn("model-invocable `/app-spec:start`", cloud_readme)
+        self.assertIn("child Devin sessions with `devin_workflow.mjs`", cloud_readme)
         self.assertIn("single-agent", spec)
-        self.assertIn("run_subagent` tool or agent profiles", spec)
+        in_devin = " ".join(spec.split("## In Devin\n", 1)[1].split("## In Devin cloud", 1)[0].split())
+        self.assertIn("run_subagent` and profile `app-spec:<agent>", in_devin)
+        self.assertIn("no `run_subagent` and no agent profiles", cloud)
 
     def test_cloud_start_skill_and_child_prompt_template_exist(self):
         skill = (PLUGIN / "skills" / "start" / "SKILL.md").read_text(encoding="utf-8")

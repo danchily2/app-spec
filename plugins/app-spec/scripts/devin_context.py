@@ -26,7 +26,8 @@ directory was printed, find the installed folder with \
 expected.
 - A cloud spec request should use the model-invocable `<root>/skills/start/SKILL.md`. Its spec instructions describe \
 running the workflow agents in independent child Devin sessions with `devin_workflow.mjs` and \
-`devin_session_create`; select `child-sessions` or, for the same-session fallback, `single-agent` in the options command.
+`devin_session_create`; select `child-sessions` or, for the same-session fallback, `single-agent` in the options command. \
+Use `source_check.py save|verify OUT` to check that the app and contract source folders were not changed.
 - AskUserQuestion is `ask_user_question` in Devin CLI/Desktop, with the same limits (1-4 questions, 2-4 options each; \
 multiSelect is `multi_select`). In Devin cloud, ask with a blocking message whose `content_type` is `user_question`, \
 with the same limits.
