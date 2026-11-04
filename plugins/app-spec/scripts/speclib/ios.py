@@ -441,7 +441,7 @@ def extract(root):
                     nm = re.match(r"\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:=\s*(" + _SWIFT_STRING + r"))?", part)
                     if nm:
                         events.append({"name": _literal(nm.group(2)) if nm.group(2) else nm.group(1), "family": m.group(1),
-                                       "file": f"{rel}:{line_of(text, m.end() + cm.start())}"})
+                                       "file": f"{rel}:{line_of(text, m.end() + cm.start(1))}"})  # the case name, not the blank lines before it
         for m in _LOG_EVENT.finditer(text):
             events.append({"name": _literal(m.group(1)), "family": "call", "file": f"{rel}:{line_of(text, m.start())}"})
 

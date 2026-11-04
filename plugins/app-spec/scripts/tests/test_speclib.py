@@ -66,6 +66,20 @@ class TestSpeclib(unittest.TestCase):
         self.assertEqual(found[0]["method"], "GET")  # the one method the service sends built URLs with
         self.assertEqual(len(inv["endpoints"]), 1, "a non-URL name is not an endpoint")
 
+    def test_an_event_case_after_blank_lines_has_its_own_line(self):
+        # payslips v8: exportAllPayslips was reported at :10 (`public enum Event`), quickSelection and payslipOpen two
+        # lines early; `^\s*case` matched from the first blank line above the case
+        import os
+        root = self.tmp + "/events-app"
+        os.makedirs(root + "/Analytics")
+        with open(root + "/Analytics/Events.swift", "w") as f:
+            f.write("public enum Event: Equatable {\n    case exportAllPayslips\n\n\n    case payslipOpen\n"
+                    "    // the start page\n\n    case quickSelection(String)\n}\n")
+        lines = {e["name"]: e["file"] for e in ios.extract(root)["events"]}
+        self.assertEqual(lines["exportAllPayslips"], "Analytics/Events.swift:2")
+        self.assertEqual(lines["payslipOpen"], "Analytics/Events.swift:5")
+        self.assertEqual(lines["quickSelection"], "Analytics/Events.swift:8")
+
     def test_normalize_endpoint_drops_a_note_after_the_path(self):
         from speclib.common import normalize_endpoint
         self.assertEqual(normalize_endpoint("/employee/api/v1/Payslip/Export (single company)"),

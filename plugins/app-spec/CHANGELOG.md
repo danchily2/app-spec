@@ -5,6 +5,13 @@ changes.
 
 ## Unreleased
 
+Fixes found in the v8 payslips run (0.7.1).
+
+- **An event case gets its own line.** The iOS scan reported `exportAllPayslips` at the `enum Event` line and other
+  cases one or two lines early, because the case pattern began its match on the blank lines above the case. The
+  analyst gave the right lines, but nothing writes `inventory.json` again, so the critic raised it in every pass.
+  The line now counts from the case name.
+
 ## 0.7.1 - 2026-11-03
 
 - **A review patch can clear the out-of-scope list.** In v7b the critic raised year-end items that `out-of-scope.json`
