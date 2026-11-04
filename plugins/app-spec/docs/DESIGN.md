@@ -97,7 +97,7 @@ A re-run of `spec` regenerates every file except three. `overrides.json` is neve
 | `scope` | List of `CAP-NNN` ids that define the module through the capability index, or `null` |
 | `options.passes` | Most review rounds. Default 2, range 1 to 5 |
 | `options.specName` | File name of the spec inside `<out>`, as the spec skill wrote it with `--name`. Optional, default `SPEC.md`. `status.py` reads it |
-| `options.independence` | `separate-agents` (default when absent) or `single-agent`. The latter means one agent played every role, so P0 judges were not independent |
+| `options.independence` | `separate-agents` (default when absent), `child-sessions` or `single-agent`. `child-sessions` means Devin ran each workflow agent in an independent child session. `single-agent` means one agent played every role, so P0 judges were not independent |
 | `options.locale` | Source-language code of the strings the spec quotes. Default `en` |
 | `options.thresholds` | Coverage percent per class. See Thresholds and defaults |
 | `options.bannedNouns` | Legacy nouns the grader forbids in requirement sentences outside Appendix C |

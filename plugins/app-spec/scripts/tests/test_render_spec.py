@@ -257,6 +257,18 @@ class TestSpec(unittest.TestCase):
         out.save(self.out, "app-spec.json", config)
         self.assertEqual(default, render.spec(self.out))
 
+    def test_child_sessions_has_no_single_agent_render_lines(self):
+        data = out.load(self.out, "rules.json")
+        data["rules"][0]["priority"] = "P0"
+        out.save(self.out, "rules.json", data)
+        config = out.load_config(self.out)
+        config["options"]["independence"] = "child-sessions"
+        out.save(self.out, "app-spec.json", config)
+
+        text = render.spec(self.out)
+        self.assertNotIn("Judges:", text)
+        self.assertNotIn("Every role was played in one agent.", text)
+
     def test_endpoint_section_shows_fields_errors_label_clients_and_backend(self):
         data = out.load(self.out, "endpoints.json")
         e = next(x for x in data["endpoints"] if x["path"].endswith("/payslips"))

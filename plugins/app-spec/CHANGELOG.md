@@ -14,6 +14,8 @@ changes.
 - **Devin cloud can detect writes to its source folders.** The source check records and verifies Git revisions and
   working-tree changes, with a file inventory fallback for non-Git folders. Evidence: Devin cloud parity request,
   2026-11-04.
+- **Child-session runs are recorded as independent agents.** `child-sessions` is an accepted independence mode and
+  renders without the single-agent warning. Evidence: Devin cloud parity request, 2026-11-04.
 
 ## 0.8.0 - 2026-11-04
 

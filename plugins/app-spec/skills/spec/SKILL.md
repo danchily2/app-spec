@@ -73,17 +73,17 @@ Then record the options this run was given, reset the review of an earlier run, 
 ```bash
 # always: specName is NAME (SPEC.md without --name), so a name from an earlier run never lingers;
 # passes only when --passes was given, and only from 1 to 5; use single-agent
-# only when every role in this run is played in this session
+# when every role is played in this session, or child-sessions for independent Devin cloud agents
 python3 -c 'import json,sys; p=sys.argv[1]+"/app-spec.json"; d=json.load(open(p)); o=d.setdefault("options",{})
 o["specName"]=sys.argv[2] or "SPEC.md"
 if sys.argv[3]:
     n=int(sys.argv[3])
     if not 1<=n<=5: sys.exit("--passes must be from 1 to 5")
     o["passes"]=n
-if sys.argv[4] == "single-agent": o["independence"]="single-agent"
+if sys.argv[4] in ("single-agent","child-sessions"): o["independence"]=sys.argv[4]
 else: o.pop("independence",None)
 json.dump(d,open(p,"w"),indent=2,ensure_ascii=False)' OUT "<NAME or empty>" "<N or empty>" \
-  "<single-agent or empty>"
+  "<single-agent, child-sessions or empty>"
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/review.py" reset OUT
 ```
 

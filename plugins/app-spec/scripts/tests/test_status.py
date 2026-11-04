@@ -178,6 +178,17 @@ class TestStatus(unittest.TestCase):
         self.assertEqual(code, 0, err)
         self.assertIn("  independence: single-agent", stdout)
 
+    def test_child_sessions_has_no_single_agent_status_line(self):
+        dest = self.good()
+        config = out.load_config(dest)
+        config["options"]["independence"] = "child-sessions"
+        out.save(dest, "app-spec.json", config)
+        report = status.report(dest)
+        self.assertNotIn("independence", report)
+        code, stdout, err = run_cli(["status.py", dest], module=status)
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("independence:", stdout)
+
     def test_inventory_and_catalog_staleness(self):
         dest = self.good()
         touch(dest, "module.json", later=True)

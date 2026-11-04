@@ -78,12 +78,13 @@ class TestDocs(unittest.TestCase):
         self.assertIn("app-spec:start", (PLUGIN / "README.md").read_text(encoding="utf-8"))
         self.assertTrue((PLUGIN / "references" / "devin-child.md").is_file())
 
-    def test_single_agent_option_is_documented_and_set_for_cloud_runs(self):
+    def test_independence_options_are_documented_and_set_for_cloud_runs(self):
         design = (PLUGIN / "docs" / "DESIGN.md").read_text(encoding="utf-8")
         spec = (PLUGIN / "skills" / "spec" / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("`options.independence`", design)
-        self.assertIn("`separate-agents` (default when absent) or `single-agent`", design)
-        self.assertIn('o["independence"]="single-agent"', spec)
+        self.assertIn("`separate-agents` (default when absent), `child-sessions` or `single-agent`", design)
+        self.assertIn('if sys.argv[4] in ("single-agent","child-sessions")', spec)
+        self.assertIn('o["independence"]=sys.argv[4]', spec)
         self.assertIn('o.pop("independence",None)', spec)
         self.assertIn("not independent", design)
 
