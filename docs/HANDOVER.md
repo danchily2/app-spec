@@ -329,4 +329,5 @@ Add one entry per round: date, items, commits, release tag, run folder, scorecar
   usage window: `zsh docs/acceptance/run.sh payslips-v7b 3`.
 - **v7b + release 0.7.1 + wrap-up (2026-11-03):** v7b finished all 3 passes with no usage-limit stop (the supervisor
   stood by). Its recorded gap fixed in `a6f0871`, released as 0.7.1 (`a8c2d17`). Final summary written at the top.
-
+- **Devin cloud support, 0.8.0, items 16 + cloud docs (2026-11-04):** added cloud-specific skill instructions and
+  recorded single-agent P0 judging; released as 0.8.0 on the feature branch.

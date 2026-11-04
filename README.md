@@ -15,7 +15,7 @@ not covered with a reason, and a critic's review. The analysed app is never writ
 
 ## Status
 
-Release 0.7.1 (November 2026). On the acceptance module (me-ios payslips, 13,000 lines) a headless run with three
+Release 0.8.0 (November 2026). On the acceptance module (me-ios payslips, 13,000 lines) a headless run with three
 review passes takes about 90 minutes and writes a 2,300-line spec with 68 acceptance criteria and 865 code citations;
 the grade passes, no step is done by hand, and the last pass leaves no Blocker. See
 [`docs/HANDOVER.md`](docs/HANDOVER.md) for the scorecard of every run and what is open.
