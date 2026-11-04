@@ -7,6 +7,12 @@ changes.
 
 Fixes found in the v8 payslips run (0.7.1).
 
+- **A saved contract patch always reaches the endpoints.** In pass 2 the session saved `contracts/batch-4.json` and
+  ran `merge_contracts.py OUT` without it (the skill's after-patch step names no file), so the corrected error
+  reactions never reached `endpoints.json` and critic-3 raised them again as a Blocker and a High.
+  `merge_contracts.py` now also folds every `contracts/batch-<k>.json` that no earlier merge folded, in batch order,
+  and records the folded files, so an older batch never overwrites a later correction.
+
 - **An event case gets its own line.** The iOS scan reported `exportAllPayslips` at the `enum Event` line and other
   cases one or two lines early, because the case pattern began its match on the blank lines above the case. The
   analyst gave the right lines, but nothing writes `inventory.json` again, so the critic raised it in every pass.

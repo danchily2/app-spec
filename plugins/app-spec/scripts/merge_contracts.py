@@ -13,7 +13,9 @@ Every string of an envelope is first rewritten so its citations are relative to 
 absolute root and a leading `<root folder name>/` are stripped. The envelopes are then folded into `<out>/contracts_result.json` (an entry with the same id replaces the earlier one together with
 its disagreements; other disagreements and flags are added once), and then contracts_result.json is applied to endpoints.json. Without an
 ENVELOPE the saved contracts_result.json is applied again: run it after every `render.py catalogs` and `contracts.py`,
-because `render.py catalogs` writes endpoints.json from scratch.
+because `render.py catalogs` writes endpoints.json from scratch. Every `<out>/contracts/batch-<k>.json` that no earlier merge folded (or that
+changed since) is folded first, in batch order, so a saved patch always reaches endpoints.json; contracts_result.json
+records each folded file and its modification time in `folded`.
 
 The merge rule, applied to each endpoint the reader returned, matched by id:
 - `request`, `response`, `errors` and `auth` are written from the reader when the reader gives them.
@@ -157,6 +159,19 @@ def check_ranges(dest):
     return new
 
 
+def _rel(dest, path):
+    return os.path.relpath(os.path.realpath(path), os.path.realpath(dest))
+
+
+def _batches(dest):
+    """OUT/contracts/batch-<k>.json files, by k."""
+    folder = os.path.join(dest, "contracts")
+    if not os.path.isdir(folder):
+        return []
+    found = [f for f in os.listdir(folder) if re.fullmatch(r"batch-\d+\.json", f)]
+    return [os.path.join(folder, f) for f in sorted(found, key=lambda f: int(re.findall(r"\d+", f)[0]))]
+
+
 def main(argv=None):
     args = list(sys.argv[1:] if argv is None else argv)
     if not args or args[0].startswith("-"):
@@ -166,9 +181,19 @@ def main(argv=None):
     root_list = paths.roots(out.load_config(dest))
     saved = out.load(dest, RESULT, {}) or {}
     saved = saved if isinstance(saved, dict) else {}
+    folded = dict(saved.get("folded") or {})  # {OUT-relative batch file: mtime} of every batch file folded so far
     for path in envelopes:
         saved = fold(saved, _envelope(path, root_list))
-    if envelopes:
+        folded[_rel(dest, path)] = os.path.getmtime(path)
+    # a batch file in OUT/contracts that no run named yet (or that changed since) is folded too, in batch order, so a
+    # saved patch always reaches endpoints.json; a file already folded is never folded again over a later correction
+    pending = [p for p in _batches(dest) if folded.get(_rel(dest, p)) != os.path.getmtime(p)]
+    for path in pending:
+        saved = fold(saved, _envelope(path, root_list))
+        folded[_rel(dest, path)] = os.path.getmtime(path)
+        print(f"folded {_rel(dest, path)}, which no earlier merge named")
+    if envelopes or pending:
+        saved["folded"] = folded
         out.save(dest, RESULT, saved)
     if not saved.get("endpoints"):
         print(f"no contract reader result in {dest}; endpoints.json is unchanged")

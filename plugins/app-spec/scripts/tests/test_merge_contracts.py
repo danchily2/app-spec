@@ -55,6 +55,27 @@ class TestMerge(unittest.TestCase):
             json.dump(data, fh)
         return path
 
+    def test_a_batch_file_saved_but_not_named_is_merged_once(self):
+        # payslips v8: the session saved contracts/batch-4.json and ran `merge_contracts.py OUT` without it, so the
+        # corrected error reactions never reached endpoints.json and critic-3 raised them again
+        os.makedirs(os.path.join(self.out, "contracts"), exist_ok=True)
+        first = os.path.join(self.out, "contracts", "batch-1.json")
+        with open(first, "w", encoding="utf-8") as fh:
+            json.dump({"endpoints": [{"id": self.verified, "response": FIELDS, "errors": [{"status": 500, "reaction": "old"}]}]}, fh)
+        code, _, err = run_cli(["merge_contracts.py", self.out, first])
+        self.assertEqual(code, 0, err)
+        later = os.path.join(self.out, "contracts", "batch-4.json")
+        with open(later, "w", encoding="utf-8") as fh:
+            json.dump({"endpoints": [{"id": self.verified, "errors": [{"status": 500, "reaction": "corrected"}]}]}, fh)
+        code, stdout, err = run_cli(["merge_contracts.py", self.out])  # no file named
+        self.assertEqual(code, 0, err)
+        self.assertEqual(endpoints(self.out)[self.verified]["errors"], [{"status": 500, "reaction": "corrected"}])
+        self.assertIn("batch-4.json", stdout)
+        # a second run without files folds nothing again: batch-1 never overwrites the correction
+        code, _, err = run_cli(["merge_contracts.py", self.out])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(endpoints(self.out)[self.verified]["errors"], [{"status": 500, "reaction": "corrected"}])
+
     def test_fields_disagreements_and_flags_are_merged(self):
         env = self.envelope("a.json", {
             "endpoints": [{"id": self.verified, "request": {"fields": []}, "response": FIELDS,
