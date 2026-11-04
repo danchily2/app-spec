@@ -329,4 +329,10 @@ Add one entry per round: date, items, commits, release tag, run folder, scorecar
   usage window: `zsh docs/acceptance/run.sh payslips-v7b 3`.
 - **v7b + release 0.7.1 + wrap-up (2026-11-03):** v7b finished all 3 passes with no usage-limit stop (the supervisor
   stood by). Its recorded gap fixed in `a6f0871`, released as 0.7.1 (`a8c2d17`). Final summary written at the top.
+- **2026-11-04:** v8 (0.7.1, 3 passes, $71.22, 100 min): grade pass, 2 Blocker / 2 High after pass 3 (an operator-missed
+  contract merge and wrong event lines), screens 68% (mapper variance). Fixes released as **0.7.2** (`238f24b`): event
+  lines, unmerged contract batches folded, `...` paths. Dan approved the string reasons: recorded on v8 with
+  `review.py accept`; strings now 97.8% (only SUMMARY left). After the re-render, `grade.py` on v8 FAILS: not
+  investigated yet (check `payslips-v8/grade.json`). Calendar confirming run `calendar-v1` (0.7.2, CAP-001..006,
+  3 passes, bar = work-app-v2 calendar spec) hit the usage limit at 10:35; `supervise.sh` resumes it at about 13:45.
 
