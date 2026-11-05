@@ -355,3 +355,13 @@ Add one entry per round: date, items, commits, release tag, run folder, scorecar
   and `PayslipFeature/Common/Error/UnknownError.swift` (both one file, both from contracts) stay as 2 citation
   warnings; (c) 12 Medium findings repeat in all 3 passes, because only Blocker/High are routed (by design; decide
   whether Mediums with a one-line fix should route too). Output: `~/Documents/GitHub/vmm3/specs/payslips-v9/`.
+- **Builder spec + evidence file (2026-11-05, branch `feat/builder-spec`):** Dan's question: the spec is meant to be
+  built from without the old code, so why does it cite sources? Answer: citations are reviewer evidence. Plan
+  `docs/superpowers/plans/2026-11-05-builder-spec.md`, done by subagent-driven development: `render.py spec` now
+  writes `NAME` (builder spec, no `path:line`) and `<stem>.evidence.md` (full text). Every old grader check, the
+  critic and status read the evidence file; a new last check `self-contained` reads the builder file (citations
+  left, string keys named without text, "see the code", dangling words where a citation was a word's only object).
+  Appendix D now lists every string key the spec names. Tests: 454 Python, 37 + 5 Node. Re-render of a v9 copy
+  (`~/Documents/GitHub/vmm3/specs/payslips-v9-split`): builder 2,113 lines with 0 citations, evidence 2,320 lines
+  with 1,027; grade fails only on `self-contained`, 6 real items (COMMON_DATA_LOADING_ERROR without its text; 5
+  sentences such as "This happens in, and." that the writer must rewrite). Not yet released; next run `payslips-v10`.
