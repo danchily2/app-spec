@@ -29,7 +29,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from speclib import out, paths, ranges, spec_md  # noqa: E402
+from speclib import builder, out, paths, ranges, spec_md  # noqa: E402
 from speclib.common import die, endpoints_match, load_json, normalize_endpoint  # noqa: E402
 from speclib.ids import Registry, element_slug, norm  # noqa: E402
 
@@ -711,6 +711,7 @@ def main(argv=None):
     if args.command == "spec":
         spec(args.out, args.name)
         print(os.path.join(args.out, args.name))
+        print(os.path.join(args.out, builder.evidence_name(args.name)))
         return
     if args.command == "catalogs":
         result = catalogs(args.out)

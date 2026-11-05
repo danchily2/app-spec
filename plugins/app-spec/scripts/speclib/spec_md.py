@@ -8,7 +8,7 @@ import json
 import os
 import re
 
-from . import out, paths
+from . import builder, out, paths
 from .common import die
 from .ids import element_slug
 from .template import APPENDICES, CITE_RE, EVIDENCE_LABELS, HEADINGS, header
@@ -659,14 +659,25 @@ def _kept_platform(c, plat):
     return kept
 
 
-def strings_and_platform(c):
+def _named_keys(c, strings, named):
+    """Inventory string keys (`keys` and `allValues`) that appear as whole words in `named`, the spec text so far."""
+    pool = set(strings.get("keys") or {}) | set(strings.get("allValues") or {})
+    return {k for k in pool if isinstance(k, str) and k and not c.is_dropped("string", k)
+            and re.search(r"(?<![A-Za-z0-9_])" + re.escape(k) + r"(?![A-Za-z0-9_])", named)}
+
+
+def strings_and_platform(c, named=""):
     inv = c.inventory
     strings = inv.get("strings") if isinstance(inv.get("strings"), dict) else {}
     values = strings.get("values") if isinstance(strings.get("values"), dict) else {}
+    all_values = strings.get("allValues") if isinstance(strings.get("allValues"), dict) else {}
     keys = _items(c.module.get("stringKeys")) or sorted((strings.get("keys") or {}))
-    keys = sorted(k for k in keys if not c.is_dropped("string", k))
+    keys = [k for k in keys if not c.is_dropped("string", k)]
+    # a key the spec names must be findable in Appendix D, with its text when the inventory has one
+    keys += [k for k in _named_keys(c, strings, named) - set(keys) if values.get(k) or all_values.get(k)]
+    keys = sorted(keys)
     lines = [f"### Strings ({c.locale})", ""]
-    lines += (_table(["Key", "Text"], [[k, values.get(k) or ""] for k in keys]) if keys else ["None found."])
+    lines += (_table(["Key", "Text"], [[k, values.get(k) or all_values.get(k) or ""] for k in keys]) if keys else ["None found."])
     events = sorted((e for e in _items(inv.get("events")) if not c.is_dropped("event", _name(e, "name"))),
                     key=lambda e: _name(e, "name"))
     lines += ["", "### Analytics events", ""]
@@ -730,7 +741,7 @@ def render(dest):
     c = Context(dest)
     lines = head(c)
     for heading, section in list(zip(HEADINGS, _SECTIONS)) + list(zip(APPENDICES, _APPENDICES)):
-        body = section(c)
+        body = section(c, "\n".join(lines)) if section is strings_and_platform else section(c)
         while body and not body[-1]:
             body = body[:-1]
         lines += ["", heading, ""] + body
@@ -751,14 +762,19 @@ def target(dest, name):
     if not inside:
         die(f"--name {name!r} must be a file inside {dest}")
     rel = os.path.relpath(os.path.realpath(os.path.join(root, name)), root).replace(os.sep, "/").lower()
+    if rel.endswith(".evidence.md"):
+        die(f"--name {name!r} ends in .evidence.md, which is the evidence file written beside it; choose another --name")
     if rel.endswith(".json") or rel in _OWNED or rel.split("/")[0] == "shards":
         die(f"--name {name!r} is a file the tools own in {dest}; choose another name")
     return name
 
 
 def write(dest, name="SPEC.md"):
-    """Render the spec and write it to `name` in `dest`. Return the text."""
+    """Render the spec: the full text goes to `evidence_name(name)`, the builder text to `name`. Return the builder text."""
     name = target(dest, name)
-    text = render(dest)
-    out.save_text(dest, name, text)
-    return text
+    evidence = render(dest)
+    evidence_file = builder.evidence_name(name)
+    builder_spec = builder.builder_text(evidence, os.path.basename(evidence_file))
+    out.save_text(dest, evidence_file, evidence)
+    out.save_text(dest, name, builder_spec)
+    return builder_spec

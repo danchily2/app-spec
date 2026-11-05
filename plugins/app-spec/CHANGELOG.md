@@ -7,6 +7,9 @@ changes.
 
 - **A citation-free builder spec can be derived from the evidence spec.** A new function takes out every `path:line`
   citation, the Source and Evidence columns and the module scope lines, and points Appendix F to the evidence file.
+- **`render.py spec` now writes two files.** The file you name (default `SPEC.md`) is the builder spec with no code
+  citations, and `<name>.evidence.md` beside it keeps the full text with every citation. Appendix D now lists every
+  string key the spec names, with its text. `grade.py` and `status.py` read the evidence file.
 
 ## 0.9.0 - 2026-11-04
 

@@ -193,7 +193,8 @@ class TestRules(LedgerCase):
                                                                   "file": f"{LIST_VIEW}:3"}]))
         edit(dest, "inventory.json", lambda d: d["platform"].update(
             permissions=[{"key": "NSCameraUsageDescription", "file": f"{LIST_VIEW}:4"}], urlSchemes=["vismapay"]))
-        before = render.spec(dest)
+        render.spec(dest)
+        before = read_text(dest, "SPEC.evidence.md")
         self.assertIn("lastPayslipId", before)
         self.assertIn("NSCameraUsageDescription", before)
         write_overrides(dest, {"drop": [
@@ -206,7 +207,8 @@ class TestRules(LedgerCase):
         self.assertEqual(led["classes"]["permissions"]["uncovered"],
                          [{"item": "NSCameraUsageDescription", "reason": "out of module"}])
         self.assertEqual(led["classes"]["platform"]["uncovered"], [{"item": "urlSchemes:vismapay", "reason": "not user-facing"}])
-        text = render.spec(dest)
+        render.spec(dest)
+        text = read_text(dest, "SPEC.evidence.md")
         appendix_d = text.split("## Appendix D.")[1].split("## Appendix E.")[0]
         appendix_f = text.split("## Appendix F.")[1]
         for item in ("lastPayslipId", "NSCameraUsageDescription", "vismapay"):
@@ -298,7 +300,8 @@ class TestFiles(LedgerCase):
     def test_the_spec_appendix_reads_the_ledger(self):
         dest = self.full()
         ledger.compute(dest)
-        text = render.spec(dest)
+        render.spec(dest)
+        text = read_text(dest, "SPEC.evidence.md")
         self.assertIn("Result: pass", text)
 
     def test_cli_exits_1_on_fail_and_0_on_pass(self):

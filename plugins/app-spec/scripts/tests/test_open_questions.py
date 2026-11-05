@@ -37,7 +37,7 @@ class TestStructuralUnknowns(unittest.TestCase):
         edit(cls.dest, "endpoints.json", endpoints)
         edit(cls.dest, "rules.json", rules)
         render.spec(cls.dest)
-        cls.text = read_text(cls.dest, "SPEC.md")
+        cls.text = read_text(cls.dest, "SPEC.evidence.md")
         cls.ep = out.load(cls.dest, "endpoints.json")["endpoints"][0]
 
     @classmethod
@@ -81,12 +81,12 @@ class TestStructuralUnknowns(unittest.TestCase):
 
     def test_an_unknown_without_a_listed_question_still_fails(self):
         text = self.text.replace("- **Auth:** UNKNOWN (open question OQ-", "- **Auth:** UNKNOWN (open question OQ-9", 1)
-        out.save_text(self.dest, "BAD.md", text)
+        out.save_text(self.dest, "BAD.evidence.md", text)
         self.assertFalse(check(grade.run(self.dest, "BAD.md"), "unknowns-have-owner")["pass"])
 
     def test_prose_placeholder_still_fails(self):
         text = self.text.replace("## Summary\n\n", "## Summary\n\nUNKNOWN — summary not written yet\n\n", 1)
-        out.save_text(self.dest, "BAD2.md", text)
+        out.save_text(self.dest, "BAD2.evidence.md", text)
         self.assertFalse(check(grade.run(self.dest, "BAD2.md"), "prose-complete")["pass"])
 
 
@@ -125,7 +125,7 @@ class TestEveryCatalogGap(unittest.TestCase):
         edit(cls.dest, "screens.json", lambda d: d["screens"][1].update(
             states=[{"name": "error", "shows": "A retry button", "evidence": "UNKNOWN"}]))
         render.spec(cls.dest)
-        cls.text = read_text(cls.dest, "SPEC.md")
+        cls.text = read_text(cls.dest, "SPEC.evidence.md")
 
     @classmethod
     def tearDownClass(cls):

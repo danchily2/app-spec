@@ -28,6 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ledger import _Ledger, _platform_values  # noqa: E402
 from speclib import out, paths  # noqa: E402
+from speclib.builder import evidence_name  # noqa: E402
 from speclib.common import die  # noqa: E402
 from speclib.ids import norm  # noqa: E402
 from speclib.spec_md import NO_RULE, NO_RULE_RE, NO_RULE_REASON, OUT_OF_SCOPE_LEAD, Context, _element_rows, target  # noqa: E402
@@ -118,7 +119,7 @@ class _Grader:
     def __init__(self, dest, name):
         self.dest = dest
         self.ctx = Context(dest)  # exits 2 when the output folder or a catalog is missing
-        path = os.path.join(dest, target(dest, name))
+        path = os.path.join(dest, evidence_name(target(dest, name)))
         if not os.path.isfile(path):
             die(f"{path} not found (run render.py spec first)")
         with open(path, encoding="utf-8") as fh:

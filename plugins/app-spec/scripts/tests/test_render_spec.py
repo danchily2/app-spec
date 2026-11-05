@@ -9,6 +9,7 @@ from speclib import out, template
 from test_render_catalogs import build_out, read_text, write_overrides
 
 import render
+from speclib import builder
 
 ALIAS_INDEX = FIX / "results" / "capability_index_alias.json"
 
@@ -19,6 +20,12 @@ def section(text, heading):
     start = lines.index(heading)
     end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
     return "\n".join(lines[start:end])
+
+
+def evidence_of(dest):
+    """Render the spec in `dest` and return the evidence text, which carries every citation."""
+    render.spec(dest)
+    return read_text(dest, "SPEC.evidence.md")
 
 
 def prose():
@@ -59,7 +66,7 @@ class TestSpec(unittest.TestCase):
         data = out.load(self.out, "rules.json")
         data["rules"][0].update(source=None, priority=None)
         out.save(self.out, "rules.json", data)
-        text = render.spec(self.out)
+        text = evidence_of(self.out)
         line = next(l for l in text.splitlines() if l.startswith("- **OQ-") and "(RULE-001)" in l)
         self.assertIn("The rule card does not record its priority and source lines.", line)
         self.assertNotIn(" is not recorded", line)
@@ -68,13 +75,13 @@ class TestSpec(unittest.TestCase):
         self.assertIn("`EmployeeServices/Payslips/Sources/Payslips/GetPayslips.swift`", line)
 
     def test_spec_has_template_headings_in_order(self):
-        text = render.spec(self.out)
+        text = evidence_of(self.out)
         heads = [l for l in text.splitlines() if l.startswith("## ")]
         self.assertEqual(heads[:8], template.HEADINGS)
         self.assertEqual(heads[8:], template.APPENDICES)
 
     def test_spec_header_lines(self):
-        text = render.spec(self.out)
+        text = evidence_of(self.out)
         self.assertIn("Source: module Payslips of ios-app (no source issue)", text)
         self.assertRegex(text, r"Reference HEADs: ios-app `[0-9a-f]{7,}`")
 
@@ -82,18 +89,18 @@ class TestSpec(unittest.TestCase):
         for with_prose in (False, True):
             if with_prose:
                 self.with_prose()
-            nums = [int(m.group(1)) for m in re.finditer(template.AC_RE, render.spec(self.out), re.M)]
+            nums = [int(m.group(1)) for m in re.finditer(template.AC_RE, evidence_of(self.out), re.M)]
             self.assertEqual(nums, list(range(1, len(nums) + 1)))
             self.assertGreater(len(nums), 0)
 
     def test_design_column_is_carry_as_is(self):
-        self.assertRegex(render.spec(self.out), r"\| UC-001 \| [^|]+ \| carry-as-is \(ios-app [^)]+:\d+\) \|")
+        self.assertRegex(evidence_of(self.out), r"\| UC-001 \| [^|]+ \| carry-as-is \(ios-app [^)]+:\d+\) \|")
 
     def test_dropped_field_leaves_appendix_a_and_enters_f(self):
-        before = section(render.spec(self.out), "## Appendix A. Fields and ids")
+        before = section(evidence_of(self.out), "## Appendix A. Fields and ids")
         self.assertIn("pay.list.title", before)
         write_overrides(self.out, {"drop": [{"kind": "field", "id": "SCR-001.title", "reason": "not user-facing"}]})
-        text = render.spec(self.out)
+        text = evidence_of(self.out)
         a, f = section(text, "## Appendix A. Fields and ids"), section(text, "## Appendix F. Coverage")
         self.assertNotIn("SCR-001.title", a)
         self.assertNotIn("pay.list.title", a)  # the row is gone, not only the id
@@ -127,6 +134,38 @@ class TestSpec(unittest.TestCase):
             self.assertIn("inside", err)
         self.assertFalse(os.path.exists(os.path.join(self.tmp, "escape.md")))
 
+    def test_spec_writes_builder_and_evidence_files(self):
+        self.with_prose()
+        render.spec(self.out, "payslips.md")
+        evidence = read_text(self.out, "payslips.evidence.md")
+        self.assertIn("`Modules/PayslipsFeature/PayslipListView.swift:8`", evidence)
+        cited = [line for _, line in builder.outside_code(read_text(self.out, "payslips.md")) if builder.CITATION.search(line)]
+        self.assertEqual(cited, [])
+
+    def test_name_ending_in_evidence_md_is_refused(self):
+        for bad in ("x.evidence.md", "docs/X.Evidence.MD"):
+            code, _, err = run_cli(["render.py", "spec", self.out, "--name", bad], module=render)
+            self.assertEqual(code, 2, bad)
+            self.assertIn("--name", err)
+
+    def test_cli_prints_the_builder_path_then_the_evidence_path(self):
+        code, stdout, err = run_cli(["render.py", "spec", self.out, "--name", "X.md"], module=render)
+        self.assertEqual((code, err), (0, ""))
+        self.assertEqual(stdout.split("\n")[:2], [os.path.join(self.out, "X.md"), os.path.join(self.out, "X.evidence.md")])
+
+    def test_appendix_d_lists_every_string_key_the_spec_names(self):
+        text = "Please check your internet connection or try again later."
+        inv = out.load(self.out, "inventory.json")
+        inv["strings"].setdefault("allValues", {})["COMMON_DATA_LOADING_ERROR"] = text
+        inv["strings"]["allValues"]["UNNAMED_KEY"] = "Nobody mentions me."
+        out.save(self.out, "inventory.json", inv)
+        data = prose()
+        data["criteria"][0]["text"] = "Shows COMMON_DATA_LOADING_ERROR."
+        out.save(self.out, "prose.json", data)
+        spec = evidence_of(self.out)
+        self.assertIn(f"| COMMON_DATA_LOADING_ERROR | {text} |", section(spec, template.APPENDICES[3]))
+        self.assertNotIn("UNNAMED_KEY", section(spec, template.APPENDICES[3]))
+
     def test_cli_runs_spec(self):
         code, stdout, err = run_cli(["render.py", "spec", self.out, "--name", "X.md"], module=render)
         self.assertEqual(code, 0, err)
@@ -140,7 +179,7 @@ class TestSpec(unittest.TestCase):
         self.assertIn("use-cases.json", err)
 
     def test_without_prose_every_slot_is_unknown_and_criteria_are_placeholders(self):
-        text = render.spec(self.out)
+        text = evidence_of(self.out)
         self.assertIn("UNKNOWN — summary not written yet", section(text, "## Summary"))
         self.assertIn("UNKNOWN", section(text, "## Appendix B. Data"))
         criteria = re.findall(template.AC_RE, text, re.M)
@@ -151,7 +190,7 @@ class TestSpec(unittest.TestCase):
 
     def test_prose_fills_the_slots(self):
         self.with_prose()
-        text = render.spec(self.out)
+        text = evidence_of(self.out)
         self.assertIn("An employee reads their payslips.", section(text, "## Summary"))
         self.assertIn("List the payslips of the year.", section(text, "## Screens"))
         self.assertIn("The newest payslip is on top.", section(text, "## Acceptance criteria"))
@@ -163,7 +202,7 @@ class TestSpec(unittest.TestCase):
 
     def test_a_use_case_without_a_written_criterion_gets_a_placeholder_after_the_prose_ones(self):
         self.with_prose()
-        text = render.spec(self.out)
+        text = evidence_of(self.out)
         lines = [l for l in section(text, "## Acceptance criteria").splitlines() if l.startswith("- **AC")]
         self.assertEqual(len(lines), 3)  # two written (covering UC-001 and UC-002), then UC-003's placeholder
         self.assertTrue(any("UC-003" in l and "UNKNOWN" in l for l in lines))
@@ -173,7 +212,7 @@ class TestSpec(unittest.TestCase):
         data = prose()
         data["criteria"].append({"ids": [], "text": "Orphan statement.", "evidence": "x.swift:1"})
         out.save(self.out, "prose.json", data)
-        text = render.spec(self.out)
+        text = evidence_of(self.out)
         self.assertIn("UNKNOWN — criterion without a use case id: Orphan statement.", text)
         nums = [int(m.group(1)) for m in re.finditer(template.AC_RE, text, re.M)]
         self.assertEqual(nums, list(range(1, len(nums) + 1)))
@@ -183,7 +222,7 @@ class TestSpec(unittest.TestCase):
         render.catalogs(render_out)
         cases = out.load(render_out, "use-cases.json")["useCases"]
         aliased = next(u for u in cases if u["alias"])
-        text = render.spec(render_out)
+        text = evidence_of(render_out)
         caps = section(text, "## Capabilities")
         self.assertIn(f"| {aliased['alias']} |", caps)
         self.assertNotIn(f"| {aliased['id']} |", caps)
@@ -197,7 +236,7 @@ class TestSpec(unittest.TestCase):
         render.catalogs(render_out)
         aliased = next(u for u in out.load(render_out, "use-cases.json")["useCases"] if u["alias"])
         out.save(render_out, "prose.json", {"criteria": [{"ids": [aliased["id"]], "text": "Works.", "evidence": "a.swift:1"}]})
-        crit = section(render.spec(render_out), "## Acceptance criteria")
+        crit = section(evidence_of(render_out), "## Acceptance criteria")
         self.assertIn(f"- **AC1 ({aliased['alias']}):** Works.", crit)
 
     def test_rules_are_ordered_by_priority_then_id(self):
@@ -210,7 +249,7 @@ class TestSpec(unittest.TestCase):
             {**base, "id": "RULE-004", "name": "Mid two", "priority": "P1"},
         ]
         out.save(self.out, "rules.json", data)
-        rules = section(render.spec(self.out), "## Business rules and permissions")
+        rules = section(evidence_of(self.out), "## Business rules and permissions")
         order = [rules.index(n) for n in ("Top one", "Mid one", "Mid two", "Low one")]
         self.assertEqual(order, sorted(order))
         self.assertIn("Given", rules)
@@ -218,7 +257,7 @@ class TestSpec(unittest.TestCase):
         self.assertEqual(rules.count("Question:"), 1)  # High confidence carries none
 
     def test_rule_shows_gwt_parameters_source_and_confidence(self):
-        rules = section(render.spec(self.out), "## Business rules and permissions")
+        rules = section(evidence_of(self.out), "## Business rules and permissions")
         self.assertIn("RULE-001", rules)
         self.assertIn("three payslips", rules)
         self.assertIn("PayslipItem.swift:10-14", rules)
@@ -236,7 +275,7 @@ class TestSpec(unittest.TestCase):
         config["options"]["independence"] = "single-agent"
         out.save(self.out, "app-spec.json", config)
 
-        text = render.spec(self.out)
+        text = evidence_of(self.out)
         rules = section(text, "## Business rules and permissions")
         p0 = next(block for block in rules.split("### ") if block.startswith("RULE-001"))
         p1 = next(block for block in rules.split("### ") if block.startswith("RULE-002"))
@@ -248,14 +287,14 @@ class TestSpec(unittest.TestCase):
         data = out.load(self.out, "rules.json")
         data["rules"][0]["priority"] = "P0"
         out.save(self.out, "rules.json", data)
-        default = render.spec(self.out)
+        default = evidence_of(self.out)
         self.assertNotIn("Judges:", default)
         self.assertNotIn("Run: Every role was played in one agent.", default)
 
         config = out.load_config(self.out)
         config["options"]["independence"] = "separate-agents"
         out.save(self.out, "app-spec.json", config)
-        self.assertEqual(default, render.spec(self.out))
+        self.assertEqual(default, evidence_of(self.out))
 
     def test_child_sessions_has_no_single_agent_render_lines(self):
         data = out.load(self.out, "rules.json")
@@ -265,7 +304,7 @@ class TestSpec(unittest.TestCase):
         config["options"]["independence"] = "child-sessions"
         out.save(self.out, "app-spec.json", config)
 
-        text = render.spec(self.out)
+        text = evidence_of(self.out)
         self.assertNotIn("Judges:", text)
         self.assertNotIn("Every role was played in one agent.", text)
 
@@ -280,7 +319,7 @@ class TestSpec(unittest.TestCase):
         e["disagreements"] = [{"field": "gross", "client": "GetPayslips.swift:9", "backend": "Payslip.cs:12",
                                "note": "backend names it grossPay"}]
         out.save(self.out, "endpoints.json", data)
-        text = render.spec(self.out)
+        text = evidence_of(self.out)
         eps = section(text, "## Endpoints")
         self.assertIn(f"{e['id']} — GET {e['path']}", eps)
         for needle in ("bearer token", "year", "decimal", "explicit", "404", "shows the not-found state", "VERIFIED",
@@ -293,18 +332,18 @@ class TestSpec(unittest.TestCase):
         self.assertIn("Payslip.cs:12", block)
 
     def test_appendix_a_lists_identifier_or_proposed_id(self):
-        a = section(render.spec(self.out), "## Appendix A. Fields and ids")
+        a = section(evidence_of(self.out), "## Appendix A. Fields and ids")
         self.assertIn("pay.list.title", a)  # the existing identifier
         self.assertIn("payslips.paysliplistview.refresh", a)  # a proposal
 
     def test_appendix_f_without_ledger_and_with_ledger(self):
-        f = section(render.spec(self.out), "## Appendix F. Coverage")
+        f = section(evidence_of(self.out), "## Appendix F. Coverage")
         self.assertIn("Coverage not computed yet: run ledger.py", f)
         out.save(self.out, "ledger.json", {"version": 1, "pass": False,
                                            "classes": {"screens": {"total": 4, "covered": 3,
                                                                    "uncovered": [{"item": "DebugScreen", "reason": None}]}},
                                            "thresholds": {"screens": 100}})
-        f = section(render.spec(self.out), "## Appendix F. Coverage")
+        f = section(evidence_of(self.out), "## Appendix F. Coverage")
         self.assertNotIn("not computed", f)
         self.assertIn("DebugScreen", f)
         self.assertIn("| screens | 3 | 4 | 100 |", f)
@@ -320,7 +359,7 @@ class TestSpec(unittest.TestCase):
             {"kind": "endpoint", "id": "EP-002", "reason": "reason endpoint"},
             {"kind": "string", "id": "payslip.pdf", "reason": "reason string"},
             {"kind": "event", "id": "payslip_opened", "reason": "reason event"}]})
-        text = render.spec(self.out)
+        text = evidence_of(self.out)
         self.assertNotIn("PayslipDetailView (SCR-002)", section(text, "## Screens"))
         self.assertNotIn("| UC-003 |", section(text, "## Capabilities"))
         self.assertNotIn("(UC-003)", section(text, "## Acceptance criteria"))
@@ -348,7 +387,7 @@ class TestSpec(unittest.TestCase):
         ]
         out.save(self.out, "flows.json", flows)
         write_overrides(self.out, {"drop": [{"kind": "useCase", "id": "UC-003", "reason": "out of module"}]})
-        e = section(render.spec(self.out), "## Appendix E. Flows")
+        e = section(evidence_of(self.out), "## Appendix E. Flows")
         self.assertNotIn("FLOW-001", e)
         self.assertNotIn("refresh", e)
         self.assertIn("FLOW-002", e)
@@ -364,7 +403,7 @@ class TestSpec(unittest.TestCase):
         self.assertIn("view payslip list", read_text(self.out, "ids.json"))
 
     def test_flows_render_with_steps_in_appendix_e(self):
-        e = section(render.spec(self.out), "## Appendix E. Flows")
+        e = section(evidence_of(self.out), "## Appendix E. Flows")
         self.assertIn("FLOW-001", e)
         self.assertIn("tap the first row", e)
 
@@ -379,7 +418,7 @@ class TestSpec(unittest.TestCase):
         cfg = out.load_config(self.out)
         cfg["contracts"] = [{"path": "/x/me-api", "name": "me-api", "commit": "abcdef1234567"}]
         out.save(self.out, "app-spec.json", cfg)
-        self.assertRegex(render.spec(self.out), r"Reference HEADs: ios-app `[0-9a-f]{7,}`, me-api `abcdef1234567`")
+        self.assertRegex(evidence_of(self.out), r"Reference HEADs: ios-app `[0-9a-f]{7,}`, me-api `abcdef1234567`")
 
     def test_prose_citations_are_backticked(self):
         data = prose()
@@ -387,7 +426,7 @@ class TestSpec(unittest.TestCase):
         data["criteria"][0]["evidence"] = "PayslipItem.swift:10-20, PayslipListView.swift:14"
         data["data"][0]["evidence"] = "PayslipItem.swift:3"
         out.save(self.out, "prose.json", data)
-        text = render.spec(self.out)
+        text = evidence_of(self.out)
         for cited in ("Source: `Modules/PayslipsFeature/PayslipListView.swift:8`", "`Modules/PayslipsFeature/PayslipListView.swift:20`",
                       "`PayslipItem.swift:10-20`", "`PayslipListView.swift:14`", "`PayslipItem.swift:3`",
                       "`GetPayslips.swift:6`"):
@@ -395,29 +434,29 @@ class TestSpec(unittest.TestCase):
         self.assertNotRegex(text, r"(?<!`)\bPayslipItem\.swift:3\b(?!`)")
         data["summary"] = "Already `A.swift:1` marked, and B.swift:2 not, but api.visma.net:443 is a host."
         out.save(self.out, "prose.json", data)
-        summary = section(render.spec(self.out), "## Summary")
+        summary = section(evidence_of(self.out), "## Summary")
         self.assertIn("`A.swift:1` marked, and `B.swift:2` not, but api.visma.net:443 is a host.", summary)
 
     def test_a_dropped_permission_leaves_the_permissions_table(self):
         data = out.load(self.out, "use-cases.json")
         data["useCases"][0]["permissions"] = ["payroll-admin", "viewer"]
         out.save(self.out, "use-cases.json", data)
-        self.assertIn("payroll-admin", section(render.spec(self.out), "## Business rules and permissions"))
+        self.assertIn("payroll-admin", section(evidence_of(self.out), "## Business rules and permissions"))
         write_overrides(self.out, {"drop": [{"kind": "permission", "id": "payroll-admin", "reason": "dead code"}]})
-        text = render.spec(self.out)
+        text = evidence_of(self.out)
         rules = section(text, "## Business rules and permissions")
         self.assertNotIn("payroll-admin", rules)
         self.assertIn("viewer", rules)
         self.assertIn("payroll-admin", section(text, "## Appendix F. Coverage"))
 
     def test_a_dropped_string_leaves_the_text_key_column_of_appendix_a(self):
-        self.assertIn("payslip.list.title", section(render.spec(self.out), "## Appendix A. Fields and ids"))
+        self.assertIn("payslip.list.title", section(evidence_of(self.out), "## Appendix A. Fields and ids"))
         write_overrides(self.out, {"drop": [{"kind": "string", "id": "payslip.list.title", "reason": "dead code"}]})
-        text = render.spec(self.out)
+        text = evidence_of(self.out)
         self.assertNotIn("payslip.list.title", text.replace(section(text, "## Appendix F. Coverage"), ""))
 
     def test_the_no_rule_hint_uses_the_exact_sentence(self):
-        rules = section(render.spec(self.out), "## Business rules and permissions")
+        rules = section(evidence_of(self.out), "## Business rules and permissions")
         self.assertIn("No client-side rule; the server decides.", rules)
 
 

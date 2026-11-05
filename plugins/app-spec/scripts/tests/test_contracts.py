@@ -260,7 +260,7 @@ class TestEnrich(unittest.TestCase):
     def test_backend_repo_is_a_name_and_the_spec_has_no_home_path(self):
         contracts.enrich(self.out, ASPNET)
         render.spec(self.out)
-        with open(os.path.join(self.out, "SPEC.md"), encoding="utf-8") as fh:
+        with open(os.path.join(self.out, "SPEC.evidence.md"), encoding="utf-8") as fh:
             text = fh.read()
         self.assertNotIn(ASPNET, text)
         self.assertIn("- **Backend:** backend-aspnet `Controllers/PayslipController.cs:11`", text)

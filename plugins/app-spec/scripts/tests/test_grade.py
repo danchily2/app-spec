@@ -95,7 +95,7 @@ class GradeCase(unittest.TestCase):
     def mutated(self, name, change):
         """A copy of the good folder whose SPEC.md went through `change(text)`."""
         dest = self.copy(name)
-        out.save_text(dest, "SPEC.md", change(read_text(dest, "SPEC.md")))
+        out.save_text(dest, "SPEC.evidence.md", change(read_text(dest, "SPEC.evidence.md")))
         return dest
 
     def failing(self, dest):
@@ -148,7 +148,7 @@ class TestBrief(GradeCase):
                                                                     "List the payslips from the Realm store."))
         self.assertFalse(check(grade.run(screens), "banned-nouns")["pass"])
         appendix_c = self.mutated("realm_c", lambda t: t.replace("the list holder", "the Realm list holder"))
-        self.assertIn("Realm list holder", read_text(appendix_c, "SPEC.md"))
+        self.assertIn("Realm list holder", read_text(appendix_c, "SPEC.evidence.md"))
         self.assertTrue(check(grade.run(appendix_c), "banned-nouns")["pass"])
 
     def test_criteria_gap_fails(self):
@@ -290,9 +290,9 @@ class TestOtherChecks(GradeCase):
         cfg = out.load_config(dest)
         cfg["contracts"] = [{"path": contract, "name": "me-api", "commit": "abc1234"}]
         out.save(dest, "app-spec.json", cfg)
-        out.save_text(dest, "SPEC.md", read_text(self.good, "SPEC.md").replace("## Open questions\n", "## Open questions\n\n`src/A.cs:3`\n"))
+        out.save_text(dest, "SPEC.evidence.md", read_text(self.good, "SPEC.evidence.md").replace("## Open questions\n", "## Open questions\n\n`src/A.cs:3`\n"))
         self.assertTrue(check(grade.run(dest), "citations-resolve")["pass"])
-        out.save_text(dest, "SPEC.md", read_text(self.good, "SPEC.md").replace("## Open questions\n", "## Open questions\n\n`src/A.cs:4`\n"))
+        out.save_text(dest, "SPEC.evidence.md", read_text(self.good, "SPEC.evidence.md").replace("## Open questions\n", "## Open questions\n\n`src/A.cs:4`\n"))
         self.assertFalse(check(grade.run(dest), "citations-resolve")["pass"])
 
     def test_banned_noun_in_a_path_or_code_span_is_not_a_requirement(self):
@@ -329,7 +329,7 @@ class TestCatalogCitations(GradeCase):
     def test_an_invented_file_in_a_use_case_fails_through_the_design_column(self):
         dest = self.rendered("design_ghost", "use-cases.json",
                              lambda d: d["useCases"][0].update(files=[self.GHOST]))
-        self.assertIn(f"carry-as-is (ios-app {self.GHOST})", read_text(dest, "SPEC.md"))
+        self.assertIn(f"carry-as-is (ios-app {self.GHOST})", read_text(dest, "SPEC.evidence.md"))
         passed, detail = self.failing_cites(dest)
         self.assertFalse(passed)
         self.assertIn(f"{self.GHOST} (line ", detail)
@@ -345,14 +345,14 @@ class TestCatalogCitations(GradeCase):
     def test_a_design_file_without_a_line_must_exist(self):
         dest = self.rendered("design_noline", "use-cases.json",
                              lambda d: d["useCases"][0].update(files=["Modules/Invented/Ghost.swift"], screens=[]))
-        self.assertIn("carry-as-is (ios-app Modules/Invented/Ghost.swift, line not resolved)", read_text(dest, "SPEC.md"))
+        self.assertIn("carry-as-is (ios-app Modules/Invented/Ghost.swift, line not resolved)", read_text(dest, "SPEC.evidence.md"))
         passed, detail = self.failing_cites(dest)
         self.assertFalse(passed)
         self.assertIn("Modules/Invented/Ghost.swift", detail)
 
     def test_an_invented_screen_declaration_fails_through_the_source_line(self):
         dest = self.rendered("screen_ghost", "screens.json", lambda d: d["screens"][0].update(file=self.GHOST))
-        self.assertIn(f"- **Source:** {self.GHOST}", read_text(dest, "SPEC.md"))
+        self.assertIn(f"- **Source:** {self.GHOST}", read_text(dest, "SPEC.evidence.md"))
         passed, detail = self.failing_cites(dest)
         self.assertFalse(passed)
         self.assertIn(self.GHOST, detail)
@@ -406,7 +406,7 @@ class TestOverrides(GradeCase):
         def rename(dest):
             edit(dest, "use-cases.json", lambda d: next(u for u in d["useCases"] if u["id"] == "UC-002").update(name=new))
         ok = self.with_overrides("rename_ok", {"rename": [{"id": "UC-002", "name": new}]}, rename)
-        self.assertIn(new, read_text(ok, "SPEC.md"))
+        self.assertIn(new, read_text(ok, "SPEC.evidence.md"))
         self.assertTrue(check(grade.run(ok), "overrides-reflected")["pass"], check(grade.run(ok), "overrides-reflected"))
         stale = self.with_overrides("rename_stale", {"rename": [{"id": "UC-002", "name": new}]})  # catalog keeps the old name
         c = check(grade.run(stale), "overrides-reflected")
@@ -415,7 +415,7 @@ class TestOverrides(GradeCase):
         self.assertIn(f"'{new}' is not in the spec", c["detail"])
         both = self.mutated("rename_both", lambda t: t)
         write_overrides(both, {"rename": [{"id": "UC-002", "name": new}]})
-        out.save_text(both, "SPEC.md", read_text(ok, "SPEC.md").replace(
+        out.save_text(both, "SPEC.evidence.md", read_text(ok, "SPEC.evidence.md").replace(
             "## Open questions\n", "## Open questions\n\nStill called View a payslip's details.\n"))
         c = check(grade.run(both), "overrides-reflected")
         self.assertIn("old name", c["detail"])
@@ -467,7 +467,7 @@ class TestFixRound1(GradeCase):
 
     def test_renderer_and_grader_agree_on_use_cases_without_a_rule(self):
         """UC-003 carries the cited no-rule sentence in its criterion: neither the renderer nor the grader lists it."""
-        text = read_text(self.good, "SPEC.md")
+        text = read_text(self.good, "SPEC.evidence.md")
         self.assertNotIn("no rule extracted for", text)
         self.assertTrue(check(grade.run(self.good), "rules-per-use-case")["pass"])
         dest = self.copy("no_rule_uncited")
@@ -515,12 +515,22 @@ class TestCli(GradeCase):
         self.assertEqual(run_cli(["grade.py", self.good, "--name", "../x.md"], module=grade)[0], 2)
         self.assertEqual(run_cli(["grade.py", self.good, "--name", "missing.md"], module=grade)[0], 2)
 
+    def test_missing_evidence_file_asks_for_render(self):
+        dest = self.copy("no_evidence")
+        os.remove(os.path.join(dest, "SPEC.evidence.md"))
+        with self.assertRaises(SystemExit) as caught:
+            grade.run(dest)
+        self.assertEqual(caught.exception.code, 2)
+        code, _, err = run_cli(["grade.py", dest], module=grade)
+        self.assertEqual(code, 2)
+        self.assertIn("SPEC.evidence.md not found (run render.py spec first)", err)
+
     def test_name_grades_another_file(self):
         dest = self.copy("named")
         render.spec(dest, "docs/payslips.md")
         code, stdout, err = run_cli(["grade.py", dest, "--name", "docs/payslips.md"], module=grade)
         self.assertEqual(code, 0, stdout + err)
-        out.save_text(dest, "docs/payslips.md", "# nothing\n")
+        out.save_text(dest, "docs/payslips.evidence.md", "# nothing\n")
         self.assertEqual(run_cli(["grade.py", dest, "--name", "docs/payslips.md"], module=grade)[0], 1)
         self.assertEqual(run_cli(["grade.py", dest], module=grade)[0], 0)  # SPEC.md is untouched
 

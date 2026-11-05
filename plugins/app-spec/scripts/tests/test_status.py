@@ -335,6 +335,7 @@ class TestStatus(unittest.TestCase):
         cfg["options"] = {"specName": "payslips.md"}
         out.save(dest, "app-spec.json", cfg)
         shutil.copy(os.path.join(dest, "SPEC.md"), os.path.join(dest, "payslips.md"))
+        shutil.copy(os.path.join(dest, "SPEC.evidence.md"), os.path.join(dest, "payslips.evidence.md"))
         settle(dest)
         stamp(dest, "payslips.md", 115)
         self.assertEqual(cmd(dest), "(a person) read payslips.md")

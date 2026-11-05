@@ -6,7 +6,7 @@ import unittest
 
 from helpers import FIX, run_cli
 from speclib import out
-from test_render_catalogs import build_out
+from test_render_catalogs import build_out, read_text
 
 import merge_contracts
 
@@ -271,7 +271,8 @@ class TestCitationPaths(unittest.TestCase):
         lst = self.grade_mod.LIST
         prose["summary"] = f"An employee reads their payslips. Source: `{self.app}/{lst}:8` and `{self.app_name}/{lst}:9`"
         out.save(self.dest, "prose.json", prose)
-        text = render.spec(self.dest)
+        render.spec(self.dest)
+        text = read_text(self.dest, "SPEC.evidence.md")
         self.assertIn(f"Source: `{lst}:8` and `{lst}:9`", text)
 
     def test_a_real_folder_named_like_the_root_is_kept(self):

@@ -19,6 +19,7 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from speclib import out, spec_md  # noqa: E402
+from speclib.builder import evidence_name  # noqa: E402
 from speclib.common import die  # noqa: E402
 from speclib.template import APPENDICES  # noqa: E402
 
@@ -138,7 +139,7 @@ def _coverage_differs(dest, spec_name):
     """True when the spec's Appendix F is not what `render.py spec` would write from the current ledger.json. Content,
     not time: the review command runs ledger.py after the spec, and the same numbers must not stale the spec."""
     try:
-        with open(os.path.join(dest, spec_name), encoding="utf-8") as fh:
+        with open(os.path.join(dest, evidence_name(spec_name)), encoding="utf-8") as fh:  # the builder spec has no coverage
             written = _appendix_f(fh.read())
         want = spec_md.coverage(spec_md.Context(dest))
     except (OSError, UnicodeDecodeError, SystemExit, KeyError, TypeError, ValueError, AttributeError):
