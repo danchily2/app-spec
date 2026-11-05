@@ -12,7 +12,6 @@ from .template import APPENDICES, CITE_RE
 CITATION = re.compile(CITE_RE)
 # a citation may list more lines of the same file: A.swift:20,40-44,90
 _MORE_LINES = r"(?:,\d+(?:-\d+)?)*"
-_TICKED = re.compile("`" + CITE_RE + _MORE_LINES + "`")
 _BARE = re.compile(CITE_RE + _MORE_LINES)
 
 _SEPARATOR = re.compile(r"^\s*\|[\s:|\-]+\|\s*$")
@@ -20,7 +19,10 @@ _CELL_SPLIT = re.compile(r"(?<!\\)\|")
 _LABELLED_BULLET = re.compile(r"^\s*- \*\*(?:Source|Evidence|Citations?):\*\*")
 _ONLY_CONNECTORS = re.compile(r"[\s,;.]*(?:and[\s,;.]*)*")
 _EMPTY_PAREN = re.compile(r" ?\((?:[\s,;]|\band\b|\bcites\b|\bsee\b|\bin\b)*\)")
-_EMPTY_LABEL = re.compile(r"\s*\b(?:Source|Evidence|Searched|Cited in):[\s,;]*\.?(?=\s|$)")
+# a label with nothing after it but punctuation: the end of the line, a full stop, or a closing parenthesis
+_EMPTY_LABEL = re.compile(r"\s*\b(?:Source|Evidence|Searched|Cited in):[\s,;]*(?:\.(?=\s|$)|$|(?=\)))")
+_CODE_SPAN = re.compile(r"`([^`\n]*)`")
+_HANGING_SEE = re.compile(r"[,;]?\s+see(?=\s*(?:[.,;)]|$))")
 _CARRY_AS_IS = re.compile(r"carry-as-is \([^)]*\)")
 _SEARCHED = re.compile(r"(UNKNOWN; )searched: .*?; (?=owner:)")
 _DROPPED_COLUMNS = ("Source", "Evidence")
@@ -41,8 +43,17 @@ def outside_code(text):
             yield number, line
 
 
+def _span_without_citation(match):
+    """A code span that holds a citation loses it; a span left empty or with one plain word is dropped whole."""
+    inner = match.group(1)
+    if not _BARE.search(inner):
+        return match.group(0)
+    rest = re.sub(r"\s+", " ", _BARE.sub("", inner)).strip()
+    return "" if re.fullmatch(r"[A-Za-z][\w-]*|", rest) else f"`{rest}`"
+
+
 def _remove_citations(line):
-    return _BARE.sub("", _TICKED.sub("", line))
+    return _BARE.sub("", _CODE_SPAN.sub(_span_without_citation, line))
 
 
 def _tidy(line):
@@ -53,6 +64,8 @@ def _tidy(line):
         line = _EMPTY_PAREN.sub("", line)
         line = _EMPTY_LABEL.sub("", line)
         line = line.replace(", ,", ",").replace(" ,", ",").replace(" .", ".").replace(" ;", ";")
+        line = re.sub(r"[,;]\s*\)", ")", line)
+        line = _HANGING_SEE.sub("", line)
         line = re.sub(r"[,;]\.", ".", line)
         line = re.sub(r"\(\s*[,;]\s*", "(", line)
         line = re.sub(r"(?<=\S)  +", " ", line)
