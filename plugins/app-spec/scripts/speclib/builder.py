@@ -20,7 +20,10 @@ _LABELLED_BULLET = re.compile(r"^\s*- \*\*(?:Source|Evidence|Citations?):\*\*")
 _ONLY_CONNECTORS = re.compile(r"[\s,;.]*(?:and[\s,;.]*)*")
 _EMPTY_PAREN = re.compile(r" ?\((?:[\s,;]|\band\b|\bcites\b|\bsee\b|\bin\b)*\)")
 # a label with nothing after it but punctuation: the end of the line, a full stop, or a closing parenthesis
-_EMPTY_LABEL = re.compile(r"\s*\b(?:Source|Evidence|Searched|Cited in):[\s,;]*(?:\.(?=\s|$)|$|(?=\)))")
+_EMPTY_LABEL = re.compile(r"\s*\b(?:Sources?|Evidence|Searched|Cited in):[\s,;]*(?:\.(?=\s|$)|$|(?=\)))")
+# a `word:` or `...]:` whose value was a citation: the label is left with nothing before `;`, `)`, `|` or the line end
+_EMPTY_WORD_LABEL = re.compile(r"\b\w+: *(?:;\s*|(?=[)|]|$))")
+_EMPTY_BRACKET_LABEL = re.compile(r"(?<=[(;|])\s*[^;()|]*\]:\s*(?:;\s*|(?=[)|]|$))")
 _CODE_SPAN = re.compile(r"`([^`\n]*)`")
 _HANGING_SEE = re.compile(r"[,;]?\s+see(?=\s*(?:[.,;)]|$))")
 _CARRY_AS_IS = re.compile(r"carry-as-is \([^)]*\)")
@@ -30,7 +33,7 @@ _DROPPED_COLUMNS = ("Source", "Evidence")
 
 def evidence_name(name):
     """`payslips.md` -> `payslips.evidence.md`; a name without `.md` gets `.evidence.md` appended."""
-    return (name[:-3] if name.endswith(".md") else name) + ".evidence.md"
+    return (name[:-3] if name.lower().endswith(".md") else name) + ".evidence.md"
 
 
 def outside_code(text):
@@ -49,7 +52,10 @@ def _span_without_citation(match):
     if not _BARE.search(inner):
         return match.group(0)
     rest = re.sub(r"\s+", " ", _BARE.sub("", inner)).strip()
-    return "" if re.fullmatch(r"[A-Za-z][\w-]*|", rest) else f"`{rest}`"
+    if re.fullmatch(r"[A-Za-z][\w-]*|", rest):
+        return ""
+    rest = rest.rstrip(":, ")  # `Name: A.swift:3` leaves `Name:`
+    return f"`{rest}`" if rest else ""
 
 
 def _remove_citations(line):
@@ -63,7 +69,10 @@ def _tidy(line):
         previous = line
         line = _EMPTY_PAREN.sub("", line)
         line = _EMPTY_LABEL.sub("", line)
-        line = line.replace(", ,", ",").replace(" ,", ",").replace(" .", ".").replace(" ;", ";")
+        line = _EMPTY_BRACKET_LABEL.sub("", _EMPTY_WORD_LABEL.sub("", line))
+        line = line.replace(", ,", ",")
+        # a space before `.`, `,` or `;` goes only when the mark ends a phrase: " .api" is a name and keeps its space
+        line = re.sub(r" ([.,;])(?=[\s)\]|]|$)", r"\1", line)
         line = re.sub(r"[,;]\s*\)", ")", line)
         line = _HANGING_SEE.sub("", line)
         line = re.sub(r"[,;]\.", ".", line)

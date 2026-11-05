@@ -12,6 +12,25 @@ class TestBuilder(unittest.TestCase):
         self.assertEqual(builder.evidence_name("SPEC.md"), "SPEC.evidence.md")
         self.assertEqual(builder.evidence_name("docs/a.md"), "docs/a.evidence.md")
         self.assertEqual(builder.evidence_name("notes"), "notes.evidence.md")
+        self.assertEqual(builder.evidence_name("X.MD"), "X.evidence.md")  # the stem keeps its case
+
+    def test_a_dot_before_an_identifier_is_not_glued_to_the_word_before(self):
+        text = "Wraps it as .api (`A.swift:3`).\n"
+        self.assertEqual(builder.builder_text(text, "x.evidence.md"), "Wraps it as .api.\n")
+
+    def test_a_label_left_with_nothing_is_removed(self):
+        text = "Rules and endpoints. Sources: `A.swift:3`, `B.swift:4`.\n"
+        self.assertEqual(builder.builder_text(text, "x.evidence.md"), "Rules and endpoints.\n")
+        text = "X (task: `A.swift:3`; quick action keyed by [.payslips]: `B.swift:4`)\n"
+        self.assertEqual(builder.builder_text(text, "x.evidence.md"), "X\n")
+
+    def test_a_label_with_a_value_and_a_citation_keeps_the_value(self):
+        text = "X (task: `A.swift:3`; key [.payslips]: `B.swift:4`; plain: yes)\n"
+        self.assertEqual(builder.builder_text(text, "x.evidence.md"), "X (plain: yes)\n")
+
+    def test_a_span_keeps_no_trailing_colon_after_its_citation(self):
+        text = "Uses `ReportsInterface: Mod/YearEndReports.swift:46` here.\n"
+        self.assertEqual(builder.builder_text(text, "x.evidence.md"), "Uses `ReportsInterface` here.\n")
 
     def test_citation_lists_in_parentheses_leave_no_debris(self):
         line = ("The list pages back only (`A/B.swift:3`, `C/D.swift:9-12`). "
