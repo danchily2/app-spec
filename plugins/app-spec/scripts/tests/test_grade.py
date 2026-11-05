@@ -529,8 +529,12 @@ class TestSelfContained(GradeCase):
         self.assertTrue(check(grade.run(dest), "self-contained")["pass"])
 
     def test_string_key_without_text_fails(self):
-        dest = self.with_criterion("nokey", "The error shows `SERVER_ERROR_TEXT`.")
+        dest = self.with_criterion("nokey", "The error shows the text of `SERVER_ERROR_TEXT`.")
         self.assertIn("string key SERVER_ERROR_TEXT has no text", self.detail(dest))
+
+    def test_enum_and_event_names_are_not_string_keys(self):
+        dest = self.with_criterion("enums", "The state `PENDING_APPROVAL` is set and the event `LOGIN_SUCCESS` is sent.")
+        self.assertTrue(check(grade.run(dest), "self-contained")["pass"])
 
     def test_pointer_to_code_fails(self):
         dest = self.with_criterion("pointer", "Rounding is as the code does it.")
@@ -547,7 +551,8 @@ class TestSelfContained(GradeCase):
         self.assertTrue(check(grade.run(dest), "self-contained")["pass"])
 
     def test_hyphenated_and_ordinary_sentence_ends_pass(self):
-        text = "Sign-in, then the user is signed in. The file name ends in .pdf and, in bold, the total."
+        text = (f"Sign-in, then the value in `{LIST}:3` is used. The user is signed in. "
+                "The file name ends in .pdf and, in bold, the total.")
         dest = self.with_criterion("ordinary", text)
         self.assertTrue(check(grade.run(dest), "self-contained")["pass"])
 

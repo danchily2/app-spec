@@ -54,7 +54,9 @@ _NO_RULE_LINE = re.compile(r"^UNKNOWN — no rule extracted for ((?:UC|CAP)-\d{3
                            r'"' + re.escape(NO_RULE) + r'" or "' + re.escape(NO_RULE_REASON) + r'" with a citation$')
 _ROW_SPLIT = re.compile(r"(?<!\\)\|")
 _OQ_REF = re.compile(r"\bopen question (OQ-\d{3,})\b")
-_KEY_IN_SPAN = re.compile(r"(?<![\w.-])[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+(?![\w-]|\.\w)")
+# an UPPER_SNAKE token the words right before it name as copy: "the text of `X`", "string key X", "message X"
+_KEY_AS_COPY = re.compile(r"\b(?:text|key|string|copy|message|title|label)\s+(?:(?:of|key)\s+)?`?"
+                          r"((?<![\w.-])[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)(?![\w-]|\.\w)", re.I)
 _POINTS_TO_CODE = (re.compile(r"\bsee (?:the )?(?:code|source|file|implementation)\b", re.I),
                    re.compile(r"\bin the cited (?:code|files?|lines?)\b", re.I),
                    re.compile(r"\bas (?:the )?(?:code|source) (?:shows|does|says)\b", re.I))
@@ -553,11 +555,11 @@ class _Grader:
         items = [f"leftover citation {m.group(0)} (line {n})" for n, line in lines for m in CITATION.finditer(line)]
         table, with_text = self._strings_table()
         strings = self.ctx.inventory.get("strings") if isinstance(self.ctx.inventory.get("strings"), dict) else {}
-        pool = {k for k in set(strings.get("keys") or {}) | set(strings.get("allValues") or {}) if isinstance(k, str) and k}
+        pool = {k for part in ("keys", "values", "allValues") for k in (strings.get(part) or {}) if isinstance(k, str) and k}
         named = [(n, line) for n, line in lines if n not in table]
         for _, line in named:
-            for span in _SPAN.findall(line):
-                pool.update(_KEY_IN_SPAN.findall(span))
+            pool.update(m.group(1) for m in _KEY_AS_COPY.finditer(line) if m.group(1).isupper())
+        pool = {k for k in pool if not self.ctx.is_dropped("string", k)}
         for key in sorted(pool - with_text):
             first = next((n for n, line in named if _names_key(key, line)), None)
             if first:
