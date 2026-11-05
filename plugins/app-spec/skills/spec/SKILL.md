@@ -1,6 +1,6 @@
 ---
 name: spec
-description: Turns one module of one existing mobile app (native iOS, native Android or React Native) into a reviewed spec in the team's spec template. Resolves the module and asks for a yes, inventories it, maps its use cases, screens and flows, extracts its business rules, reads its endpoint contracts, writes the spec, and runs the coverage ledger, the grader and a critic for up to the configured number of review passes. Writes SPEC.md, LEDGER.md, REVIEW.md and OPEN_QUESTIONS.md into the output folder.
+description: Turns one module of one existing mobile app (native iOS, native Android or React Native) into a reviewed spec in the team's spec template. Resolves the module and asks for a yes, inventories it, maps its use cases, screens and flows, extracts its business rules, reads its endpoint contracts, writes the spec, and runs the coverage ledger, the grader and a critic for up to the configured number of review passes. Writes SPEC.md (the builder spec, no code citations) and SPEC.evidence.md (the same spec with every citation), LEDGER.md, REVIEW.md and OPEN_QUESTIONS.md into the output folder.
 argument-hint: "<app> --module <name|path> [--module ...] [--out DIR] [--name FILE] [--contracts REPO ...] [--capabilities FILE --scope CAP,...] [--bar FILE] [--passes N] [--headless]"
 disable-model-invocation: true
 ---
@@ -20,7 +20,9 @@ Write the spec of one module of one app. The arguments are `$ARGUMENTS`:
 | `--headless` | Ask nothing: take every proposal and say so in the report |
 
 Below, `OUT` is the absolute output folder, `NAME` the spec's file name, and `P` is `${CLAUDE_PLUGIN_ROOT}`.
-`NAME_ARG` is `--name NAME` when `--name` was given, else nothing.
+`NAME_ARG` is `--name NAME` when `--name` was given, else nothing. `render.py spec` writes two files: `OUT/NAME`, the
+builder spec with no code citations, and `OUT/<stem>.evidence.md` (`<stem>` is `NAME` without `.md`), the same text with
+every `path:line` citation. A `--name` that ends in `.evidence.md` is refused.
 
 **Saving JSON.** Agents answer with fenced JSON inside prose, and a workflow's task output wraps its result as
 `{"summary", "result"}`. Never write an ad-hoc extractor. A workflow's result is in its task output file: pass that
@@ -254,7 +256,7 @@ For pass `n` from 1:
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/grade.py" OUT NAME_ARG
    ```
 
-2. Give `app-spec:spec-critic` the folder `OUT`, the spec's name, the app root, the contract roots, the plugin folder
+2. Give `app-spec:spec-critic` the folder `OUT`, the spec's name and the evidence file's name (`<stem>.evidence.md`), the app root, the contract roots, the plugin folder
    and, with `--bar`, the bar file. Tell it that it must open at least one cited range per use case, and that it
    cannot see a fact the code does not show, so it never asks for one. Save its JSON list as `OUT/critic-<n>.json`
    (`save_json.py OUT/answers/critic-<n>.txt OUT/critic-<n>.json --list`).
@@ -350,7 +352,7 @@ steps 3 and 4 (and the critic of step 8) in child sessions, so each agent stays 
   says for a Workflow result. Do the same for `extract-rules` at step 4. A child that ends with no structured output
   counts as an agent that returned nothing: save `{"answers": {}}` for it.
 - **Critic (step 8) with child sessions:** start one fresh child per pass with the role `app-spec:spec-critic`, the
-  spec, `ledger.json` and `grade.json` attached, and the critic's output shape from DESIGN.md as its schema.
+  evidence spec (`<stem>.evidence.md`), `ledger.json` and `grade.json` attached, and the critic's output shape from DESIGN.md as its schema.
 - **Without child sessions:** play each role in this session one after another. Read `<root>/agents/<agent>.md` as its
   instructions, write nothing while you are in the role, then save its JSON as the session under `OUT`, following
   "Who writes".
@@ -373,5 +375,5 @@ Report:
   automated analysis
 
 The next step is a person: they read `OUT/NAME` with `REVIEW.md` and `OPEN_QUESTIONS.md` before any plan or issue is
-made from it. Name it exactly: "Next: read `OUT/NAME`. After you edit it, run `/app-spec:review OUT`." Any time,
+made from it. Builders read `OUT/NAME`. Reviewers and `compare` read `OUT/<stem>.evidence.md`. Name it exactly: "Next: read `OUT/NAME`. After you edit it, run `/app-spec:review OUT`." Any time,
 `/app-spec:status OUT` says where the run stands.

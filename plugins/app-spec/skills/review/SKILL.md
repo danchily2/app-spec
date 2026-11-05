@@ -26,7 +26,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/grade.py" OUT NAME_ARG
 
 ## 2: Critic
 
-Give `app-spec:spec-critic` the folder `OUT`, the spec's name, the app root (`app.path`), the contract roots
+Give `app-spec:spec-critic` the folder `OUT`, the spec's name, the evidence file's name (`<stem>.evidence.md`, `<stem>` is `NAME` without `.md`), the app root (`app.path`), the contract roots
 (`contracts[].path`) and the plugin folder `P`. Tell it that it must open at least one cited range per use case, and
 that it cannot see a fact the code does not show, so it never asks for one. Save its JSON list as
 `OUT/critic-review-<n>.json`, where `n` is the next pass number

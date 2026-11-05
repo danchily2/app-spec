@@ -5,6 +5,8 @@ changes.
 
 ## Unreleased
 
+- **Skills, critic and docs name the two files.** The critic reads the evidence spec and raises a High finding when a
+  requirement is complete only through its citation; the writer is told to put every value into the sentence.
 - **Status reads the evidence spec.** It checks the coverage appendix and the file times against the evidence file
   too, and sends a folder that has only the old single spec back to `render.py spec`.
 - **The grader checks that the builder spec stands without the code.** A new `self-contained` check fails on a leftover

@@ -16,7 +16,8 @@ The caller gives you the output folder `<out>`, the spec's file name, the app ro
    caller gives a bar file (a hand-written spec the team holds up as the standard), read it too and grade the depth
    of each section against it as well as against the rubric. It shows how deep, never what to say: never ask the
    spec to copy its content, its names or its facts.
-2. The spec, `<out>/<name>` (default `SPEC.md`).
+2. The evidence spec, `<out>/<stem>.evidence.md`. The builder spec `<out>/<name>` is the same text with every citation
+   removed; builders read only that file.
 3. `<out>/ledger.json`: the coverage per class and the uncovered items.
 4. `<out>/grade.json`: the shape checks that fail.
 5. `<out>/use-cases.json`, `screens.json`, `rules.json` and `endpoints.json` when you need an id's catalog entry.
@@ -54,6 +55,8 @@ The caller gives you the output folder `<out>`, the spec's file name, the app ro
 - **High:** a screen lacks states; a rule lacks values; an error or offline path the code has is missing; legacy
   structure is stated as a requirement.
 - **Medium:** any other rubric symptom.
+- A requirement that is complete only through its citation (a string key without its text, a value or a limit only in
+  the cited code, 'see the code') is **High**, owner `writer`, or `rules` for a rule card.
 - **Nit:** wording, order, readability.
 
 ## Owner

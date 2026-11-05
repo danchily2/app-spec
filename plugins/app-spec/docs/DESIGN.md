@@ -61,7 +61,8 @@ catalogs and ids.
   grade.json            shape checks
   critic-<n>.json       the critic's findings of one pass, as returned
   review.json, REVIEW.md            the scorecard of every review pass          (reset by `spec`; `review` appends a pass)
-  SPEC.md (or --name)   the deliverable
+  SPEC.md (or --name)   the builder spec: the deliverable, no code citations
+  SPEC.evidence.md      the same spec with every citation (<stem>.evidence.md); reviewers, the critic and compare read it
   OPEN_QUESTIONS.md
 ```
 
@@ -409,8 +410,10 @@ then does a person read the spec.
 
 One entry per shape check of the grader, in this order: `sections`, `rules-per-use-case`, `criteria-per-use-case`,
 `criteria-numbering`, `citations-resolve`, `unknowns-have-owner`, `prose-complete`, `no-duplicate-use-cases`,
-`banned-nouns`, `overrides-reflected`. `detail` names every failing item, at most 20, then `and N more`. `pass` is `true`
+`banned-nouns`, `overrides-reflected`, `self-contained`. `detail` names every failing item, at most 20, then `and N more`. `pass` is `true`
 when every check passes.
+
+`self-contained` runs on the builder spec only (the other checks read the evidence spec). It fails for a leftover citation, a string key named without its text in Appendix D, a phrase that points to the code, and a connector such as "in" or "at" left with no object once its citation was removed.
 
 `unknowns-have-owner` fails for a line of sections 1 to 8 that holds `UNKNOWN` without the words `searched` and `owner`,
 unless every `OQ-NNN` the line names as `open question OQ-NNN` is listed in section 8. Every UNKNOWN the renderer writes
@@ -489,7 +492,7 @@ in the purpose of one of its screens.
 
 ### SPEC.md and OPEN_QUESTIONS.md
 
-`SPEC.md` is the deliverable, in the template below. It can be named with `--name`, for example `docs/specs/payslips.md`.
+`SPEC.md` is the builder spec, the deliverable, in the template below, with no code citations. `<stem>.evidence.md` beside it is the same text with every citation. It can be named with `--name`, for example `docs/specs/payslips.md`.
 `OPEN_QUESTIONS.md` lists every UNKNOWN with what was searched, who can answer and its id.
 
 ## Ids

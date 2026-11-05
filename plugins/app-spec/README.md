@@ -71,7 +71,7 @@ into each backend repository you gave.
 | 5 | Endpoint contracts | `endpoints.json` with request and response fields, errors and auth. With a backend repository, each route is found there and the two sides are compared. |
 | 6 | Catalogs: `render.py catalogs` | `use-cases.json`, `screens.json`, `flows.json`, `rules.json`, `endpoints.json`, and `ids.json`, which keeps every id stable. |
 | 7 | Write | `prose.json`: the spec writer's text, from the catalogs and the cited code only. |
-| 8 | Review loop | `SPEC.md`, `LEDGER.md`, `grade.json`, `REVIEW.md`: render, count, grade, critic, fix, up to the configured passes. |
+| 8 | Review loop | `SPEC.md` (builder spec), `SPEC.evidence.md` (with citations), `LEDGER.md`, `grade.json`, `REVIEW.md`: render, count, grade, critic, fix, up to the configured passes. |
 | 9 | Open questions | `OPEN_QUESTIONS.md`, each question with what was searched and who can answer. |
 
 ## Skills
@@ -126,7 +126,7 @@ full coverage says so: it hands over the spec with the gaps listed, never a clea
 - **Usage.** The workflows start one analyst per slice of about 9,000 lines, one referee per use case, one per rule and
   two per P0 rule. A large module means dozens of agents. Start with one module, not the whole app.
 - **Time.** A large module takes a long run. A run that stops is resumed with its run id, never restarted.
-- **The first draft is not final.** Read `SPEC.md` with `REVIEW.md` and `OPEN_QUESTIONS.md` before anyone plans or
+- **The first draft is not final.** Read `SPEC.md` (`SPEC.evidence.md` has the citations) with `REVIEW.md` and `OPEN_QUESTIONS.md` before anyone plans or
   files issues from it.
 - **What the code does not show stays `UNKNOWN`.** The plugin labels a fact it cannot find and asks. It does not guess.
 - **Re-runs keep your work.** `overrides.json` is never touched, and ids are never reused, so a re-run gives an item the

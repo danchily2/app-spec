@@ -14,6 +14,13 @@ class TestDocs(unittest.TestCase):
         self.assertNotIn("two more passes", manifest["description"])
         self.assertIn("up to two review rounds", manifest["description"])
 
+    def test_skill_and_critic_name_the_evidence_file(self):
+        for rel in ("skills/spec/SKILL.md", "skills/review/SKILL.md", "agents/spec-critic.md"):
+            text = (PLUGIN / rel).read_text(encoding="utf-8")
+            self.assertIn(".evidence.md", text, rel)
+        critic = " ".join((PLUGIN / "agents" / "spec-critic.md").read_text(encoding="utf-8").split())
+        self.assertIn("complete only through its citation", critic)
+
     def test_the_capabilities_file_is_app_fusions_capabilities_json(self):
         for rel in ("skills/spec/SKILL.md", "docs/DESIGN.md"):
             text = (PLUGIN / rel).read_text(encoding="utf-8")
