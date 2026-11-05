@@ -546,6 +546,16 @@ class TestSelfContained(GradeCase):
         self.assertNotIn("citations-resolve", self.failing(dest))
         self.assertIn("dangling words (evidence line", self.detail(dest))
 
+    def test_shapes_the_builder_cleans_are_not_dangling(self):
+        for n, text in enumerate((f"The list pages back (see `{LIST}:3`).", f"The list pages back (in `{LIST}:3`).",
+                                  f"The list pages back, see `{LIST}:3`.")):
+            dest = self.with_criterion(f"cleaned{n}", text)
+            self.assertTrue(check(grade.run(dest), "self-contained")["pass"], text)
+
+    def test_a_connector_before_a_table_cell_end_is_dangling(self):
+        self.assertEqual(grade._dangling_items([(7, f"| a | loaded from `{LIST}:3` |")]),
+                         ["dangling words (evidence line 7): from `" + LIST + ":3`"])
+
     def test_a_citation_followed_by_real_words_is_not_dangling(self):
         dest = self.with_criterion("notdangling", f"The list is built in `{LIST}:3` the old way.")
         self.assertTrue(check(grade.run(dest), "self-contained")["pass"])

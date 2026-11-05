@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ledger import _Ledger, _platform_values  # noqa: E402
 from speclib import out, paths  # noqa: E402
-from speclib.builder import CITATION, evidence_name, outside_code  # noqa: E402
+from speclib.builder import CITATION, builder_text, evidence_name, outside_code  # noqa: E402
 from speclib.common import die  # noqa: E402
 from speclib.ids import norm  # noqa: E402
 from speclib.spec_md import (NO_RULE, NO_RULE_RE, NO_RULE_REASON, OUT_OF_SCOPE_LEAD, Context, _element_rows,  # noqa: E402
@@ -63,8 +63,22 @@ _POINTS_TO_CODE = (re.compile(r"\bsee (?:the )?(?:code|source|file|implementatio
 _CITED = r"`?" + CITE_RE + r"`?"
 # a connector word whose objects were all citations: once they are taken out only the connector is left
 _DANGLING = re.compile(r"\b(?:in|at|from|of|by|see|and)\s+(" + _CITED + r"(?:\s*(?:[,;]|\band\b)\s*" + _CITED + r")*)"
-                       r"\s*(?:[,.;)]|$)")
+                       r"\s*(?:[,.;)|]|$)")
+# a connector word that ends a phrase: what is left of a dangling match once the citations are taken out
+_LEFT_OVER = re.compile(r"\b(?:in|at|from|of|by|see|and)\s*(?:[,.;)|]|$)")
 _OQ_ITEM = re.compile(r"^- \*\*(OQ-\d{3,}):\*\* .*\bSearched: .*\bOwner: ")
+
+
+def _dangling_items(rows):
+    """The `(number, line)` evidence lines where taking the citations out leaves a connector word at the end of a
+    phrase. A match counts only when the builder text of its line has more of them than the evidence line, so
+    `(see `A:3`).` and `, see `A:3`.`, which the builder cleans whole, pass."""
+    items = []
+    for number, line in rows:
+        found = list(_DANGLING.finditer(line))
+        if found and len(_LEFT_OVER.findall(builder_text(line, ""))) > len(_LEFT_OVER.findall(line)):
+            items += [f"dangling words (evidence line {number}): {m.group(0).rstrip(' ,.;)|')}" for m in found]
+    return items
 
 
 # ---------------------------------------------------------------- the spec as lines with a section
@@ -566,11 +580,7 @@ class _Grader:
                 items.append(f"string key {key} has no text (line {first})")
         for pattern in _POINTS_TO_CODE:
             items += [f"points to the code (line {n}): {m.group(0)}" for n, line in lines for m in pattern.finditer(line)]
-        for number, line, code, _ in self.spec.rows:
-            if not code:
-                items += [f"dangling words (evidence line {number}): {m.group(0).rstrip(' ,.;)')}"
-                          for m in _DANGLING.finditer(line)]
-        return items
+        return items + _dangling_items([(number, line) for number, line, code, _ in self.spec.rows if not code])
 
     # ------------------------------------------------------------ run
 

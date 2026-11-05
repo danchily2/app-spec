@@ -5,6 +5,8 @@ changes.
 
 ## Unreleased
 
+- **`self-contained` passes shapes the builder cleans.** `(see `A:3`).`, `(in `A:3`).` and `, see `A:3`.` no longer
+  report dangling words, and a connector before a table cell's end now does.
 - **The builder spec keeps ` .name` and loses empty labels.** `as .api (`A:3`)` stays `as .api`; `Sources:.`, `task:;`
   and `]: )` left behind by a removed citation are cleaned, a span such as `Name:` loses its colon, and
   `evidence_name` strips `.MD` in any case.
