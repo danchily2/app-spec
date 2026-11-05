@@ -537,10 +537,19 @@ class TestSelfContained(GradeCase):
         self.assertIn("points to the code", self.detail(dest))
 
     def test_dangling_words_fail(self):
-        dest = self.with_criterion("dangling", "The rule is defined in and.")
-        self.assertIn("dangling words", self.detail(dest))
-        dest = self.with_criterion("dangling2", "This happens in, and.")
-        self.assertIn("dangling words", self.detail(dest))
+        text = f"The rule is defined in `{LIST}:3` and `{DETAIL}:4`."
+        dest = self.with_criterion("dangling", text)
+        self.assertNotIn("citations-resolve", self.failing(dest))
+        self.assertIn("dangling words (evidence line", self.detail(dest))
+
+    def test_a_citation_followed_by_real_words_is_not_dangling(self):
+        dest = self.with_criterion("notdangling", f"The list is built in `{LIST}:3` the old way.")
+        self.assertTrue(check(grade.run(dest), "self-contained")["pass"])
+
+    def test_hyphenated_and_ordinary_sentence_ends_pass(self):
+        text = "Sign-in, then the user is signed in. The file name ends in .pdf and, in bold, the total."
+        dest = self.with_criterion("ordinary", text)
+        self.assertTrue(check(grade.run(dest), "self-contained")["pass"])
 
     def test_missing_builder_file_asks_for_render(self):
         dest = self.copy("no_builder")

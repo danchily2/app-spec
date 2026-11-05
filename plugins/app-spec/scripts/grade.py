@@ -58,8 +58,10 @@ _KEY_IN_SPAN = re.compile(r"(?<![\w.-])[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+(?![\w-]|\.\
 _POINTS_TO_CODE = (re.compile(r"\bsee (?:the )?(?:code|source|file|implementation)\b", re.I),
                    re.compile(r"\bin the cited (?:code|files?|lines?)\b", re.I),
                    re.compile(r"\bas (?:the )?(?:code|source) (?:shows|does|says)\b", re.I))
-_DANGLING = (re.compile(r"\b(?:in|at|from|of|by|and|see)\s*[,.;]"),
-             re.compile(r"\b(?:in|at|from|of|by|see)\s+and\s*[,.;]"))
+_CITED = r"`?" + CITE_RE + r"`?"
+# a connector word whose objects were all citations: once they are taken out only the connector is left
+_DANGLING = re.compile(r"\b(?:in|at|from|of|by|see|and)\s+(" + _CITED + r"(?:\s*(?:[,;]|\band\b)\s*" + _CITED + r")*)"
+                       r"\s*(?:[,.;)]|$)")
 _OQ_ITEM = re.compile(r"^- \*\*(OQ-\d{3,}):\*\* .*\bSearched: .*\bOwner: ")
 
 
@@ -545,7 +547,8 @@ class _Grader:
 
     def self_contained(self):
         """The builder spec read alone: no citation left, every named string key has its text, nothing points at the
-        code, and no sentence is left with nothing after its preposition."""
+        code, and no sentence of the evidence spec has a citation as the only object of a word such as `in`: taking the
+        citation out would leave the word dangling."""
         lines = list(outside_code(self.builder))
         items = [f"leftover citation {m.group(0)} (line {n})" for n, line in lines for m in CITATION.finditer(line)]
         table, with_text = self._strings_table()
@@ -561,8 +564,10 @@ class _Grader:
                 items.append(f"string key {key} has no text (line {first})")
         for pattern in _POINTS_TO_CODE:
             items += [f"points to the code (line {n}): {m.group(0)}" for n, line in lines for m in pattern.finditer(line)]
-        for pattern in _DANGLING:
-            items += [f"dangling words (line {n}): {m.group(0)}" for n, line in lines for m in pattern.finditer(line)]
+        for number, line, code, _ in self.spec.rows:
+            if not code:
+                items += [f"dangling words (evidence line {number}): {m.group(0).rstrip(' ,.;)')}"
+                          for m in _DANGLING.finditer(line)]
         return items
 
     # ------------------------------------------------------------ run
