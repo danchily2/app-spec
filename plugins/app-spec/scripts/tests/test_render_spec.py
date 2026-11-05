@@ -166,6 +166,31 @@ class TestSpec(unittest.TestCase):
         self.assertIn(f"| COMMON_DATA_LOADING_ERROR | {text} |", section(spec, template.APPENDICES[3]))
         self.assertNotIn("UNNAMED_KEY", section(spec, template.APPENDICES[3]))
 
+    def named_keys_in_appendix_d(self, keys, criterion):
+        inv = out.load(self.out, "inventory.json")
+        inv["strings"].setdefault("allValues", {}).update({k: f"Text of {k}" for k in keys})
+        out.save(self.out, "inventory.json", inv)
+        data = prose()
+        data["criteria"][0]["text"] = criterion
+        out.save(self.out, "prose.json", data)
+        return section(render.spec(self.out), template.APPENDICES[3])
+
+    def test_a_key_that_is_a_segment_of_a_named_dotted_key_gets_no_row(self):
+        d = self.named_keys_in_appendix_d(
+            ["pay.list", "pay.list.title", "list.title", "pay.list-foo", "COMMON_ERROR", "COMMON_ERROR_LONG"],
+            "Shows `pay.list.title` and `pay.list-foo` and COMMON_ERROR_LONG, not a.pay.list.")
+        self.assertIn("| pay.list.title | Text of pay.list.title |", d)
+        self.assertIn("| pay.list-foo | Text of pay.list-foo |", d)
+        self.assertIn("| COMMON_ERROR_LONG |", d)
+        for short in ("| pay.list |", "| list.title |", "| COMMON_ERROR |"):
+            self.assertNotIn(short, d)
+
+    def test_a_lowercase_key_counts_only_in_backticks_or_as_a_table_cell(self):
+        d = self.named_keys_in_appendix_d(["shown", "done", "other"], "The row is shown when done, as `other` says.")
+        self.assertIn("| other | Text of other |", d)
+        self.assertNotIn("| shown |", d)
+        self.assertNotIn("| done |", d)
+
     def test_cli_runs_spec(self):
         code, stdout, err = run_cli(["render.py", "spec", self.out, "--name", "X.md"], module=render)
         self.assertEqual(code, 0, err)

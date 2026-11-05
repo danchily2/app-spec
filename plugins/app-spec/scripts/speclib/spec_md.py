@@ -659,11 +659,19 @@ def _kept_platform(c, plat):
     return kept
 
 
+def _names_key(key, named):
+    """True when `named` names `key`: an UPPER_SNAKE key as a whole word, any other key in backticks or as a whole table
+    cell. A `.` or `-` that joins key characters does not end the key, so `a.b` is not named by `a.b.c`."""
+    e = re.escape(key)
+    if re.fullmatch(r"[A-Z0-9_]+", key):
+        return bool(re.search(r"(?<![\w.-])" + e + r"(?![\w-]|\.\w)", named))
+    return bool(re.search(r"`" + e + r"`|^\|\s*" + e + r"\s*\||\|\s*" + e + r"\s*\|", named, re.M))
+
+
 def _named_keys(c, strings, named):
-    """Inventory string keys (`keys` and `allValues`) that appear as whole words in `named`, the spec text so far."""
+    """Inventory string keys (`keys` and `allValues`) that the spec text so far names."""
     pool = set(strings.get("keys") or {}) | set(strings.get("allValues") or {})
-    return {k for k in pool if isinstance(k, str) and k and not c.is_dropped("string", k)
-            and re.search(r"(?<![A-Za-z0-9_])" + re.escape(k) + r"(?![A-Za-z0-9_])", named)}
+    return {k for k in pool if isinstance(k, str) and k and not c.is_dropped("string", k) and _names_key(k, named)}
 
 
 def strings_and_platform(c, named=""):

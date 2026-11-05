@@ -475,7 +475,8 @@ class TestFixRound1(GradeCase):
         def uncite(p):
             p["criteria"][2]["evidence"] = ""
         edit(dest, "prose.json", uncite)
-        text = render.spec(dest)
+        render.spec(dest)
+        text = read_text(dest, "SPEC.evidence.md")
         self.assertIn("no rule extracted for UC-003;", text)
         c = check(grade.run(dest), "rules-per-use-case")
         self.assertFalse(c["pass"])
