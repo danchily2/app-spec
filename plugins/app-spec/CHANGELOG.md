@@ -5,6 +5,8 @@ changes.
 
 ## Unreleased
 
+## 0.10.0 - 2026-11-05
+
 - **Review says what it reads.** The spec and review skills tell the person that a lasting change goes in
   `prose.json`, `overrides.json` or the catalogs, then `render.py spec`, then review, and that a hand edit of either
   spec file is lost; `status` reports a builder spec edited after render; `compare` is named as a later reader.
