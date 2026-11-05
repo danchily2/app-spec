@@ -339,3 +339,19 @@ Add one entry per round: date, items, commits, release tag, run folder, scorecar
   recorded single-agent P0 judging; released as 0.8.0.
 - **Devin cloud parity, 0.9.0: child-session driver, start skill, source check (2026-11-04):** added replayable
   workflow child sessions, recorded the source immutability check and child-session independence mode.
+- **Release 0.8.0 + 0.9.0 to main (2026-11-05):** `main` fast-forwarded to `release-0.9.0` (`fd385dc`), tags `v0.8.0`
+  (`713ddc8`) and `v0.9.0` (`2474fe5`) pushed, installed plugin updated 0.7.2 -> 0.9.0. Before the merge: 407 Python,
+  42 Node (37 workflow + 5 Devin) pass. 0.8.0/0.9.0 change no agent, workflow or hook, so a Claude Code run behaves
+  as on 0.7.2. `calendar-v1` is still unfinished (supervisor gave up after resume 2; output stops at `critic-1.json`).
+- **2026-11-05:** v9 (0.9.0, 3 passes, $68.64, 100 min, no usage-limit stop): **no manual step** (v8: 2). Grade
+  pass. Ledger fails on strings only (58.7%: no person recorded string reasons, as on v8 before `review.py accept`);
+  screens 68% -> 100%, fields 92.5% -> 100%, endpoints 100%. 2,320 lines, 77 criteria, 943 code citations. The 0.7.2
+  fixes hold: event lines correct (`exportAllPayslips` :11, `payslipOpen` :40), contract batch-4 merged. Findings per
+  pass (Blocker/High): 5/6, 3/2, 1/4. Left after pass 3: 1 Blocker (RULE-113/AC29 says upcoming payslips page; they
+  never do) and 4 High (PDF failures stated as silent but show an alert; push mismatch side effects in
+  `MainCoordinator.swift:214-242`; no rule for the year-end list limit; EP-011 client UNKNOWN). New plugin gaps:
+  (a) **EP-011 client High repeated in all 3 passes**: the contracts owner fix never reaches `endpoints.json`;
+  (b) **path completion misses a path that starts below the repo root**: `PayslipsInterface/.../PayslipService.swift`
+  and `PayslipFeature/Common/Error/UnknownError.swift` (both one file, both from contracts) stay as 2 citation
+  warnings; (c) 12 Medium findings repeat in all 3 passes, because only Blocker/High are routed (by design; decide
+  whether Mediums with a one-line fix should route too). Output: `~/Documents/GitHub/vmm3/specs/payslips-v9/`.
