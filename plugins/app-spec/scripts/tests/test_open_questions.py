@@ -82,11 +82,13 @@ class TestStructuralUnknowns(unittest.TestCase):
     def test_an_unknown_without_a_listed_question_still_fails(self):
         text = self.text.replace("- **Auth:** UNKNOWN (open question OQ-", "- **Auth:** UNKNOWN (open question OQ-9", 1)
         out.save_text(self.dest, "BAD.evidence.md", text)
+        out.save_text(self.dest, "BAD.md", read_text(self.dest, "SPEC.md"))  # the builder file the grader also reads
         self.assertFalse(check(grade.run(self.dest, "BAD.md"), "unknowns-have-owner")["pass"])
 
     def test_prose_placeholder_still_fails(self):
         text = self.text.replace("## Summary\n\n", "## Summary\n\nUNKNOWN — summary not written yet\n\n", 1)
         out.save_text(self.dest, "BAD2.evidence.md", text)
+        out.save_text(self.dest, "BAD2.md", read_text(self.dest, "SPEC.md"))  # the builder file the grader also reads
         self.assertFalse(check(grade.run(self.dest, "BAD2.md"), "prose-complete")["pass"])
 
 

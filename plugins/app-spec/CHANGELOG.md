@@ -5,6 +5,9 @@ changes.
 
 ## Unreleased
 
+- **The grader checks that the builder spec stands without the code.** A new `self-contained` check fails on a leftover
+  citation, a string key with no text in Appendix D, a sentence that points the reader to the code, and a sentence
+  left with nothing after its preposition.
 - **A citation-free builder spec can be derived from the evidence spec.** A new function takes out every `path:line`
   citation, the Source and Evidence columns and the module scope lines, and points Appendix F to the evidence file.
 - **`render.py spec` now writes two files.** The file you name (default `SPEC.md`) is the builder spec with no code

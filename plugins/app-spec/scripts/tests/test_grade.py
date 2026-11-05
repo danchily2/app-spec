@@ -496,6 +496,60 @@ class TestFixRound1(GradeCase):
             self.assertFalse(check(grade.run(dest), "citations-resolve")["pass"], text)
 
 
+class TestSelfContained(GradeCase):
+    def with_criterion(self, name, text):
+        dest = self.copy(name)
+        prose = out.load(dest, "prose.json")
+        prose["criteria"][0]["text"] = text
+        out.save(dest, "prose.json", prose)
+        render.spec(dest)
+        return dest
+
+    def detail(self, dest):
+        c = check(grade.run(dest), "self-contained")
+        self.assertFalse(c["pass"])
+        return c["detail"]
+
+    def test_good_fixture_is_self_contained(self):
+        self.assertTrue(check(grade.run(self.good), "self-contained")["pass"])
+
+    def test_it_is_the_last_check(self):
+        self.assertEqual(grade.CHECKS[-1], "self-contained")
+
+    def test_leftover_citation_fails(self):
+        dest = self.copy("leftover")
+        text = read_text(dest, "SPEC.md")
+        out.save_text(dest, "SPEC.md", text + "\nThe sort is in `A.swift:3`.\n")
+        self.assertIn("leftover citation", self.detail(dest))
+
+    def test_citation_in_a_code_block_is_left_alone(self):
+        dest = self.copy("fenced")
+        text = read_text(dest, "SPEC.md")
+        out.save_text(dest, "SPEC.md", text + "\n```\nA.swift:3\n```\n")
+        self.assertTrue(check(grade.run(dest), "self-contained")["pass"])
+
+    def test_string_key_without_text_fails(self):
+        dest = self.with_criterion("nokey", "The error shows `SERVER_ERROR_TEXT`.")
+        self.assertIn("string key SERVER_ERROR_TEXT has no text", self.detail(dest))
+
+    def test_pointer_to_code_fails(self):
+        dest = self.with_criterion("pointer", "Rounding is as the code does it.")
+        self.assertIn("points to the code", self.detail(dest))
+
+    def test_dangling_words_fail(self):
+        dest = self.with_criterion("dangling", "The rule is defined in and.")
+        self.assertIn("dangling words", self.detail(dest))
+        dest = self.with_criterion("dangling2", "This happens in, and.")
+        self.assertIn("dangling words", self.detail(dest))
+
+    def test_missing_builder_file_asks_for_render(self):
+        dest = self.copy("no_builder")
+        os.remove(os.path.join(dest, "SPEC.md"))
+        code, _, err = run_cli(["grade.py", dest], module=grade)
+        self.assertEqual(code, 2)
+        self.assertIn("SPEC.md not found (run render.py spec first)", err)
+
+
 class TestCli(GradeCase):
     def test_exit_codes_and_output(self):
         code, stdout, err = run_cli(["grade.py", self.good], module=grade)

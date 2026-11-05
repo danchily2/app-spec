@@ -28,14 +28,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ledger import _Ledger, _platform_values  # noqa: E402
 from speclib import out, paths  # noqa: E402
-from speclib.builder import evidence_name  # noqa: E402
+from speclib.builder import CITATION, evidence_name, outside_code  # noqa: E402
 from speclib.common import die  # noqa: E402
 from speclib.ids import norm  # noqa: E402
-from speclib.spec_md import NO_RULE, NO_RULE_RE, NO_RULE_REASON, OUT_OF_SCOPE_LEAD, Context, _element_rows, target  # noqa: E402
+from speclib.spec_md import (NO_RULE, NO_RULE_RE, NO_RULE_REASON, OUT_OF_SCOPE_LEAD, Context, _element_rows,  # noqa: E402
+                             _names_key, target)
 from speclib.template import APPENDICES, AC_RE, CITE_RE, HEADINGS  # noqa: E402
 
 CHECKS = ("sections", "rules-per-use-case", "criteria-per-use-case", "criteria-numbering", "citations-resolve",
-          "unknowns-have-owner", "prose-complete", "no-duplicate-use-cases", "banned-nouns", "overrides-reflected")
+          "unknowns-have-owner", "prose-complete", "no-duplicate-use-cases", "banned-nouns", "overrides-reflected",
+          "self-contained")
 MAX_DETAIL = 20
 
 BODY = HEADINGS                                            # sections 1 to 8
@@ -52,6 +54,12 @@ _NO_RULE_LINE = re.compile(r"^UNKNOWN — no rule extracted for ((?:UC|CAP)-\d{3
                            r'"' + re.escape(NO_RULE) + r'" or "' + re.escape(NO_RULE_REASON) + r'" with a citation$')
 _ROW_SPLIT = re.compile(r"(?<!\\)\|")
 _OQ_REF = re.compile(r"\bopen question (OQ-\d{3,})\b")
+_KEY_IN_SPAN = re.compile(r"(?<![\w.-])[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+(?![\w-]|\.\w)")
+_POINTS_TO_CODE = (re.compile(r"\bsee (?:the )?(?:code|source|file|implementation)\b", re.I),
+                   re.compile(r"\bin the cited (?:code|files?|lines?)\b", re.I),
+                   re.compile(r"\bas (?:the )?(?:code|source) (?:shows|does|says)\b", re.I))
+_DANGLING = (re.compile(r"\b(?:in|at|from|of|by|and|see)\s*[,.;]"),
+             re.compile(r"\b(?:in|at|from|of|by|see)\s+and\s*[,.;]"))
 _OQ_ITEM = re.compile(r"^- \*\*(OQ-\d{3,}):\*\* .*\bSearched: .*\bOwner: ")
 
 
@@ -124,6 +132,11 @@ class _Grader:
             die(f"{path} not found (run render.py spec first)")
         with open(path, encoding="utf-8") as fh:
             self.spec = _Spec(fh.read())
+        bpath = os.path.join(dest, target(dest, name))
+        if not os.path.isfile(bpath):
+            die(f"{bpath} not found (run render.py spec first)")
+        with open(bpath, encoding="utf-8") as fh:
+            self.builder = fh.read()
         self.cfg = self.ctx.cfg
         self.roots = [str(self.cfg["app"]["path"])] + [str(c["path"]) for c in self.cfg.get("contracts") or []
                                                        if isinstance(c, dict) and c.get("path")]
@@ -511,6 +524,45 @@ class _Grader:
             items.append(f"rename {ident}: '{name}' is not in the spec")
         stale = [o for o in self._old_names(ident) if o != name and o in body.replace(name, "")]
         items += [f"rename {ident}: old name '{o}' is still in the spec" for o in sorted(stale)]
+        return items
+
+    # ------------------------------------------------------------ self-contained
+
+    def _strings_table(self):
+        """Line numbers of the Appendix D Strings table rows, and the keys that have text there."""
+        rows, with_text, inside, in_d = set(), set(), False, False
+        for number, line in outside_code(self.builder):
+            if line.startswith("## "):
+                in_d = line.rstrip() == APPENDICES[3]
+            if line.startswith("### "):
+                inside = in_d and line.startswith("### Strings")
+            elif inside and line.startswith("|"):
+                rows.add(number)
+                cells = [c.strip() for c in _ROW_SPLIT.split(line.strip().strip("|"))]
+                if len(cells) >= 2 and cells[1] and not set(cells[0]) <= set("-: "):
+                    with_text.add(cells[0])
+        return rows, with_text
+
+    def self_contained(self):
+        """The builder spec read alone: no citation left, every named string key has its text, nothing points at the
+        code, and no sentence is left with nothing after its preposition."""
+        lines = list(outside_code(self.builder))
+        items = [f"leftover citation {m.group(0)} (line {n})" for n, line in lines for m in CITATION.finditer(line)]
+        table, with_text = self._strings_table()
+        strings = self.ctx.inventory.get("strings") if isinstance(self.ctx.inventory.get("strings"), dict) else {}
+        pool = {k for k in set(strings.get("keys") or {}) | set(strings.get("allValues") or {}) if isinstance(k, str) and k}
+        named = [(n, line) for n, line in lines if n not in table]
+        for _, line in named:
+            for span in _SPAN.findall(line):
+                pool.update(_KEY_IN_SPAN.findall(span))
+        for key in sorted(pool - with_text):
+            first = next((n for n, line in named if _names_key(key, line)), None)
+            if first:
+                items.append(f"string key {key} has no text (line {first})")
+        for pattern in _POINTS_TO_CODE:
+            items += [f"points to the code (line {n}): {m.group(0)}" for n, line in lines for m in pattern.finditer(line)]
+        for pattern in _DANGLING:
+            items += [f"dangling words (line {n}): {m.group(0)}" for n, line in lines for m in pattern.finditer(line)]
         return items
 
     # ------------------------------------------------------------ run
