@@ -26,8 +26,9 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/grade.py" OUT NAME_ARG
 
 ## 2: Critic
 
-Give `app-spec:spec-critic` the folder `OUT`, the spec's name, the evidence file's name (`<stem>.evidence.md`, `<stem>` is `NAME` without `.md`), the app root (`app.path`), the contract roots
-(`contracts[].path`) and the plugin folder `P`. Tell it that it must open at least one cited range per use case, and
+Give `app-spec:spec-critic` the folder `OUT`, the spec's name, the evidence file's name (`<stem>.evidence.md`,
+`<stem>` is `NAME` without `.md`), the app root (`app.path`), the contract roots (`contracts[].path`) and the
+plugin folder `P`. Tell it that it must open at least one cited range per use case, and
 that it cannot see a fact the code does not show, so it never asks for one. Save its JSON list as
 `OUT/critic-review-<n>.json`, where `n` is the next pass number
 (`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/save_json.py" <answer> OUT/critic-review-<n>.json --list`), and record the
@@ -69,8 +70,8 @@ leaves the spec on the next `render.py spec`, and that the grader then checks it
 - AskUserQuestion is `ask_user_question` in Devin CLI/Desktop. In Devin cloud, ask with a blocking message whose
   `content_type` is `user_question` (1 to 4 questions, 2 to 4 options each).
 - Run the critic with `run_subagent` and profile `app-spec:spec-critic` where available. In Devin cloud, start a fresh
-  child Devin session for every pass with role `app-spec:spec-critic`, attach the spec, `ledger.json` and `grade.json`,
-  and set `structured_output_schema` to the critic's output shape from DESIGN.md. See
+  child Devin session for every pass with role `app-spec:spec-critic`, attach the evidence spec (`<stem>.evidence.md`),
+  `ledger.json` and `grade.json`, and set `structured_output_schema` to the critic's output shape from DESIGN.md. See
   `<root>/skills/spec/SKILL.md` under "In Devin cloud" for the child-session path.
 - This command needs no Workflow tool.
 
@@ -85,3 +86,7 @@ named, and the reasons recorded. Name the next command exactly:
 - With `--accept` reasons recorded: "Next: `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/render.py" spec OUT NAME_ARG`,
   then `/app-spec:review OUT`."
 - Otherwise: "Next: a person reads `OUT/NAME`; it is ready for planning."
+
+Then say, in one sentence: "The critic and the grader read `OUT/<stem>.evidence.md`, and `OUT/NAME` is rebuilt from it
+by `render.py spec`, which also overwrites any hand edit of either file, so put a lasting change in `prose.json`,
+`overrides.json` or the catalogs."

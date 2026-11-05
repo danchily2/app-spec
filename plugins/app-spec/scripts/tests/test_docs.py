@@ -18,6 +18,8 @@ class TestDocs(unittest.TestCase):
         for rel in ("skills/spec/SKILL.md", "skills/review/SKILL.md", "agents/spec-critic.md"):
             text = (PLUGIN / rel).read_text(encoding="utf-8")
             self.assertIn(".evidence.md", text, rel)
+        review = " ".join((PLUGIN / "skills" / "review" / "SKILL.md").read_text(encoding="utf-8").split())
+        self.assertIn("attach the evidence spec (`<stem>.evidence.md`)", review)
         critic = " ".join((PLUGIN / "agents" / "spec-critic.md").read_text(encoding="utf-8").split())
         self.assertIn("complete only through its citation", critic)
 

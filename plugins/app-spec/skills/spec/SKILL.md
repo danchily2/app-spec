@@ -256,8 +256,8 @@ For pass `n` from 1:
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/grade.py" OUT NAME_ARG
    ```
 
-2. Give `app-spec:spec-critic` the folder `OUT`, the spec's name and the evidence file's name (`<stem>.evidence.md`), the app root, the contract roots, the plugin folder
-   and, with `--bar`, the bar file. Tell it that it must open at least one cited range per use case, and that it
+2. Give `app-spec:spec-critic` the folder `OUT`, the spec's name and the evidence file's name
+   (`<stem>.evidence.md`), the app root, the contract roots, the plugin folder and, with `--bar`, the bar file. Tell it that it must open at least one cited range per use case, and that it
    cannot see a fact the code does not show, so it never asks for one. Save its JSON list as `OUT/critic-<n>.json`
    (`save_json.py OUT/answers/critic-<n>.txt OUT/critic-<n>.json --list`).
 3. Record the pass. This appends `{n, ledger: {pass}, grade: {pass}, critic: [findings]}` to `review.json` and
@@ -375,5 +375,7 @@ Report:
   automated analysis
 
 The next step is a person: they read `OUT/NAME` with `REVIEW.md` and `OPEN_QUESTIONS.md` before any plan or issue is
-made from it. Builders read `OUT/NAME`. Reviewers and `compare` read `OUT/<stem>.evidence.md`. Name it exactly: "Next: read `OUT/NAME`. After you edit it, run `/app-spec:review OUT`." Any time,
+made from it. Builders read `OUT/NAME`. Reviewers and `compare` read `OUT/<stem>.evidence.md`. A hand edit of either
+file is lost the next time `render.py spec` runs, so say that a lasting change goes in `prose.json`, `overrides.json`
+or the catalogs. Name it exactly: "Next: read `OUT/NAME`. After you edit it, run `/app-spec:review OUT`." Any time,
 `/app-spec:status OUT` says where the run stands.
