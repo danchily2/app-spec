@@ -5,6 +5,8 @@ changes.
 
 ## Unreleased
 
+- **Status reads the evidence spec.** It checks the coverage appendix and the file times against the evidence file
+  too, and sends a folder that has only the old single spec back to `render.py spec`.
 - **The grader checks that the builder spec stands without the code.** A new `self-contained` check fails on a leftover
   citation, a string key with no text in Appendix D, a sentence that points the reader to the code, and a sentence
   left with nothing after its preposition.

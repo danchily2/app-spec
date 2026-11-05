@@ -153,7 +153,10 @@ def _stale(dest, spec_name):
     """What is out of date, in pipeline order. Each review pass runs the ledger, then the spec (its Appendix F reads
     ledger.json), then the grader (it reads the spec): the ledger is compared with what it reads, never the spec."""
     lines = []
-    spec_t = _mtime(dest, spec_name)
+    builder_t = _mtime(dest, spec_name)
+    evidence_t = _mtime(dest, evidence_name(spec_name))
+    # The spec is two files: compare with the older, so a half-refreshed pair is stale.
+    spec_t = min(builder_t, evidence_t) if builder_t is not None and evidence_t is not None else builder_t
     if _newer(_mtime(dest, "module.json"), _mtime(dest, "inventory.json")) and os.path.isfile(os.path.join(dest, "inventory.json")):
         lines.append("the inventory predates module.json: re-run inventory.py")
     catalogs_t = _oldest(dest, CATALOGS)
@@ -164,6 +167,8 @@ def _stale(dest, spec_name):
     for name in (*CATALOGS, "overrides.json"):
         if _newer(_mtime(dest, name), ledger_t):
             lines.append(f"the ledger predates {name}: run ledger.py")
+    if builder_t is not None and evidence_t is None:
+        lines.append("the spec predates the evidence split: re-run render.py spec")
     for name in (*CATALOGS, "overrides.json", "prose.json"):
         if _newer(_mtime(dest, name), spec_t):
             lines.append(f"the spec predates {name}: re-run render.py spec")

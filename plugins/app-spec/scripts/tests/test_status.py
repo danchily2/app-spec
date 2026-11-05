@@ -14,7 +14,7 @@ import status
 
 ORDER = ("app-spec.json", "module.json", "inventory.json", "fields.json", "understand_result.json",
          "rules_result.json", "use-cases.json", "screens.json", "flows.json", "rules.json", "endpoints.json",
-         "overrides.json", "prose.json", "ledger.json", "SPEC.md", "grade.json", "review.json")  # each pass: ledger, spec, grade
+         "overrides.json", "prose.json", "ledger.json", "SPEC.md", "SPEC.evidence.md", "grade.json", "review.json")  # each pass: ledger, spec, grade
 BASE = time.time() - 10_000
 
 
@@ -209,6 +209,7 @@ class TestStatus(unittest.TestCase):
     def test_review_stale(self):
         dest = self.good()
         touch(dest, "SPEC.md", later=True)
+        touch(dest, "SPEC.evidence.md", later=True)  # a regenerated spec is both files
         stale = status.report(dest)["stale"]
         self.assertIn("the review predates the spec: run review", stale)
         self.assertEqual(cmd(dest), f"/app-spec:review {dest}")
@@ -216,6 +217,7 @@ class TestStatus(unittest.TestCase):
     def test_ledger_and_grade_staleness(self):
         dest = self.good()
         touch(dest, "SPEC.md", later=True)
+        touch(dest, "SPEC.evidence.md", later=True)  # a regenerated spec is both files
         stale = status.report(dest)["stale"]
         self.assertNotIn("the ledger predates the spec: run ledger.py", stale)  # the ledger does not read the spec
         self.assertIn("the grade predates the spec: run grade.py", stale)
@@ -248,6 +250,32 @@ class TestStatus(unittest.TestCase):
         dest = self.good()
         stamp(dest, "ledger.json", 145)
         self.assertEqual(status.report(dest)["stale"], [])
+
+    def test_old_folder_without_evidence_asks_for_render(self):
+        dest = self.good()
+        os.remove(os.path.join(dest, "SPEC.evidence.md"))
+        r = status.report(dest)
+        self.assertIn("the spec predates the evidence split: re-run render.py spec", r["stale"])
+        self.assertIn('render.py" spec', r["next"]["command"])
+        self.assertNotIn("grade.py", r["next"]["command"])
+
+    def test_coverage_read_from_evidence_file(self):
+        """Appendix F of the builder spec is a pointer; only the evidence file's Appendix F is compared."""
+        dest = self.good()
+        stamp(dest, "ledger.json", 145)  # newer than the spec, same numbers
+
+        def add_to_appendix_f(name):
+            path = os.path.join(dest, name)
+            with open(path, encoding="utf-8") as fh:
+                text = fh.read()
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(text.rstrip("\n") + "\n\nextra line\n")
+            stamp(dest, name, 125)
+
+        add_to_appendix_f("SPEC.md")
+        self.assertEqual(status.report(dest)["stale"], [])
+        add_to_appendix_f("SPEC.evidence.md")
+        self.assertIn("the spec predates ledger.json: re-run render.py spec", status.report(dest)["stale"])
 
     def test_prose_newer_than_the_spec_is_stale(self):
         dest = self.good()
@@ -309,9 +337,11 @@ class TestStatus(unittest.TestCase):
         cfg["options"] = {"specName": "my spec.md"}
         out.save(dest, "app-spec.json", cfg)
         shutil.copy(os.path.join(dest, "SPEC.md"), os.path.join(dest, "my spec.md"))
+        shutil.copy(os.path.join(dest, "SPEC.evidence.md"), os.path.join(dest, "my spec.evidence.md"))
         settle(dest)
         stamp(dest, "ledger.json", 115)
         stamp(dest, "my spec.md", 125)
+        stamp(dest, "my spec.evidence.md", 125)
         stamp(dest, "grade.json", 120)
         c = cmd(dest)
         self.assertTrue(c.endswith('grade.py" ' + dest + " --name 'my spec.md'"), c)
