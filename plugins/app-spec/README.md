@@ -126,8 +126,8 @@ full coverage says so: it hands over the spec with the gaps listed, never a clea
 - **Usage.** The workflows start one analyst per slice of about 9,000 lines, one referee per use case, one per rule and
   two per P0 rule. A large module means dozens of agents. Start with one module, not the whole app.
 - **Time.** A large module takes a long run. A run that stops is resumed with its run id, never restarted.
-- **The first draft is not final.** Read `SPEC.md` (`SPEC.evidence.md` has the citations) with `REVIEW.md` and `OPEN_QUESTIONS.md` before anyone
-  plans or files issues from it.
+- **The first draft is not final.** Read `SPEC.md` (`SPEC.evidence.md` has the citations) with `REVIEW.md` and
+  `OPEN_QUESTIONS.md` before anyone plans or files issues from it.
 - **What the code does not show stays `UNKNOWN`.** The plugin labels a fact it cannot find and asks. It does not guess.
 - **Re-runs keep your work.** `overrides.json` is never touched, and ids are never reused, so a re-run gives an item the
   same id.

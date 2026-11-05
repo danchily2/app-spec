@@ -5,6 +5,9 @@ changes.
 
 ## Unreleased
 
+- **Review says what it reads.** The spec and review skills tell the person that a lasting change goes in
+  `prose.json`, `overrides.json` or the catalogs, then `render.py spec`, then review, and that a hand edit of either
+  spec file is lost; `status` reports a builder spec edited after render; `compare` is named as a later reader.
 - **`self-contained` passes shapes the builder cleans.** `(see `A:3`).`, `(in `A:3`).` and `, see `A:3`.` no longer
   report dangling words, and a connector before a table cell's end now does.
 - **The builder spec keeps ` .name` and loses empty labels.** `as .api (`A:3`)` stays `as .api`; `Sources:.`, `task:;`

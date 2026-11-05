@@ -62,7 +62,7 @@ catalogs and ids.
   critic-<n>.json       the critic's findings of one pass, as returned
   review.json, REVIEW.md            the scorecard of every review pass          (reset by `spec`; `review` appends a pass)
   SPEC.md (or --name)   the builder spec: the deliverable, no code citations
-  SPEC.evidence.md      the same spec with every citation (<stem>.evidence.md); reviewers, the critic and compare read it
+  SPEC.evidence.md      the same spec with every citation (<stem>.evidence.md); reviewers and the critic read it (and, later, compare)
   OPEN_QUESTIONS.md
 ```
 

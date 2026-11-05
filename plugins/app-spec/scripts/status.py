@@ -167,6 +167,8 @@ def _stale(dest, spec_name):
     for name in (*CATALOGS, "overrides.json"):
         if _newer(_mtime(dest, name), ledger_t):
             lines.append(f"the ledger predates {name}: run ledger.py")
+    if _newer(builder_t, evidence_t):
+        lines.append(f"{spec_name} was edited after render; review reads the evidence file: re-run render.py spec")
     if builder_t is not None and evidence_t is None:
         lines.append("the spec predates the evidence split: re-run render.py spec")
     for name in (*CATALOGS, "overrides.json", "prose.json"):

@@ -1,6 +1,6 @@
 ---
 name: review
-description: Re-grades an app-spec spec that a person may have edited. Runs the coverage ledger, the shape grader and the spec critic on the current spec, appends one pass to review.json and rewrites REVIEW.md; it changes nothing in the spec. With --accept, offers each uncovered inventory item and records the reason a person gives in overrides.json. Use after editing a spec written by /app-spec:spec, or to see what still blocks it.
+description: Re-grades an app-spec spec after a change to its prose.json, overrides.json or catalogs and a new render. Runs the coverage ledger, the shape grader and the spec critic on the current spec, appends one pass to review.json and rewrites REVIEW.md; it changes nothing in the spec. With --accept, offers each uncovered inventory item and records the reason a person gives in overrides.json. Use after changing prose.json, overrides.json or the catalogs and running render.py spec, or to see what still blocks the spec. It reads the evidence file, so a hand edit of the builder spec is not reviewed.
 argument-hint: "<out> [--accept]"
 ---
 
@@ -87,6 +87,6 @@ named, and the reasons recorded. Name the next command exactly:
   then `/app-spec:review OUT`."
 - Otherwise: "Next: a person reads `OUT/NAME`; it is ready for planning."
 
-Then say, in one sentence: "The critic and the grader read `OUT/<stem>.evidence.md`, and `OUT/NAME` is rebuilt from it
-by `render.py spec`, which also overwrites any hand edit of either file, so put a lasting change in `prose.json`,
-`overrides.json` or the catalogs."
+Then say, in one sentence: "The critic and the grader read `OUT/<stem>.evidence.md`; `OUT/NAME` and the evidence file
+are both rendered from the catalogs by `render.py spec`, which overwrites any hand edit of either file, so put a
+lasting change in `prose.json`, `overrides.json` or the catalogs and render again."

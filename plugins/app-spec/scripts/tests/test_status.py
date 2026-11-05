@@ -277,6 +277,12 @@ class TestStatus(unittest.TestCase):
         add_to_appendix_f("SPEC.evidence.md")
         self.assertIn("the spec predates ledger.json: re-run render.py spec", status.report(dest)["stale"])
 
+    def test_a_builder_spec_edited_after_render_is_reported(self):
+        dest = self.good()
+        touch(dest, "SPEC.md", later=True)
+        self.assertIn("SPEC.md was edited after render; review reads the evidence file: re-run render.py spec",
+                      status.report(dest)["stale"])
+
     def test_prose_newer_than_the_spec_is_stale(self):
         dest = self.good()
         out.save(dest, "prose.json", {"summary": "x"})
